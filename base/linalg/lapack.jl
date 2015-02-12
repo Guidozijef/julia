@@ -3671,7 +3671,7 @@ for (gees, gges, elty) in
     ((:dgees_,:dgges_,:Float64),
      (:sgees_,:sgges_,:Float32))
     @eval begin
-        function gees!(jobvs::Char, A::StridedMatrix{$elty})
+        function gees!(jobvs::Char, A::StridedMatrix{$elty}, selctg::Ptr{Void} = C_NULL)
 #     .. Scalar Arguments ..
 #     CHARACTER          JOBVS, SORT
 #     INTEGER            INFO, LDA, LDVS, LWORK, N, SDIM
@@ -3682,10 +3682,17 @@ for (gees, gges, elty) in
 #    $                   WR( * )
             chkstride1(A)
             n = chksquare(A)
+            if selctg != C_NULL
+                sort = 'S'
+                bwork = Array(BlasInt, n)
+            else
+                sort = 'N'
+                bwork = Array(BlasInt, 0)
+            end
             sdim = Array(BlasInt, 1)
             wr = similar(A, $elty, n)
             wi = similar(A, $elty, n)
-            ldvs = jobvs == 'V' ? n : 1
+            ldvs = jobvs == 'V' ? n : 0
             vs = similar(A, $elty, ldvs, n)
             work = Array($elty, 1)
             lwork = BlasInt(-1)
@@ -3696,10 +3703,10 @@ for (gees, gges, elty) in
                         Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{$elty},
                         Ptr{$elty}, Ptr{$elty}, Ptr{BlasInt}, Ptr{$elty},
                         Ptr{BlasInt}, Ptr{Void}, Ptr{BlasInt}),
-                    &jobvs, &'N', C_NULL, &n,
+                    &jobvs, &sort, selctg, &n,
                         A, &max(1, stride(A, 2)), sdim, wr,
-                        wi, vs, &ldvs, work,
-                        &lwork, C_NULL, info)
+                        wi, vs, &max(1, ldvs), work,
+                        &lwork, bwork, info)
                 @lapackerror
                 if lwork < 0
                     lwork = BlasInt(real(work[1]))
@@ -3708,7 +3715,7 @@ for (gees, gges, elty) in
             end
             A, vs, all(wi .== 0) ? wr : complex(wr, wi)
         end
-        function gges!(jobvsl::Char, jobvsr::Char, A::StridedMatrix{$elty}, B::StridedMatrix{$elty})
+        function gges!(jobvsl::Char, jobvsr::Char, A::StridedMatrix{$elty}, B::StridedMatrix{$elty}, selctg::Ptr{Void} = C_NULL)
 # *     .. Scalar Arguments ..
 #       CHARACTER          JOBVSL, JOBVSR, SORT
 #       INTEGER            INFO, LDA, LDB, LDVSL, LDVSR, LWORK, N, SDIM
@@ -3724,12 +3731,19 @@ for (gees, gges, elty) in
                 throw(DimensionMismatch("Dimensions of A, ($n,$n), and B, ($m,$m), must match"))
             end
             sdim = BlasInt(0)
+            if selctg != C_NULL
+                sort = 'S'
+                bwork = Array(BlasInt, n)
+            else
+                sort = 'N'
+                bwork = Array(BlasInt, 0)
+            end
             alphar = similar(A, $elty, n)
             alphai = similar(A, $elty, n)
             beta = similar(A, $elty, n)
-            ldvsl = jobvsl == 'V' ? n : 1
+            ldvsl = jobvsl == 'V' ? n : 0
             vsl = similar(A, $elty, ldvsl, n)
-            ldvsr = jobvsr == 'V' ? n : 1
+            ldvsr = jobvsr == 'V' ? n : 0
             vsr = similar(A, $elty, ldvsr, n)
             work = Array($elty, 1)
             lwork = BlasInt(-1)
@@ -3742,11 +3756,11 @@ for (gees, gges, elty) in
                         Ptr{$elty}, Ptr{$elty}, Ptr{BlasInt}, Ptr{$elty},
                         Ptr{BlasInt}, Ptr{$elty}, Ptr{BlasInt}, Ptr{Void},
                         Ptr{BlasInt}),
-                    &jobvsl, &jobvsr, &'N', C_NULL,
+                    &jobvsl, &jobvsr, &sort, selctg,
                     &n, A, &max(1,stride(A, 2)), B,
                     &max(1,stride(B, 2)), &sdim, alphar, alphai,
-                    beta, vsl, &ldvsl, vsr,
-                    &ldvsr, work, &lwork, C_NULL,
+                    beta, vsl, &max(1, ldvsl), vsr,
+                    &max(1, ldvsr), work, &lwork, bwork,
                     info)
                 if i == 1
                     lwork = BlasInt(real(work[1]))
@@ -3762,7 +3776,7 @@ for (gees, gges, elty, relty) in
     ((:zgees_,:zgges_,:Complex128,:Float64),
      (:cgees_,:cgges_,:Complex64,:Float32))
     @eval begin
-        function gees!(jobvs::Char, A::StridedMatrix{$elty})
+        function gees!(jobvs::Char, A::StridedMatrix{$elty}, selctg::Ptr{Void} = C_NULL)
 # *     .. Scalar Arguments ..
 #       CHARACTER          JOBVS, SORT
 #       INTEGER            INFO, LDA, LDVS, LWORK, N, SDIM
@@ -3773,10 +3787,16 @@ for (gees, gges, elty, relty) in
 #       COMPLEX*16         A( LDA, * ), VS( LDVS, * ), W( * ), WORK( * )
             chkstride1(A)
             n = chksquare(A)
-            sort = 'N'
             sdim = BlasInt(0)
+            if selctg != C_NULL
+                sort = 'S'
+                bwork = Array(BlasInt, n)
+            else
+                sort = 'N'
+                bwork = Array(BlasInt, 0)
+            end
             w = similar(A, $elty, n)
-            ldvs = jobvs == 'V' ? n : 1
+            ldvs = jobvs == 'V' ? n : 0
             vs = similar(A, $elty, ldvs, n)
             work = Array($elty, 1)
             lwork = BlasInt(-1)
@@ -3788,10 +3808,10 @@ for (gees, gges, elty, relty) in
                         Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{$elty},
                         Ptr{$elty}, Ptr{BlasInt}, Ptr{$elty}, Ptr{BlasInt},
                         Ptr{$relty}, Ptr{Void}, Ptr{BlasInt}),
-                    &jobvs, &sort, C_NULL, &n,
+                    &jobvs, &sort, selctg, &n,
                         A, &max(1, stride(A, 2)), &sdim, w,
-                        vs, &ldvs, work, &lwork,
-                        rwork, C_NULL, info)
+                        vs, &max(1, ldvs), work, &lwork,
+                        rwork, bwork, info)
                 @lapackerror
                 if lwork < 0
                     lwork = BlasInt(real(work[1]))
@@ -3800,7 +3820,7 @@ for (gees, gges, elty, relty) in
             end
             A, vs, w
         end
-        function gges!(jobvsl::Char, jobvsr::Char, A::StridedMatrix{$elty}, B::StridedMatrix{$elty})
+        function gges!(jobvsl::Char, jobvsr::Char, A::StridedMatrix{$elty}, B::StridedMatrix{$elty}, selctg::Ptr{Void} = C_NULL)
 # *     .. Scalar Arguments ..
 #       CHARACTER          JOBVSL, JOBVSR, SORT
 #       INTEGER            INFO, LDA, LDB, LDVSL, LDVSR, LWORK, N, SDIM
@@ -3817,11 +3837,18 @@ for (gees, gges, elty, relty) in
                 throw(DimensionMismatch("Dimensions of A, ($n,$n), and B, ($m,$m), must match"))
             end
             sdim = BlasInt(0)
+            if selctg != C_NULL
+                sort = 'S'
+                bwork = Array(BlasInt, n)
+            else
+                sort = 'N'
+                bwork = Array(BlasInt, 0)
+            end
             alpha = similar(A, $elty, n)
             beta = similar(A, $elty, n)
-            ldvsl = jobvsl == 'V' ? n : 1
+            ldvsl = jobvsl == 'V' ? n : 0
             vsl = similar(A, $elty, ldvsl, n)
-            ldvsr = jobvsr == 'V' ? n : 1
+            ldvsr = jobvsr == 'V' ? n : 0
             vsr = similar(A, $elty, ldvsr, n)
             work = Array($elty, 1)
             lwork = BlasInt(-1)
@@ -3835,11 +3862,11 @@ for (gees, gges, elty, relty) in
                         Ptr{$elty}, Ptr{BlasInt}, Ptr{$elty}, Ptr{BlasInt},
                         Ptr{$elty}, Ptr{BlasInt}, Ptr{$relty}, Ptr{Void},
                         Ptr{BlasInt}),
-                    &jobvsl, &jobvsr, &'N', C_NULL,
+                    &jobvsl, &jobvsr, &sort, selctg,
                     &n, A, &max(1, stride(A, 2)), B,
                     &max(1, stride(B, 2)), &sdim, alpha, beta,
-                    vsl, &ldvsl, vsr, &ldvsr,
-                    work, &lwork, rwork, C_NULL,
+                    vsl, &max(1, ldvsl), vsr, &max(1, ldvsr),
+                    work, &lwork, rwork, bwork,
                     info)
                 if i == 1
                     lwork = BlasInt(real(work[1]))

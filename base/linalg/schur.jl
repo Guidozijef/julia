@@ -10,10 +10,18 @@ end
 Schur{Ty}(T::AbstractMatrix{Ty}, Z::AbstractMatrix{Ty}, values::Vector) = Schur{Ty, typeof(T)}(T, Z, values)
 
 schurfact!{T<:BlasFloat}(A::StridedMatrix{T}) = Schur(LinAlg.LAPACK.gees!('V', A)...)
+function schurfact!{T<:BlasReal}(A::StridedMatrix{T}, select::Function)
+    p = cfunction(select, BlasInt, (Ref{T}, Ref{T}))
+    return Schur(LinAlg.LAPACK.gees!('V', A, p)...)
+end
+function schurfact!{T<:BlasComplex}(A::StridedMatrix{T}, select::Function)
+    p = cfunction(select, BlasInt, (Ref{T},))
+    return Schur(LinAlg.LAPACK.gees!('V', A, p)...)
+end
 schurfact{T<:BlasFloat}(A::StridedMatrix{T}) = schurfact!(copy(A))
-function schurfact{T}(A::StridedMatrix{T})
+function schurfact{T}(A::StridedMatrix{T}, args::Function...)
     S = promote_type(Float32, typeof(one(T)/norm(one(T))))
-    return schurfact!(copy_oftype(A, S))
+    return schurfact!(copy_oftype(A, S), args...)
 end
 
 function getindex(F::Schur, d::Symbol)
@@ -28,8 +36,8 @@ function getindex(F::Schur, d::Symbol)
     end
 end
 
-function schur(A::StridedMatrix)
-    SchurF = schurfact(A)
+function schur(A::StridedMatrix, args::Function...)
+    SchurF = schurfact(A, args...)
     SchurF[:T], SchurF[:Z], SchurF[:values]
 end
 
@@ -50,10 +58,18 @@ end
 GeneralizedSchur{Ty}(S::AbstractMatrix{Ty}, T::AbstractMatrix{Ty}, alpha::Vector, beta::Vector{Ty}, Q::AbstractMatrix{Ty}, Z::AbstractMatrix{Ty}) = GeneralizedSchur{Ty, typeof(S)}(S, T, alpha, beta, Q, Z)
 
 schurfact!{T<:BlasFloat}(A::StridedMatrix{T}, B::StridedMatrix{T}) = GeneralizedSchur(LinAlg.LAPACK.gges!('V', 'V', A, B)...)
+function schurfact!{T<:BlasReal}(A::StridedMatrix{T}, B::StridedMatrix{T}, select::Function)
+    p = cfunction(select, BlasInt, (Ref{T}, Ref{T}, Ref{T}))
+    return GeneralizedSchur(LAPACK.gges!('V', 'V', A, B, p))
+end
+function schurfact!{T<:BlasComplex}(A::StridedMatrix{T}, B::StridedMatrix{T}, select::Function)
+    p = cfunction(select, BlasInt, (Ref{T}, Ref{T}))
+    return GeneralizedSchur(LAPACK.gges!('V', 'V', A, B, p))
+end
 schurfact{T<:BlasFloat}(A::StridedMatrix{T},B::StridedMatrix{T}) = schurfact!(copy(A),copy(B))
-function schurfact{TA,TB}(A::StridedMatrix{TA}, B::StridedMatrix{TB})
+function schurfact{TA,TB}(A::StridedMatrix{TA}, B::StridedMatrix{TB}, args::Function...)
     S = promote_type(Float32, typeof(one(TA)/norm(one(TA))), TB)
-    return schurfact!(copy_oftype(A, S), copy_oftype(B, S))
+    return schurfact!(copy_oftype(A, S), copy_oftype(B, S), args...)
 end
 
 ordschur!{Ty<:BlasFloat}(S::StridedMatrix{Ty}, T::StridedMatrix{Ty}, Q::StridedMatrix{Ty}, Z::StridedMatrix{Ty}, select::Union{Vector{Bool},BitVector}) = GeneralizedSchur(LinAlg.LAPACK.tgsen!(convert(Vector{BlasInt}, select), S, T, Q, Z)...)
@@ -81,8 +97,8 @@ function getindex(F::GeneralizedSchur, d::Symbol)
     end
 end
 
-function schur(A::StridedMatrix, B::StridedMatrix)
-    SchurF = schurfact(A, B)
+function schur(A::StridedMatrix, B::StridedMatrix, args...)
+    SchurF = schurfact(A, B, args...)
     SchurF[:S], SchurF[:T], SchurF[:Q], SchurF[:Z]
 end
 
