@@ -318,17 +318,20 @@ end
 
 ## higher-order functions ##
 
-map(f::Callable, d::DArray) = DArray(I->map(f, localpart(d)), d)
+map(f, d::DArray) = DArray(I->map(f, localpart(d)), d)
 
-reduce(f::Function, d::DArray) =
+reduce(f, d::DArray) =
     mapreduce(fetch, f,
               Any[ @spawnat p reduce(f, localpart(d)) for p in procs(d) ])
 
-mapreduce(f :: Function, opt :: Function, d :: DArray) =
-    mapreduce(fetch, opt,
-              Any[ @spawnat p mapreduce(f, opt, localpart(d)) for p in procs(d) ])
+mapreduce(f, op::Function, d::DArray) = mapreduce_darray(f, op, d)
+mapreduce(f, op, d::DArray) = mapreduce_darray(f, op, d)
 
-function map!(f::Callable, d::DArray)
+mapreduce_darray(f, op, d :: DArray) =
+    mapreduce(fetch, op,
+              Any[ @spawnat p mapreduce(f, op, localpart(d)) for p in procs(d) ])
+
+function map!(f, d::DArray)
     @sync begin
         for p in procs(d)
             @spawnat p map!(f, localpart(d))
