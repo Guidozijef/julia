@@ -202,9 +202,9 @@ function mmap_array{T,N}(::Type{T}, dims::NTuple{N,Integer}, s::Union(IO,SharedM
 end
 
 # Mmapped-bitarray constructor
-mmap_array{N}(::Type{Bool}, dims::NTuple{N,Integer}, s::IOStream, offset::FileOffset) =
+mmap_bitarray{N}(::Type{Bool}, dims::NTuple{N,Integer}, s::IOStream, offset::FileOffset) =
     mmap_bitarray(dims, s, offset)
-mmap_array{N}(::Type{Bool}, dims::NTuple{N,Integer}, s::IOStream) = mmap_bitarray(dims, s, position(s))
+mmap_bitarray{N}(::Type{Bool}, dims::NTuple{N,Integer}, s::IOStream) = mmap_bitarray(dims, s, position(s))
 
 function mmap_bitarray{N}(dims::NTuple{N,Integer}, s::IOStream, offset::FileOffset=position(s))
     iswrite = !isreadonly(s)

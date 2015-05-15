@@ -402,7 +402,7 @@ end # @unix_only
 function _shm_mmap_array(T, dims, shm_seg_name, mode)
     readonly = !((mode & JL_O_RDWR) == JL_O_RDWR)
     create = (mode & JL_O_CREAT) == JL_O_CREAT
-    s = SharedMemSpec(shm_seg_name, readonly, create)
+    s = Mmap.SharedMemSpec(shm_seg_name, readonly, create)
     mmap_array(T, dims, s, zero(FileOffset))
 end
 
