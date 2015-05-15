@@ -9,9 +9,9 @@ type Stream # <: IO
     mmaphandle::Ptr{Void} # only needed on windows
     len::Int
     offset::Int
-    name::AbstractString
+    name
 
-    Stream(v::Ptr{Void},m::Ptr{Void},len::Int,o::Int,n::AbstractString) = new(v,m,len,o,n)
+    Stream(v::Ptr{Void},m::Ptr{Void},len::Int,o::Int,n) = new(v,m,len,o,n)
 
     @unix_only begin
     function Stream(len::Integer, prot::Integer, flags::Integer, fd, offset::Integer, name::AbstractString="")
@@ -37,7 +37,7 @@ type Stream # <: IO
     end # @unix_only
 
     @windows_only begin
-        function Stream(len::Integer, hdl::Int, readonly::Bool, create::Bool, offset::Integer, name::AbstractString="")
+        function Stream(len::Integer, hdl, readonly::Bool, create::Bool, offset::Integer, name)
             granularity::Int = ccall(:jl_getallocationgranularity, Clong, ())
             if len < 0
                 throw(ArgumentError("requested size must be ≥ 0, got $len"))
@@ -53,18 +53,18 @@ type Stream # <: IO
             if create
                 flprotect = readonly ? 0x02 : 0x04
                 mmaphandle = ccall(:CreateFileMappingW, stdcall, Ptr{Void}, (Cptrdiff_t, Ptr{Void}, Cint, Cint, Cint, Cwstring),
-                    hdl, C_NULL, flprotect, szfile>>32, szfile&typemax(UInt32), utf16(name))
+                    hdl, C_NULL, flprotect, szfile>>32, szfile&typemax(UInt32), name)
             else
                 mmaphandle = ccall(:OpenFileMappingW, stdcall, Ptr{Void}, (Cint, Cint, Cwstring),
                     access, true, name)
             end
             if mmaphandle == C_NULL
-                error("could not create file mapping: $(FormatMessage())")
+                error("could not create file mapping: $(Base.FormatMessage())")
             end
             viewhandle = ccall(:MapViewOfFile, stdcall, Ptr{Void}, (Ptr{Void}, Cint, Cint, Cint, Csize_t),
                 mmaphandle, access, offset_page>>32, offset_page&typemax(UInt32), szarray)
             if viewhandle == C_NULL
-                error("could not create mapping view: $(FormatMessage())")
+                error("could not create mapping view: $(Base.FormatMessage())")
             end
             stream = new(viewhandle,mmaphandle,szarray,Int(offset-offset_page),name)
             finalizer(stream,close)
@@ -81,7 +81,7 @@ function Base.close(m::Stream)
         status = ccall(:UnmapViewOfFile, stdcall, Cint, (Ptr{Void},), m.viewhandle)!=0
         status |= ccall(:CloseHandle, stdcall, Cint, (Ptr{Void},), m.mmaphandle)!=0
         if !status
-            error("could not unmap view: $(FormatMessage())")
+            error("could not unmap view: $(Base.FormatMessage())")
         end
     end
 end
@@ -98,7 +98,7 @@ function sync!(p::Ptr, len::Integer, flags::Integer=MS_SYNC)
     @unix_only systemerror("msync", ccall(:msync, Cint, (Ptr{Void}, Csize_t, Cint), p, len, flags) != 0)
     @windows_only begin
         status = ccall(:FlushViewOfFile, stdcall, Cint, (Ptr{Void}, Csize_t), p, len)!=0
-        status || error("could not msync: $(FormatMessage())")
+        status || error("could not msync: $(Base.FormatMessage())")
     end
 end
 
@@ -182,11 +182,9 @@ function mmap_array{T,N}(::Type{T}, dims::NTuple{N,Integer}, s::Union(IO,SharedM
 
     @windows_only begin
         if isa(s,IO)
-            hdl = _get_osfhandle(RawFD(fd(s))).handle
-            if Int(hdl) == -1
-                throw(ArgumentError("could not get handle for file to map: $(FormatMessage())"))
-            end
-            name = isdefined(s,:name) ? s.name : ""
+            hdl::Int = Base._get_osfhandle(RawFD(fd(s))).handle
+            hdl == -1 && throw(ArgumentError("could not get handle for file to map: $(Base.FormatMessage())"))
+            name = Ptr{Cwchar_t}(C_NULL)
             ro = isreadonly(s)
             create = true
         else
