@@ -12,6 +12,7 @@ export
     Sys,
     Test,
     Libc,
+    Mmap,
     Libdl,
     LinAlg,
     BLAS,

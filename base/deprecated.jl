@@ -327,7 +327,6 @@ end
 @deprecate strftime     Libc.strftime
 @deprecate strptime     Libc.strptime
 @deprecate flush_cstdio Libc.flush_cstdio
-@deprecate mmap         Libc.mmap
 @deprecate c_free       Libc.free
 @deprecate c_malloc     Libc.malloc
 @deprecate c_calloc     Libc.calloc
@@ -440,3 +439,25 @@ export float32_isvalid, float64_isvalid
 @deprecate (&)(x::Char, y::Char)  Char(UInt32(x) & UInt32(y))
 @deprecate (|)(x::Char, y::Char)  Char(UInt32(x) | UInt32(y))
 @deprecate ($)(x::Char, y::Char)  Char(UInt32(x) $ UInt32(y))
+
+function mmap(len::Integer, prot::Integer, flags::Integer, fd, offset::Integer)
+    depwarn("`mmap` is deprecated, use `Mmap.Stream` instead")
+    m = Mmap.Stream(len,prot,flags,fd,offset)
+    return m.viewhandle, m.offset
+end
+
+function munmap(p::Ptr,len::Integer)
+    depwarn("`munmap` is deprecated, use `close(::Mmap.Stream)` instead")
+    systemerror("munmap", ccall(:munmap,Cint,(Ptr{Void},Int),m.viewhandle,m.len) != 0)
+end
+
+function munmap(viewhandle::Ptr,mmaphandle::Ptr)
+    depwarn("`munmap` is deprecated, use `close(::Mmap.Stream)` instead")
+    status = ccall(:UnmapViewOfFile, stdcall, Cint, (Ptr{Void},), m.viewhandle)!=0
+    status |= ccall(:CloseHandle, stdcall, Cint, (Ptr{Void},), m.mmaphandle)!=0
+    if !status
+        error("could not unmap view: $(FormatMessage())")
+    end
+end
+
+@deprecate msync Mmap.sync!
