@@ -103,7 +103,7 @@ include("iostream.jl")
 
 # system & environment
 include("libc.jl")
-using .Libc: getpid, gethostname, time, msync
+using .Libc: getpid, gethostname, time
 include("libdl.jl")
 using .Libdl: DL_LOAD_PATH
 include("env.jl")
@@ -216,6 +216,7 @@ include("poll.jl")
 
 # memory-mapped and shared arrays
 include("mmap.jl")
+using .Mmap
 include("sharedarray.jl")
 
 # utilities - timing, help, edit
