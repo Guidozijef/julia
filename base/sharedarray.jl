@@ -54,7 +54,7 @@ function SharedArray(T::Type, dims::NTuple; init=false, pids=Int[])
         shm_seg_name = @sprintf("/jl%06u%s", getpid() % 10^6, randstring(20))
         if onlocalhost
             shmmem_create_pid = myid()
-            s = shm_mmap_array(T, dims, shm_seg_name, JL_O_CREAT | Base.JL_O_RDWR)
+            s = shm_mmap_array(T, dims, shm_seg_name, JL_O_CREAT | JL_O_RDWR)
         else
             # The shared array is created on a remote machine....
             shmmem_create_pid = pids[1]

@@ -54,11 +54,18 @@ type SharedMemSpec <: IO
     readonly::Bool
     create::Bool
 end
-fd(sh::SharedMemSpec) = -2 # -1 == INVALID_HANDLE_VALUE
-gethandle(io::SharedMemSpec) = -1
-gethandle(io::IO) = systemerror("could not get handle for file to map: $(Base.FormatMessage())",Base._get_osfhandle(RawFD(fd(io))).handle == -1)
 
-settings(io::SharedMemSpec) = utf16(sh.name), sh.readonly, sh.create
+Base.fd(sh::SharedMemSpec) = -2 # -1 == INVALID_HANDLE_VALUE
+
+const INVALID_HANDLE_VALUE = -1
+gethandle(io::SharedMemSpec) = INVALID_HANDLE_VALUE
+function gethandle(io::IO)
+    handle = Base._get_osfhandle(RawFD(fd(io))).handle
+    systemerror("could not get handle for file to map: $(Base.FormatMessage())", handle == -1)
+    return Int(handle)
+end
+
+settings(sh::SharedMemSpec) = utf16(sh.name), sh.readonly, sh.create
 settings(io::IO) = Ptr{Cwchar_t}(C_NULL), isreadonly(io), true
 
 # Memory mapped file constants
@@ -139,6 +146,7 @@ function Base.close(m::Stream)
         status |= ccall(:CloseHandle, stdcall, Cint, (Ptr{Void},), m.handle)!=0
         status || error("could not unmap view: $(Base.FormatMessage())")
     end
+    return
 end
 
 function Base.read(from::Stream, ::Type{UInt8})
@@ -164,7 +172,7 @@ sync!(B::BitArray)    = sync!(pointer(B.chunks), length(B.chunks)*sizeof(UInt64)
 function sync!(p::Ptr, len::Integer, flags::Integer=MS_SYNC)
     @unix_only systemerror("msync", ccall(:msync, Cint, (Ptr{Void}, Csize_t, Cint), p, len, flags) != 0)
     @windows_only systemerror("could not FlushViewOfFile: $(Base.FormatMessage())",
-                    ccall(:FlushViewOfFile, stdcall, Cint, (Ptr{Void}, Csize_t), p, len) != 0)
+                    ccall(:FlushViewOfFile, stdcall, Cint, (Ptr{Void}, Csize_t), p, len) == 0)
 end
 
 # Mmapped-array constructor

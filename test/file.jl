@@ -228,6 +228,7 @@ close(s)
 c=nothing; gc(); gc();
 c = Mmap.Array(file, 5, 6)
 @test c == "World".data
+c=nothing; gc(); gc();
 
 # test Mmap.Stream
 m = Mmap.Stream(file)
@@ -295,12 +296,14 @@ b = Mmap.BitArray((17,13), s)
 @test b == trues(17,13)
 @test_throws ArgumentError Mmap.BitArray((7,3), s)
 close(s)
+b=nothing; gc(); gc();
 s = open(file, "r+")
 b = Mmap.BitArray((17,19), s)
 rand!(b)
 Mmap.sync!(b)
 b0 = copy(b)
 close(s)
+b=nothing; gc(); gc();
 s = open(file, "r")
 @test isreadonly(s)
 b = Mmap.BitArray((17,19), s)
