@@ -54,7 +54,7 @@ function SharedArray(T::Type, dims::NTuple; init=false, pids=Int[])
         shm_seg_name = @sprintf("/jl%06u%s", getpid() % 10^6, randstring(20))
         if onlocalhost
             shmmem_create_pid = myid()
-            s = shm_mmap_array(T, dims, shm_seg_name, JL_O_CREAT | JL_O_RDWR)
+            s = shm_mmap_array(T, dims, shm_seg_name, JL_O_CREAT | Base.JL_O_RDWR)
         else
             # The shared array is created on a remote machine....
             shmmem_create_pid = pids[1]
@@ -387,7 +387,7 @@ function _shm_mmap_array(T, dims, shm_seg_name, mode)
         systemerror("ftruncate() failed for shm segment " * shm_seg_name, rc != 0)
     end
 
-    Mmap.Array(T, dims, s; grow=false)
+    Mmap.Array(T, dims, s, 0; grow=false)
 end
 
 shm_unlink(shm_seg_name) = ccall(:shm_unlink, Cint, (Cstring,), shm_seg_name)
@@ -401,7 +401,7 @@ function _shm_mmap_array(T, dims, shm_seg_name, mode)
     readonly = !((mode & JL_O_RDWR) == JL_O_RDWR)
     create = (mode & JL_O_CREAT) == JL_O_CREAT
     s = Mmap.SharedMemSpec(shm_seg_name, readonly, create)
-    Mmap.Array(T, dims, s)
+    Mmap.Array(T, dims, s, 0)
 end
 
 # no-op in windows

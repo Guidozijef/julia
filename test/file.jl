@@ -196,16 +196,16 @@ write(s, "Hello World\n")
 close(s)
 s = open(file, "r")
 @test isreadonly(s) == true
-c = mmap_array(UInt8, (11,), s)
+c = Mmap.Array(UInt8, (11,), s)
 @test c == "Hello World".data
-c = mmap_array(UInt8, (UInt16(11),), s)
+c = Mmap.Array(UInt8, (UInt16(11),), s)
 @test c == "Hello World".data
-@test_throws ArgumentError mmap_array(UInt8, (Int16(-11),), s)
-@test_throws ArgumentError mmap_array(UInt8, (typemax(UInt),), s)
+@test_throws ArgumentError Mmap.Array(UInt8, (Int16(-11),), s)
+@test_throws ArgumentError Mmap.Array(UInt8, (typemax(UInt),), s)
 close(s)
 s = open(file, "r+")
 @test isreadonly(s) == false
-c = mmap_array(UInt8, (11,), s)
+c = Mmap.Array(UInt8, (11,), s)
 c[5] = UInt8('x')
 Mmap.sync!(c)
 close(s)
@@ -215,6 +215,74 @@ close(s)
 @test startswith(str, "Hellx World")
 c=nothing; gc(); gc(); # cause munmap finalizer to run & free resources
 
+c = Mmap.Array(file)
+@test c == "Hellx World\n".data
+c=nothing; gc(); gc();
+c = Mmap.Array(file, 3)
+@test c == "Hel".data
+c=nothing; gc(); gc();
+s = open(file, "r")
+c = Mmap.Array(s, 6)
+@test c == "Hellx ".data
+close(s)
+c=nothing; gc(); gc();
+c = Mmap.Array(file, 5, 6)
+@test c == "World".data
+
+# test Mmap.Stream
+m = Mmap.Stream(file)
+c = Mmap.read(m,UInt8)
+@test c == "H".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "e".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "l".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "l".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "x".data[1]
+c = Mmap.read(m,UInt8)
+@test c == " ".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "W".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "o".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "r".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "l".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "d".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "\n".data[1]
+@test_throws EOFError Mmap.read(m,UInt8)
+close(m)
+@test_throws EOFError Mmap.read(m,UInt8)
+
+m = Mmap.Stream(file,6)
+c = Mmap.read(m,UInt8)
+@test c == "H".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "e".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "l".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "l".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "x".data[1]
+c = Mmap.read(m,UInt8)
+@test c == " ".data[1]
+@test_throws EOFError Mmap.read(m,UInt8)
+close(m)
+
+m = Mmap.Stream(file,2,6)
+c = Mmap.read(m,UInt8)
+@test c == "W".data[1]
+c = Mmap.read(m,UInt8)
+@test c == "o".data[1]
+@test_throws EOFError Mmap.read(m,UInt8)
+close(m)
+
 s = open(file, "w")
 write(s, [0xffffffffffffffff,
           0xffffffffffffffff,
@@ -223,19 +291,19 @@ write(s, [0xffffffffffffffff,
 close(s)
 s = open(file, "r")
 @test isreadonly(s)
-b = mmap_bitarray((17,13), s)
+b = Mmap.BitArray((17,13), s)
 @test b == trues(17,13)
-@test_throws ArgumentError mmap_bitarray((7,3), s)
+@test_throws ArgumentError Mmap.BitArray((7,3), s)
 close(s)
 s = open(file, "r+")
-b = mmap_bitarray((17,19), s)
+b = Mmap.BitArray((17,19), s)
 rand!(b)
 Mmap.sync!(b)
 b0 = copy(b)
 close(s)
 s = open(file, "r")
 @test isreadonly(s)
-b = mmap_bitarray((17,19), s)
+b = Mmap.BitArray((17,19), s)
 @test b == b0
 close(s)
 b=nothing; b0=nothing; gc(); gc(); # cause munmap finalizer to run & free resources
@@ -251,16 +319,19 @@ close(s)
 s = open(fname)
 m = read(s, Int)
 n = read(s, Int)
-A2 = mmap_array(Int, (m,n), s)
+A2 = Mmap.Array(Int, (m,n), s)
 @test A == A2
 seek(s, 0)
-A3 = mmap_array(Int, (m,n), s, convert(FileOffset,2*sizeof(Int)))
+A3 = Mmap.Array(Int, (m,n), s, convert(FileOffset,2*sizeof(Int)))
 @test A == A3
-A4 = mmap_array(Int, (m,150), s, convert(FileOffset,(2+150*m)*sizeof(Int)))
+A4 = Mmap.Array(Int, (m,150), s, convert(FileOffset,(2+150*m)*sizeof(Int)))
 @test A[:, 151:end] == A4
 close(s)
 A2=nothing; A3=nothing; A4=nothing; gc(); gc(); # cause munmap finalizer to run & free resources
 rm(fname)
+
+# other mmap tests
+@test typeof(Mmap.pagesize()) == Int
 
 ##############
 # mark/reset #

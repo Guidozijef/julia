@@ -187,7 +187,7 @@ Array(file::AbstractString, len::Integer=filesize(file), offset::Integer=0; grow
 function BitArray{N}(dims::NTuple{N,Integer}, io::IO, offset::Integer=position(io); grow::Bool=true)
     n = prod(dims)
     nc = Base.num_bit_chunks(n)
-    chunks = Mmap2.Array(UInt64, (nc,), io, offset)
+    chunks = Mmap.Array(UInt64, (nc,), io, offset)
     if !isreadonly(io)
         chunks[end] &= Base._msk_end(n)
     else
