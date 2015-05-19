@@ -60,7 +60,6 @@ function SharedArray(T::Type, dims::NTuple; init=false, pids=Int[])
             shmmem_create_pid = pids[1]
             remotecall_fetch(pids[1], () -> begin shm_mmap_array(T, dims, shm_seg_name, JL_O_CREAT | JL_O_RDWR); nothing end)
         end
-
         func_mapshmem = () -> shm_mmap_array(T, dims, shm_seg_name, JL_O_RDWR)
 
         refs = Array(RemoteRef, length(pids))
@@ -94,7 +93,6 @@ function SharedArray(T::Type, dims::NTuple; init=false, pids=Int[])
         else
             S.pidx = 0
         end
-
         # if present init function is called on each of the parts
         if isa(init, Function)
             @sync begin
@@ -389,7 +387,7 @@ function _shm_mmap_array(T, dims, shm_seg_name, mode)
         systemerror("ftruncate() failed for shm segment " * shm_seg_name, rc != 0)
     end
 
-    mmap_array(T, dims, s, zero(FileOffset), grow=false)
+    Mmap.Array(T, dims, s; grow=false)
 end
 
 shm_unlink(shm_seg_name) = ccall(:shm_unlink, Cint, (Cstring,), shm_seg_name)
@@ -403,7 +401,7 @@ function _shm_mmap_array(T, dims, shm_seg_name, mode)
     readonly = !((mode & JL_O_RDWR) == JL_O_RDWR)
     create = (mode & JL_O_CREAT) == JL_O_CREAT
     s = Mmap.SharedMemSpec(shm_seg_name, readonly, create)
-    mmap_array(T, dims, s, zero(FileOffset))
+    Mmap.Array(T, dims, s)
 end
 
 # no-op in windows

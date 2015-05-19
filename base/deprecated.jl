@@ -440,18 +440,26 @@ export float32_isvalid, float64_isvalid
 @deprecate (|)(x::Char, y::Char)  Char(UInt32(x) | UInt32(y))
 @deprecate ($)(x::Char, y::Char)  Char(UInt32(x) $ UInt32(y))
 
+
+@unix_only begin
 function mmap(len::Integer, prot::Integer, flags::Integer, fd, offset::Integer)
     depwarn("`mmap` is deprecated, use `Mmap.Stream` instead")
-    m = Mmap.Stream(len,prot,flags,fd,offset)
-    return m.viewhandle, m.offset
+    pagesize::Int = ccall(:jl_getpagesize, Clong, ())
+    len < 0 && throw(ArgumentError("requested size must be ≥ 0, got $len"))
+    len > typemax(Int)-pagesize && throw(ArgumentError("requested size must be ≤ $(typemax(Int)-pagesize), got $len"))
+    offset_page::FileOffset = floor(Integer,offset/pagesize)*pagesize
+    len_page::Int = (offset-offset_page) + len
+    p = ccall(:jl_mmap, Ptr{Void}, (Ptr{Void}, Csize_t, Cint, Cint, Cint, FileOffset), C_NULL, len_page, prot, flags, fd, offset_page)
+    systemerror("memory mapping failed", reinterpret(Int,p) == -1)
+    return p, Int(offset-offset_page)
 end
-
 function munmap(p::Ptr,len::Integer)
     depwarn("`munmap` is deprecated, use `close(::Mmap.Stream)` instead")
     systemerror("munmap", ccall(:munmap,Cint,(Ptr{Void},Int),m.viewhandle,m.len) != 0)
 end
 
-function munmap(viewhandle::Ptr,mmaphandle::Ptr)
+end
+@windows_only function munmap(viewhandle::Ptr,mmaphandle::Ptr)
     depwarn("`munmap` is deprecated, use `close(::Mmap.Stream)` instead")
     status = ccall(:UnmapViewOfFile, stdcall, Cint, (Ptr{Void},), m.viewhandle)!=0
     status |= ccall(:CloseHandle, stdcall, Cint, (Ptr{Void},), m.mmaphandle)!=0
@@ -461,3 +469,5 @@ function munmap(viewhandle::Ptr,mmaphandle::Ptr)
 end
 
 @deprecate msync Mmap.sync!
+@deprecate mmap_array Mmap.Array
+@deprecate mmap_bitarray Mmap.BitArray
