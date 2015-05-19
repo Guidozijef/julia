@@ -191,9 +191,96 @@ test_monitor_wait_poll(0.5)
 #  mmap  #
 ##########
 
+file = tempname()
+@test_throws ErrorException Mmap.Stream(file) # requested len=0 on empty file
+@test_throws ErrorException Mmap.Array(file,0)
+m = Mmap.Array(file,12)
+m[:] = "Hello World\n".data
+Mmap.sync!(m)
+m=nothing; gc(); gc()
+@test open(readall,file) == "Hello World\n"
+
+s = open(file, "r")
+close(s)
+@test_throws Base.UVError Mmap.Stream(s) # closed IOStream
+
+@test_throws SystemError Mmap.Stream("")
+
+t = "Hello World".data
+@test vec(Mmap.Array(UInt8, (11,1,1), file)) == t
+gc(); gc()
+@test vec(Mmap.Array(UInt8, (1,11,1), file)) == t
+gc(); gc()
+@test vec(Mmap.Array(UInt8, (1,1,11), file)) == t
+gc(); gc()
+m = Mmap.Array(UInt8, (1,2,1), file)
+@test vec(m) == "He".data
+@test isempty(Mmap.Array(UInt8, (11,0,1), file))
+m = nothing; gc(); gc()
+@test Mmap.Array(UInt8, (11,), file) == t
+gc(); gc()
+@test Mmap.Array(UInt8, (1,11), file) == t'
+gc(); gc()
+@test isempty(Mmap.Array(UInt8, (0,12), file))
+gc(); gc()
+
+# negative length
+@test_throws ArgumentError Mmap.Stream(file, -1)
+# negative offset
+@test_throws ArgumentError Mmap.Stream(file, 1, -1)
+
+for i = 0x00:0x0c
+    @test length(Mmap.Array(file, i)) == Int(i)
+end
+
+sz = filesize(file)
+m = Mmap.Array(file, sz+1)
+@test length(m) == sz+1 # test growing
+@test m[end] == 0x00
+sz = filesize(file)
+m = nothing; gc(); gc()
+m = Mmap.Array(file, 0, sz)
+@test isempty(m)
+sz = filesize(file)
+m = nothing; gc(); gc()
+m = Mmap.Array(file, 1, sz)
+@test length(m) == 1
+@test m[1] == 0x00
+sz = filesize(file)
+# requesting offset > filesize(file); could we allow this to get a bunch of zeros?
+@test_throws ArgumentError Mmap.Array(file, 1, sz+1)
+m = nothing; gc(); gc()
+
+# s = open(file, "r")
+# m = Mmap.Array(s)
+# m[5] = UInt8('x') # currently segfaults on windows, OutOfMemory on OSX
+# m = nothing; gc(); gc()
+
 s = open(file, "w")
 write(s, "Hello World\n")
 close(s)
+
+# m = Mmap.Stream(file)
+# open(file,"w") # errors on widnows because file is mmapped?
+s = open(file, "r") # works
+m = Mmap.Stream(s)
+close(s)
+close(m)
+m = Mmap.Stream(file)
+s = open(file, "r+") # works
+c = Mmap.Array(s)
+d = Mmap.Array(s)
+c[1] = UInt8('J')
+Mmap.sync!(c)
+close(s)
+@test read(m,UInt8) == UInt8('J')
+close(m)
+c = d = nothing; gc(); gc()
+
+s = open(file, "w")
+write(s, "Hello World\n")
+close(s)
+
 s = open(file, "r")
 @test isreadonly(s) == true
 c = Mmap.Array(UInt8, (11,), s)

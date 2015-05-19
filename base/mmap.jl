@@ -88,17 +88,21 @@ type Stream <: IO
     ptr::Ptr{Void}    # pointer to mmapped-memory
     handle::Ptr{Void} # only needed on windows for file mapping object
     len::Int          # amount of memory mapped
-    offset::Int
-    pos::Int
+    offset::FileOffset
+    pos::Int64
     name
 
     function Stream{T<:IO}(io::T, len::Integer=filesize(io), offset::Integer=0; finalize::Bool=true, grow::Bool=true)
         # check inputs
+        isopen(io) || throw(ArgumentError("$io must be open to mmap"))
         applicable(fd,io) || throw(ArgumentError("method `fd(::$T)` doesn't exist, unable to mmap $io"))
         # Check that none of the computations will overflow
-        len > 0 || throw(ArgumentError("requested size must be > 0, got $len"))
+        len >= 0 || throw(ArgumentError("requested size must be ≥ 0, got $len"))
         ps = pagesize()
         len < typemax(Int)-ps || throw(ArgumentError("requested size must be < $(typemax(Int)-ps), got $len"))
+
+        offset >= 0 || throw(ArgumentError("requested offset must be ≥ 0, got $offset"))
+        offset > filesize(io) && throw(ArgumentError("requested offset is beyond size of file: $offset > $(filesize(io))"))
 
         # Set the offset to a page boundary
         offset_page::FileOffset = div(offset,ps)*ps
@@ -128,7 +132,7 @@ type Stream <: IO
                             handle, readonly ? FILE_MAP_READ : FILE_MAP_WRITE, offset_page>>32, offset_page&typemax(UInt32), szfile - convert(Csize_t, offset_page))
             ptr == C_NULL && error("could not create mapping view: $(Base.FormatMessage())")
         end # @windows_only
-        offset = Int(offset-offset_page)
+        offset = FileOffset(offset-offset_page)
         stream = new(ptr,handle,len_page,offset,offset+1,isdefined(io,:name) ? io.name : "")
         finalize && finalizer(stream,close)
         return stream
@@ -136,7 +140,7 @@ type Stream <: IO
 end
 
 Stream(file::AbstractString, len::Integer=filesize(file), offset::Integer=0; finalize::Bool=true, grow::Bool=true) =
-    open(io->Stream(io, min(len,filesize(file)-offset), offset; finalize=finalize, grow=grow), file)
+    open(io->Stream(io, len, offset; finalize=finalize, grow=grow), file, "r+")
 Base.show(io::IO, s::Stream) = print(io, "Mmap.Stream(", s.name, ")")
 
 function Base.close(m::Stream)
@@ -187,9 +191,9 @@ function Array{T,N}(::Type{T}, dims::NTuple{N,Integer}, io::IO, offset=position(
     finalizer(A, x->close(mm))
     return A
 end
-Array{T,N}(::Type{T}, dims::NTuple{N,Integer}, file::AbstractString, offset::Integer=0; grow::Bool=true) = open(io->Array(T,dims,io,offset;grow=grow),file)
-Array(io::IO, len::Integer=filesize(io), offset::Integer=0; grow::Bool=true) = Array(UInt8, (min(len,filesize(io)-offset),), io, offset; grow=grow)
-Array(file::AbstractString, len::Integer=filesize(file), offset::Integer=0; grow::Bool=true) = open(io->Array(UInt8,(min(len,filesize(file)-offset),),io,offset;grow=grow),file)
+Array{T,N}(::Type{T}, dims::NTuple{N,Integer}, file::AbstractString, offset::Integer=0; grow::Bool=true) = open(io->Array(T,dims,io,offset;grow=grow),file, "r+")
+Array(io::IO, len::Integer=filesize(io), offset::Integer=0; grow::Bool=true) = Array(UInt8, (len,), io, offset; grow=grow)
+Array(file::AbstractString, len::Integer=filesize(file), offset::Integer=0; grow::Bool=true) = open(io->Array(UInt8,(len,),io,offset;grow=grow),file, "r+")
 
 # Mmapped-bitarray constructor
 function BitArray{N}(dims::NTuple{N,Integer}, io::IO, offset::Integer=position(io); grow::Bool=true)
@@ -211,6 +215,6 @@ function BitArray{N}(dims::NTuple{N,Integer}, io::IO, offset::Integer=position(i
     end
     return B
 end
-BitArray{N}(dims::NTuple{N,Integer}, file::AbstractString, offset::Integer=0; grow::Bool=true) = open(io->BitArray(dims,io,offset;grow=grow),file)
+BitArray{N}(dims::NTuple{N,Integer}, file::AbstractString, offset::Integer=0; grow::Bool=true) = open(io->BitArray(dims,io,offset;grow=grow),file, "r+")
 
 end # module

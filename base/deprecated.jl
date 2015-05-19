@@ -471,3 +471,4 @@ end
 @deprecate msync Mmap.sync!
 @deprecate mmap_array Mmap.Array
 @deprecate mmap_bitarray Mmap.BitArray
+@deprecate mmap_bitarray{N}(::Type{Bool}, dims::NTuple{N,Integer}, s::IOStream, offset::FileOffset=position(s)) Mmap.BitArray(dims, s, offset)
