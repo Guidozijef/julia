@@ -491,6 +491,7 @@ end
 
 # 11280, mmap
 
+export msync
 msync{T}(A::Array{T}) = msync(pointer(A), length(A)*sizeof(T))
 msync(B::BitArray) = msync(pointer(B.chunks), length(B.chunks)*sizeof(UInt64))
 
@@ -560,6 +561,7 @@ type SharedMemSpec
     readonly :: Bool
     create :: Bool
 end
+export mmap_array
 function mmap_array{T,N}(::Type{T}, dims::NTuple{N,Integer}, s::Union(IO,SharedMemSpec), offset::FileOffset)
     depwarn("`mmap_array` is deprecated, use `mmap(io, T, dims, offset)` instead", :mmap_array)
     if isa(s,SharedMemSpec)
