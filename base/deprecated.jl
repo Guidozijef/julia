@@ -348,7 +348,6 @@ end
 @deprecate strftime     Libc.strftime
 @deprecate strptime     Libc.strptime
 @deprecate flush_cstdio Libc.flush_cstdio
-@deprecate mmap         Libc.mmap
 @deprecate c_free       Libc.free
 @deprecate c_malloc     Libc.malloc
 @deprecate c_calloc     Libc.calloc
@@ -489,3 +488,88 @@ function chol(A::AbstractMatrix, uplo::Symbol)
         "use chol(a::AbstractMatrix, uplo::Union(Val{:L},Val{:U})) instead"), :chol)
     chol(A, Val{uplo})
 end
+
+# 11280, mmap
+
+msync{T}(A::Array{T}) = msync(pointer(A), length(A)*sizeof(T))
+msync(B::BitArray) = msync(pointer(B.chunks), length(B.chunks)*sizeof(UInt64))
+
+@unix_only begin
+# Low-level routines
+# These are needed for things like MAP_ANONYMOUS
+function mmap(len::Integer, prot::Integer, flags::Integer, fd, offset::Integer)
+    depwarn("`mmap` is deprecated, use `mmap(io, T, dims, offset)` instead", :mmap)
+    const pagesize::Int = ccall(:jl_getpagesize, Clong, ())
+    # Check that none of the computations will overflow
+    if len < 0
+        throw(ArgumentError("requested size must be ≥ 0, got $len"))
+    end
+    if len > typemax(Int)-pagesize
+        throw(ArgumentError("requested size must be ≤ $(typemax(Int)-pagesize), got $len"))
+    end
+    # Set the offset to a page boundary
+    offset_page::FileOffset = floor(Integer,offset/pagesize)*pagesize
+    len_page::Int = (offset-offset_page) + len
+    # Mmap the file
+    p = ccall(:jl_mmap, Ptr{Void}, (Ptr{Void}, Csize_t, Cint, Cint, Cint, FileOffset), C_NULL, len_page, prot, flags, fd, offset_page)
+    systemerror("memory mapping failed", reinterpret(Int,p) == -1)
+    # Also return a pointer that compensates for any adjustment in the offset
+    return p, Int(offset-offset_page)
+end
+
+function munmap(p::Ptr,len::Integer)
+    depwarn("`munmap` is deprecated, `mmap` Arrays are automatically munmapped when finalized", :munmap)
+    systemerror("munmap", ccall(:munmap,Cint,(Ptr{Void},Int),p,len) != 0)
+end
+
+const MS_ASYNC = 1
+const MS_INVALIDATE = 2
+const MS_SYNC = 4
+function msync(p::Ptr, len::Integer, flags::Integer=MS_SYNC)
+    depwarn("`msync` is deprecated, use `Mmap.sync!(array)` instead", :msync)
+    systemerror("msync", ccall(:msync, Cint, (Ptr{Void}, Csize_t, Cint), p, len, flags) != 0)
+end
+end
+
+
+@windows_only begin
+function munmap(viewhandle::Ptr, mmaphandle::Ptr)
+    depwarn("`munmap` is deprecated, `mmap` Arrays are automatically munmapped when finalized", :munmap)
+    status = ccall(:UnmapViewOfFile, stdcall, Cint, (Ptr{Void},), viewhandle)!=0
+    status |= ccall(:CloseHandle, stdcall, Cint, (Ptr{Void},), mmaphandle)!=0
+    if !status
+        error("could not unmap view: $(FormatMessage())")
+    end
+end
+
+function msync(p::Ptr, len::Integer)
+    depwarn("`msync` is deprecated, use `Mmap.sync!(array)` instead", :msync)
+    status = ccall(:FlushViewOfFile, stdcall, Cint, (Ptr{Void}, Csize_t), p, len)!=0
+    if !status
+        error("could not msync: $(FormatMessage())")
+    end
+end
+
+end
+
+@unix_only @deprecate mmap_array{T,N}(::Type{T}, dims::NTuple{N,Integer}, s::IO, offset=position(s)) mmap(s, T, dims, offset)
+
+@windows_only begin
+type SharedMemSpec
+    name :: AbstractString
+    readonly :: Bool
+    create :: Bool
+end
+function mmap_array{T,N}(::Type{T}, dims::NTuple{N,Integer}, s::Union(IO,SharedMemSpec), offset::FileOffset)
+    depwarn("`mmap_array` is deprecated, use `mmap(io, T, dims, offset)` instead", :mmap_array)
+    if isa(s,SharedMemSpec)
+        a = Mmap.AnonymousMmap(s.name, s.readonly, s.create)
+    else
+        a = s
+    end
+    return mmap(a, T, dims, offset)
+end
+end
+
+@deprecate mmap_bitarray{N}(::Type{Bool}, dims::NTuple{N,Integer}, s::IOStream, offset::FileOffset=position(s)) mmap(s, BitArray, dims, offset)
+@deprecate mmap_bitarray{N}(dims::NTuple{N,Integer}, s::IOStream, offset=position(s)) mmap(s, BitArray, dims, offset)
