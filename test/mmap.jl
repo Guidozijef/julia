@@ -3,52 +3,52 @@ s = open(file, "w") do f
     write(f, "Hello World\n")
 end
 t = "Hello World".data
-@test mmap(file, UInt8, (11,1,1)) == reshape(t,(11,1,1))
+@test mmap(file, Array{UInt8,3}, (11,1,1)) == reshape(t,(11,1,1))
 gc()
-@test mmap(file, UInt8, (1,11,1)) == reshape(t,(1,11,1))
+@test mmap(file, Array{UInt8,3}, (1,11,1)) == reshape(t,(1,11,1))
 gc()
-@test mmap(file, UInt8, (1,1,11)) == reshape(t,(1,1,11))
+@test mmap(file, Array{UInt8,3}, (1,1,11)) == reshape(t,(1,1,11))
 gc()
-@test_throws ArgumentError mmap(file, UInt8, (11,0,1)) # 0-dimension results in len=0
-@test mmap(file, UInt8, (11,)) == t
+@test_throws ArgumentError mmap(file, Array{UInt8,3}, (11,0,1)) # 0-dimension results in len=0
+@test mmap(file, Vector{UInt8}, (11,)) == t
 gc()
-@test mmap(file, UInt8, (1,11)) == t'
+@test mmap(file, Array{UInt8,2}, (1,11)) == t'
 gc()
-@test_throws ArgumentError mmap(file, UInt8, (0,12))
-m = mmap(file, UInt8, (1,2,1))
+@test_throws ArgumentError mmap(file, Array{UInt8,2}, (0,12))
+m = mmap(file, Array{UInt8,3}, (1,2,1))
 @test m == reshape("He".data,(1,2,1))
 m=nothing; gc()
 
 # constructors
 @test length(mmap(file)) == 12
-@test length(mmap(file, Int8)) == 12
-@test length(mmap(file, Int8, (12,1))) == 12
-@test length(mmap(file, Int8, (12,1), 0)) == 12
-@test length(mmap(file, Int8, (12,1), 0; grow=false)) == 12
-@test length(mmap(file, Int8, (12,1), 0; shared=false)) == 12
-@test length(mmap(file, Int8, 12)) == 12
-@test length(mmap(file, Int8, 12, 0)) == 12
-@test length(mmap(file, Int8, 12, 0; grow=false)) == 12
-@test length(mmap(file, Int8, 12, 0; shared=false)) == 12
+@test length(mmap(file, Vector{Int8})) == 12
+@test length(mmap(file, Matrix{Int8}, (12,1))) == 12
+@test length(mmap(file, Matrix{Int8}, (12,1), 0)) == 12
+@test length(mmap(file, Matrix{Int8}, (12,1), 0; grow=false)) == 12
+@test length(mmap(file, Matrix{Int8}, (12,1), 0; shared=false)) == 12
+@test length(mmap(file, Vector{Int8}, 12)) == 12
+@test length(mmap(file, Vector{Int8}, 12, 0)) == 12
+@test length(mmap(file, Vector{Int8}, 12, 0; grow=false)) == 12
+@test length(mmap(file, Vector{Int8}, 12, 0; shared=false)) == 12
 s = open(file)
 @test length(mmap(s)) == 12
-@test length(mmap(s, Int8)) == 12
-@test length(mmap(s, Int8, (12,1))) == 12
-@test length(mmap(s, Int8, (12,1), 0)) == 12
-@test length(mmap(s, Int8, (12,1), 0; grow=false)) == 12
-@test length(mmap(s, Int8, (12,1), 0; shared=false)) == 12
-@test length(mmap(s, Int8, 12)) == 12
-@test length(mmap(s, Int8, 12, 0)) == 12
-@test length(mmap(s, Int8, 12, 0; grow=false)) == 12
-@test length(mmap(s, Int8, 12, 0; shared=false)) == 12
+@test length(mmap(s, Vector{Int8})) == 12
+@test length(mmap(s, Matrix{Int8}, (12,1))) == 12
+@test length(mmap(s, Matrix{Int8}, (12,1), 0)) == 12
+@test length(mmap(s, Matrix{Int8}, (12,1), 0; grow=false)) == 12
+@test length(mmap(s, Matrix{Int8}, (12,1), 0; shared=false)) == 12
+@test length(mmap(s, Vector{Int8}, 12)) == 12
+@test length(mmap(s, Vector{Int8}, 12, 0)) == 12
+@test length(mmap(s, Vector{Int8}, 12, 0; grow=false)) == 12
+@test length(mmap(s, Vector{Int8}, 12, 0; shared=false)) == 12
 close(s)
-@test_throws ArgumentError mmap(file, Ref)
+@test_throws ArgumentError mmap(file, Vector{Ref}) # must be bit-type
 gc()
 
 s = open(f->f,file,"w")
 @test_throws ArgumentError mmap(file) # requested len=0 on empty file
-@test_throws ArgumentError mmap(file,UInt8,0)
-m = mmap(file,UInt8,12)
+@test_throws ArgumentError mmap(file,Vector{UInt8},0)
+m = mmap(file,Vector{UInt8},12)
 m[:] = "Hello World\n".data
 Mmap.sync!(m)
 m=nothing; gc()
@@ -57,32 +57,32 @@ m=nothing; gc()
 s = open(file, "r")
 close(s)
 @test_throws Base.UVError mmap(s) # closed IOStream
-@test_throws ArgumentError mmap(s,UInt8,12,0) # closed IOStream
+@test_throws ArgumentError mmap(s,Vector{UInt8},12,0) # closed IOStream
 @test_throws SystemError mmap("")
 
 # negative length
-@test_throws ArgumentError mmap(file, UInt8, -1)
+@test_throws ArgumentError mmap(file, Vector{UInt8}, -1)
 # negative offset
-@test_throws ArgumentError mmap(file, UInt8, 1, -1)
+@test_throws ArgumentError mmap(file, Vector{UInt8}, 1, -1)
 
 for i = 0x01:0x0c
-    @test length(mmap(file, UInt8, i)) == Int(i)
+    @test length(mmap(file, Vector{UInt8}, i)) == Int(i)
 end
 gc()
 
 sz = filesize(file)
-m = mmap(file, UInt8, sz+1)
+m = mmap(file, Vector{UInt8}, sz+1)
 @test length(m) == sz+1 # test growing
 @test m[end] == 0x00
 m=nothing; gc()
 sz = filesize(file)
-m = mmap(file, UInt8, 1, sz)
+m = mmap(file, Vector{UInt8}, 1, sz)
 @test length(m) == 1
 @test m[1] == 0x00
 m=nothing; gc()
 sz = filesize(file)
 # test where offset is actually > than size of file; file is grown with zeroed bytes
-m = mmap(file, UInt8, 1, sz+1)
+m = mmap(file, Vector{UInt8}, 1, sz+1)
 @test length(m) == 1
 @test m[1] == 0x00
 m=nothing; gc()
@@ -90,7 +90,7 @@ m=nothing; gc()
 # Uncomment out once #11351 is resolved
 # s = open(file, "r")
 # m = mmap(s)
-# @test_throws OutOfMemoryError m[5] = UInt8('x') # tries to setindex! on read-only array
+# @test_throws ReadOnlyMemoryError m[5] = Vector{UInt8}('x') # tries to setindex! on read-only array
 # m=nothing; gc()
 
 s = open(file, "w") do f
@@ -118,18 +118,18 @@ end
 
 s = open(file, "r")
 @test isreadonly(s) == true
-c = mmap(s, UInt8, (11,))
+c = mmap(s, Vector{UInt8}, (11,))
 @test c == "Hello World".data
 c=nothing; gc()
-c = mmap(s, UInt8, (UInt16(11),))
+c = mmap(s, Vector{UInt8}, (UInt16(11),))
 @test c == "Hello World".data
 c=nothing; gc()
-@test_throws ArgumentError mmap(s, UInt8, (Int16(-11),))
-@test_throws ArgumentError mmap(s, UInt8, (typemax(UInt),))
+@test_throws ArgumentError mmap(s, Vector{UInt8}, (Int16(-11),))
+@test_throws ArgumentError mmap(s, Vector{UInt8}, (typemax(UInt),))
 close(s)
 s = open(file, "r+")
 @test isreadonly(s) == false
-c = mmap(s, UInt8, (11,))
+c = mmap(s, Vector{UInt8}, (11,))
 c[5] = UInt8('x')
 Mmap.sync!(c)
 close(s)
@@ -142,15 +142,15 @@ c=nothing; gc()
 c = mmap(file)
 @test c == "Hellx World\n".data
 c=nothing; gc()
-c = mmap(file, UInt8, 3)
+c = mmap(file, Vector{UInt8}, 3)
 @test c == "Hel".data
 c=nothing; gc()
 s = open(file, "r")
-c = mmap(s, UInt8, 6)
+c = mmap(s, Vector{UInt8}, 6)
 @test c == "Hellx ".data
 close(s)
 c=nothing; gc()
-c = mmap(file, UInt8, 5, 6)
+c = mmap(file, Vector{UInt8}, 5, 6)
 @test c == "World".data
 c=nothing; gc()
 
@@ -167,7 +167,7 @@ end
 @test_throws BoundsError m[13]
 m=nothing; gc()
 
-m = mmap(file,UInt8,6)
+m = mmap(file,Vector{UInt8},6)
 @test m[1] == "H".data[1]
 @test m[2] == "e".data[1]
 @test m[3] == "l".data[1]
@@ -177,7 +177,7 @@ m = mmap(file,UInt8,6)
 @test_throws BoundsError m[7]
 m=nothing; gc()
 
-m = mmap(file,UInt8,2,6)
+m = mmap(file,Vector{UInt8},2,6)
 @test m[1] == "W".data[1]
 @test m[2] == "o".data[1]
 @test_throws BoundsError m[3]
@@ -222,12 +222,12 @@ close(s)
 s = open(fname)
 m = read(s, Int)
 n = read(s, Int)
-A2 = mmap(s, Int, (m,n))
+A2 = mmap(s, Matrix{Int}, (m,n))
 @test A == A2
 seek(s, 0)
-A3 = mmap(s, Int, (m,n), convert(FileOffset,2*sizeof(Int)))
+A3 = mmap(s, Matrix{Int}, (m,n), convert(FileOffset,2*sizeof(Int)))
 @test A == A3
-A4 = mmap(s, Int, (m,150), convert(FileOffset,(2+150*m)*sizeof(Int)))
+A4 = mmap(s, Matrix{Int}, (m,150), convert(FileOffset,(2+150*m)*sizeof(Int)))
 @test A[:, 151:end] == A4
 close(s)
 finalize(A2); finalize(A3); finalize(A4)
@@ -243,7 +243,7 @@ m = Mmap.AnonymousMmap()
 @test isreadable(m)
 @test iswritable(m)
 
-m = mmap(UInt8, 12)
+m = mmap(Vector{UInt8}, 12)
 @test length(m) == 12
 @test all(m .== 0x00)
 @test m[1] === 0x00
@@ -251,16 +251,16 @@ m = mmap(UInt8, 12)
 m[1] = 0x0a
 Mmap.sync!(m)
 @test m[1] === 0x0a
-m = mmap(UInt8, 12; shared=false)
-m = mmap(Int, 12)
+m = mmap(Vector{UInt8}, 12; shared=false)
+m = mmap(Vector{Int}, 12)
 @test length(m) == 12
 @test all(m .== 0)
 @test m[1] === 0
 @test m[end] === 0
-m = mmap(Float64, 12)
+m = mmap(Vector{Float64}, 12)
 @test length(m) == 12
 @test all(m .== 0.0)
-m = mmap(Int8, (12,12))
+m = mmap(Matrix{Int8}, (12,12))
 @test size(m) == (12,12)
 @test all(m == zeros(Int8, (12,12)))
 @test sizeof(m) == prod((12,12))

@@ -93,7 +93,7 @@ settings(io::IO) = Ptr{Cwchar_t}(C_NULL), isreadonly(io), true
 end # @windows_only
 
 # core impelementation of mmap
-function mmap{T,N}(io::IO, t::Type{Array{T}}=Vector{UInt8}, dims::NTuple{N,Integer}=(filesize(io)-position(io),), offset::Integer=position(io); grow::Bool=true, shared::Bool=true)
+function mmap{T,N}(io::IO, ::Type{Array{T,N}}=Vector{UInt8}, dims::NTuple{N,Integer}=(filesize(io)-position(io),), offset::Integer=position(io); grow::Bool=true, shared::Bool=true)
     # check inputs
     isopen(io) || throw(ArgumentError("$io must be open to mmap"))
     isbits(T)  || throw(ArgumentError("unable to mmap $T; must satisfy isbits(T) == true"))
@@ -144,23 +144,23 @@ function mmap{T,N}(io::IO, t::Type{Array{T}}=Vector{UInt8}, dims::NTuple{N,Integ
     return A
 end
 
-mmap{T,N}(file::AbstractString, t::Type{Array{T}}=Vector{UInt8}, dims::NTuple{N,Integer}=(filesize(file),), offset::Integer=Int64(0); grow::Bool=true, shared::Bool=true) =
+mmap{T,N}(file::AbstractString, t::Type{Array{T,N}}=Vector{UInt8}, dims::NTuple{N,Integer}=(filesize(file),), offset::Integer=Int64(0); grow::Bool=true, shared::Bool=true) =
     open(io->mmap(io, t, dims, offset; grow=grow, shared=shared), file, isfile(file) ? "r+" : "w+")
 
 # using a length argument instead of dims
-mmap{T}(io::IO, t::Type{Array{T}}=Vector{UInt8}, len::Integer=filesize(io)-position(io), offset::Integer=position(io); grow::Bool=true, shared::Bool=true) =
+mmap{T,N}(io::IO, t::Type{Array{T,N}}=Vector{UInt8}, len::Integer=filesize(io)-position(io), offset::Integer=position(io); grow::Bool=true, shared::Bool=true) =
     mmap(io, t, (len,), offset; grow=grow, shared=shared)
-mmap{T}(file::AbstractString, t::Type{Array{T}}=Vector{UInt8}, len::Integer=filesize(file), offset::Integer=Int64(0); grow::Bool=true, shared::Bool=true) =
+mmap{T,N}(file::AbstractString, t::Type{Array{T,N}}=Vector{UInt8}, len::Integer=filesize(file), offset::Integer=Int64(0); grow::Bool=true, shared::Bool=true) =
     open(io->mmap(io, t, (len,), offset; grow=grow, shared=shared), file, isfile(file) ? "r+" : "w+")
 
 # constructors for non-file-backed (anonymous) mmaps
-mmap{T,N}(t::Type{Array{T}}, dims::NTuple{N,Integer}; shared::Bool=true) = mmap(AnonymousMmap(), t, dims, Int64(0); shared=shared)
-mmap{T}(t::Type{Array{T}}, i::Integer...; shared::Bool=true) = mmap(AnonymousMmap(), t, convert(Tuple{Vararg{Int}},i), Int64(0); shared=shared)
+mmap{T,N}(t::Type{Array{T,N}}, dims::NTuple{N,Integer}; shared::Bool=true) = mmap(AnonymousMmap(), t, dims, Int64(0); shared=shared)
+mmap{T,N}(t::Type{Array{T,N}}, i::Integer...; shared::Bool=true) = mmap(AnonymousMmap(), t, convert(Tuple{Vararg{Int}},i), Int64(0); shared=shared)
 
 function mmap{T<:BitArray,N}(io::IOStream, ::Type{T}, dims::NTuple{N,Integer}=(filesize(io)-position(io),), offset::FileOffset=position(io); grow::Bool=true, shared::Bool=true)
     n = prod(dims)
     nc = Base.num_bit_chunks(n)
-    chunks = mmap(io, UInt64, (nc,), offset; grow=grow, shared=shared)
+    chunks = mmap(io, Vector{UInt64}, (nc,), offset; grow=grow, shared=shared)
     if !isreadonly(io)
         chunks[end] &= Base._msk_end(n)
     else
