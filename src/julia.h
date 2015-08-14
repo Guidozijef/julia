@@ -128,6 +128,15 @@ typedef struct {
     jl_value_t *data[];
 } jl_svec_t;
 
+#define B_N_INLINE 24
+
+typedef struct {
+    size_t len;
+    size_t max;
+    uint8_t *items;
+    uint8_t _space[B_N_INLINE];
+} jl_bytebuffer_t;
+
 typedef struct {
     JL_DATA_TYPE
     void *data;
@@ -386,7 +395,9 @@ extern DLLEXPORT jl_datatype_t *jl_function_type;
 extern DLLEXPORT jl_datatype_t *jl_abstractarray_type;
 extern DLLEXPORT jl_datatype_t *jl_densearray_type;
 extern DLLEXPORT jl_datatype_t *jl_array_type;
+extern DLLEXPORT jl_datatype_t *jl_bytebuffer_type;
 extern DLLEXPORT jl_typename_t *jl_array_typename;
+extern DLLEXPORT jl_typename_t *jl_bytebuffer_typename;
 extern DLLEXPORT jl_datatype_t *jl_weakref_type;
 extern DLLEXPORT jl_datatype_t *jl_ascii_string_type;
 extern DLLEXPORT jl_datatype_t *jl_utf8_string_type;
@@ -1017,6 +1028,31 @@ DLLEXPORT void *jl_array_ptr(jl_array_t *a);
 DLLEXPORT void *jl_array_eltype(jl_value_t *a);
 DLLEXPORT int jl_array_rank(jl_value_t *a);
 DLLEXPORT size_t jl_array_size(jl_value_t *a, int d);
+
+// bytebuffer
+DLLEXPORT jl_bytebuffer_t *jl_bytebuffer_new(size_t size);
+DLLEXPORT void jl_bytebuffer_free(jl_bytebuffer_t *b);
+DLLEXPORT uint8_t jl_bytebuffer_getindex(jl_bytebuffer_t *b, size_t i);
+DLLEXPORT void jl_bytebuffer_setindex(jl_bytebuffer_t *b, size_t i, uint8_t v);
+
+#define jl_bytebuffer_len(t)   (((jl_bytebuffer_t*)(t))->len)
+#define jl_bytebuffer_items(t) (((jl_bytebuffer_t*)(t))->items)
+
+STATIC_INLINE uint8_t jl_bytebufferref(void *b, size_t i)
+{
+    assert(jl_typeis(b,jl_bytebuffer_type));
+    assert(i < jl_bytebuffer_len(b));
+    return jl_bytebuffer_items(b)[i];
+}
+
+STATIC_INLINE uint8_t jl_bytebufferset(jl_bytebuffer_t *b, size_t i, uint8_t v)
+{
+    assert(jl_typeis(b,jl_bytebuffer_type));
+    assert(i < jl_bytebuffer_len(b));
+    jl_bytebuffer_items(b)[i] = v;
+    return v;
+}
+
 
 // strings
 DLLEXPORT const char *jl_bytestring_ptr(jl_value_t *s);

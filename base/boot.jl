@@ -127,7 +127,7 @@ export
     # key types
     Any, DataType, Vararg, ANY, NTuple,
     Tuple, Type, TypeConstructor, TypeName, TypeVar, Union, Void,
-    SimpleVector, AbstractArray, DenseArray,
+    SimpleVector, AbstractArray, DenseArray, ByteBuffer,
     # special objects
     Box, Function, IntrinsicFunction, LambdaStaticData, Method, MethodTable,
     Module, Symbol, Task, Array, WeakRef,

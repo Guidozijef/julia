@@ -3329,6 +3329,14 @@ void jl_init_types(void)
                                    jl_svec(2, jl_any_type,
                                             jl_box_long(1)));
 
+    jl_bytebuffer_type =
+        jl_new_datatype(jl_symbol("ByteBuffer"), jl_any_type,
+                        jl_emptysvec,
+                        jl_emptysvec, jl_emptysvec,
+                        0, 0, 0);
+    jl_bytebuffer_typename = jl_bytebuffer_type->name;
+    jl_bytebuffer_type->pointerfree = 0;
+
     jl_array_symbol_type =
         (jl_value_t*)jl_apply_type((jl_value_t*)jl_array_type,
                                    jl_svec(2, jl_symbol_type,

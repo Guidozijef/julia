@@ -74,7 +74,6 @@ macro generated(f)
     end
 end
 
-
 @generated function tuple_type_head{T<:Tuple}(::Type{T})
     T.parameters[1]
 end
@@ -200,6 +199,10 @@ Array{T}(::Type{T}, d::Integer...)      = Array{T}(convert(Tuple{Vararg{Int}}, d
 Array{T}(::Type{T}, m::Integer)                       = Array{T}(m)
 Array{T}(::Type{T}, m::Integer,n::Integer)            = Array{T}(m,n)
 Array{T}(::Type{T}, m::Integer,n::Integer,o::Integer) = Array{T}(m,n,o)
+
+# ByteBuffer
+call(::Type{ByteBuffer}, n::Integer) =
+    ccall(:jl_bytebuffer_new, ByteBuffer, (Int,), n)
 
 # SimpleVector
 
