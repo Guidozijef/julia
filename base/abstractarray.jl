@@ -1168,11 +1168,16 @@ function hash2(a::AbstractArray, h::UInt)
     length(a) == 1 && return h
     length(a) == 2 && return hash(next(a, state)[1], h)
 
-    if isa(a, AbstractVector)
-        # Check whether the array is equal to a range, and hash the elements
-        # at the beginning of the array as such as long as they match this assumption
-        s = (last(a)-first(a))/(length(a)-1)
-        r = first(a):s:last(a)
+    # Check whether the array is equal to a range, and hash the elements
+    # at the beginning of the array as such as long as they match this assumption
+    if isa(a, AbstractVector) &&
+       # Only types supporting - can be used in ranges
+       (f = first(a); l = last(a); applicable(-, f, l))
+        # Raise an error on purpose for types which support - but not /, as they can be
+        # used in ranges but we wouldn't be able to hash them the same in vectors
+        s = (l-f)/(length(a)-1)
+        r = f:s:l
+        @show a, r, f, l
         @assert length(r) == length(a)
         rstate = start(r)
         y, rstate = next(r, rstate)

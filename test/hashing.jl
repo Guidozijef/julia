@@ -87,9 +87,7 @@ end
 
 vals = Any[
     Int[], Char[], String[],
-    [0], [1], ['a'], ["a"],
-    [0, 1], ['a', 'b'], ["a", "b"],
-    [0, 1, 2], ['a', 'b', 'c'], ["a", "b", "c"],
+    [0], [1], [0, 1], [0, 1, 2],
     # test various sparsity patterns
     [0, 0], [0, 0, 0], [0, 1], [1, 0],
     [0, 0, 1], [0, 1, 0], [1, 0, 0],
@@ -102,12 +100,14 @@ for a in vals
     # check that element type does not affect hash
     @test hash(convert(Array{Any}, a)) == hash(a)
     @test hash(convert(Array{supertype(eltype(a))}, a)) == hash(a)
-    @test hashsp(sparse(a), UInt(0)) == hash(a)
+    @test hashsp(sparse(a)) == hash(a)
 end
 
 vals = Any[
     1:0, 1:1, 1:2, 1:3, 1.0:0.0, 1.0:1.0:1.0, 1.0:0.5:3.0,
-    0:-1:1, 0.0:-1.0:1.0, -4:10, 'a':'e', 'b':'a',
+    0.0:0.1:0.3, 0.3:-0.1:0.0,
+    0:-1:1, 0.0:-1.0:1.0, 0.0:1.1:10.0, -4:10,
+    'a':'e', 'b':'a',
     linspace(1, 1, 1), linspace(1, 10, 3)
 ]
 
