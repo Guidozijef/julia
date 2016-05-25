@@ -72,11 +72,47 @@ vals = Any[
     [], [1], [2], [1, 1], [1, 2], [1, 3], [2, 2], [1, 2, 2], [1, 3, 3],
     zeros(2, 2), spzeros(2, 2), eye(2, 2), speye(2, 2),
     sparse(ones(2, 2)), ones(2, 2), sparse([0 0; 1 0]), [0 0; 1 0],
-    [-0. 0; -0. 0.], SparseMatrixCSC(2, 2, [1, 3, 3], [1, 2], [-0., -0.])
+    [-0. 0; -0. 0.], SparseMatrixCSC(2, 2, [1, 3, 3], [1, 2], [-0., -0.]),
+    # issue #16364
+    1:4, 1:1:4, 1:-1:0, 1.0:4.0, 1.0:1.0:4.0, linspace(1, 4, 4),
+    'a':'e', ['a', 'b', 'c', 'd', 'e'],
+    # check that hash is still consistent with heteregeneous arrays for which - is defined
+    # for some pairs and not others (no element must be ignored)
+    ["a", "b", 1, 2], ["a", 1, 2], ["a", "b", 2, 2], ["a", "a", 1, 2], ["a", "b", 2, 3]
 ]
 
 for a in vals, b in vals
     @test isequal(a,b) == (hash(a)==hash(b))
+end
+
+vals = Any[
+    Int[], Char[], String[],
+    [0], [1], ['a'], ["a"],
+    [0, 1], ['a', 'b'], ["a", "b"],
+    [0, 1, 2], ['a', 'b', 'c'], ["a", "b", "c"],
+    # test various sparsity patterns
+    [0, 0], [0, 0, 0], [0, 1], [1, 0],
+    [0, 0, 1], [0, 1, 0], [1, 0, 0],
+    [0 0; 0 0], [1 0; 0 0], [0 1; 0 0], [0 0; 1 0], [0 0; 0 1],
+    [5 1; 0 0], [1 0; 0 1], [0 2; 3 0], [0 4; 1 2], [4 0; 0 1],
+    [0 0 0; 0 0 0], [1 0 0; 0 0 1], [0 0 2; 3 0 0], [0 0 7; 6 1 2], [4 0 0; 3 0 1]
+]
+
+for a in vals
+    # check that element type does not affect hash
+    @test hash(convert(Array{Any}, a)) == hash(a)
+    @test hash(convert(Array{supertype(eltype(a))}, a)) == hash(a)
+    @test hashsp(sparse(a), UInt(0)) == hash(a)
+end
+
+vals = Any[
+    1:0, 1:1, 1:2, 1:3, 1.0:0.0, 1.0:1.0:1.0, 1.0:0.5:3.0,
+    0:-1:1, 0.0:-1.0:1.0, -4:10, 'a':'e', 'b':'a',
+    linspace(1, 1, 1), linspace(1, 10, 3)
+]
+
+for a in vals
+    @test hash(collect(a)) == hash(a)
 end
 
 @test hash(SubString("--hello--",3,7)) == hash("hello")

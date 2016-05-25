@@ -522,6 +522,22 @@ function ==(r::Range, s::Range)
     return true
 end
 
+# hashing ranges by component at worst leads to collisions for very similar ranges
+# hashaa_seed is defined in abstractarrays.jl
+function hashr(r::Range, h::UInt)
+    h += hashaa_seed
+    h += hash(size(r))
+
+    length(r) == 0 && return h
+    h = hash(first(r), h)
+    length(r) == 1 && return h
+    length(r) == 2 && return hash(last(r), h)
+
+    h += hashr_seed
+    h = hash(step(r), h)
+    h = hash(last(r), h)
+end
+
 intersect{T1<:Integer, T2<:Integer}(r::UnitRange{T1}, s::UnitRange{T2}) = max(r.start,s.start):min(last(r),last(s))
 
 intersect{T<:Integer}(i::Integer, r::UnitRange{T}) =

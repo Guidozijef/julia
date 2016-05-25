@@ -1154,17 +1154,42 @@ unshift!(A, a, b, c...) = unshift!(unshift!(A, c...), a, b)
 
 ## hashing collections ##
 
-const hashaa_seed = UInt === UInt64 ? 0x7f53e68ceb575e76 : 0xeb575e76
-const hashrle_seed = UInt == UInt64 ? 0x2aab8909bfea414c : 0xbfea414c
-function hash(a::AbstractArray, h::UInt)
+const hashaa_seed  = UInt === UInt64 ? 0x7f53e68ceb575e76 : 0xeb575e76
+const hashrle_seed = UInt === UInt64 ? 0x2aab8909bfea414c : 0xbfea414c
+const hashr_seed   = UInt === UInt64 ? 0x80707b6821b70087 : 0x21b70087
+
+function hash2(a::AbstractArray, h::UInt)
     h += hashaa_seed
     h += hash(size(a))
 
-    state = start(a)
-    done(a, state) && return h
-    x2, state = next(a, state)
-    done(a, state) && return hash(x2, h)
+    length(a) == 0 && return h
+    x2, state = next(a, start(a))
+    h = hash(x2, h)
+    length(a) == 1 && return h
+    length(a) == 2 && return hash(next(a, state)[1], h)
 
+    if isa(a, AbstractVector)
+        # Check whether the array is equal to a range, and hash the elements
+        # at the beginning of the array as such as long as they match this assumption
+        s = (last(a)-first(a))/(length(a)-1)
+        r = first(a):s:last(a)
+        @assert length(r) == length(a)
+        rstate = start(r)
+        y, rstate = next(r, rstate)
+        firststate = state
+        while !done(a, state)
+            isequal(x2, y) || break
+            x2, state = next(a, state)
+            y, rstate = next(r, rstate)
+        end
+        if start != firststate # At least one element matched range
+            h += hashr_seed
+            h = hash(s, h)
+        end
+        h = hash(x2, h)
+    end
+
+    # Hash elements which do not correspond to a range (if any)
     x1 = x2
     while !done(a, state)
         x1 = x2
