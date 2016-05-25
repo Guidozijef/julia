@@ -524,7 +524,7 @@ end
 
 # hashing ranges by component at worst leads to collisions for very similar ranges
 # hashaa_seed is defined in abstractarrays.jl
-function hashr(r::Range, h::UInt)
+function hash(r::Range, h::UInt)
     h += hashaa_seed
     h += hash(size(r))
 

@@ -77,8 +77,10 @@ vals = Any[
     1:4, 1:1:4, 1:-1:0, 1.0:4.0, 1.0:1.0:4.0, linspace(1, 4, 4),
     'a':'e', ['a', 'b', 'c', 'd', 'e'],
     # check that hash is still consistent with heteregeneous arrays for which - is defined
-    # for some pairs and not others (no element must be ignored)
-    ["a", "b", 1, 2], ["a", 1, 2], ["a", "b", 2, 2], ["a", "a", 1, 2], ["a", "b", 2, 3]
+    # for some pairs and not others
+    ["a", "b", 1, 2], ["a", 1, 2], ["a", "b", 2, 2], ["a", "a", 1, 2], ["a", "b", 2, 3],
+    # check that a 3-element sequence isn't hashed the same as (start, step, stop)
+    [1, 1, 4], [1, -1, 0], ['a', 1, 'e']
 ]
 
 for a in vals, b in vals
@@ -108,7 +110,7 @@ vals = Any[
     0.0:0.1:0.3, 0.3:-0.1:0.0,
     0:-1:1, 0.0:-1.0:1.0, 0.0:1.1:10.0, -4:10,
     'a':'e', 'b':'a',
-    linspace(1, 1, 1), linspace(1, 10, 3)
+    linspace(1, 1, 1), linspace(0.3, 1.0, 3),  linspace(1, 1.1, 20)
 ]
 
 for a in vals

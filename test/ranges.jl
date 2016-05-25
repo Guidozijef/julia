@@ -234,7 +234,7 @@ end
 @test sum(0:2:100) == 2550
 
 # overflowing sums (see #5798)
-if WORD_SIZE == 64
+if Sys.WORD_SIZE == 64
     @test sum(Int128(1):10^18) == div(10^18 * (Int128(10^18)+1), 2)
     @test sum(Int128(1):10^18-1) == div(10^18 * (Int128(10^18)-1), 2)
 else
@@ -267,15 +267,16 @@ end
 
 # tricky floating-point ranges
 for (start, step, stop, len) in ((1, 1, 3, 3), (0, 1, 3, 4),
-                                 (3, -1, -1, 5), (1, -1, -1, 5),
-                                 (0, 1, 1.0, 11), (0, 7, 21, 4),
+                                 (3, -1, -1, 5), (1, -1, -3, 5),
+                                 (0, 1, 10, 11), (0, 7, 21, 4),
                                  (0, 11, 33, 4), (1, 11, 34, 4),
                                  (0, 13, 39, 4), (1, 13, 40, 4),
                                  (11, 11, 33, 3), (3, 1, 11, 9),
                                  (0, 10, 0, 1), (0, -1, 0, 1),
                                  (0, 10, 55, 0), (0, -1, 5, 0),
                                  (0, 1, 5, 0))
-    r = start/10:step/10:stop/10;
+@show (start, step, stop, len)
+    r = start/10:step/10:stop/10
     a = collect(start:step:stop)./10
     ra = collect(r)
 
@@ -305,7 +306,10 @@ for (start, step, stop, len) in ((1, 1, 3, 3), (0, 1, 3, 4),
     end
 end
 
-#@test [1.0:1/49:27.0;] == [linspace(1.0,27.0,1275);] == [49:1323;]./49
+@test 1.0:1/49:27.0 == linspace(1.0,27.0,1275) == [49:1323;]./49
+@test isequal(1.0:1/49:27.0, linspace(1.0,27.0,1275))
+@test isequal(1.0:1/49:27.0, collect(49:1323)./49)
+@test hash(1.0:1/49:27.0) == hash(linspace(1.0,27.0,1275)) == hash(collect(49:1323)./49)
 
 @test [prevfloat(0.1):0.1:0.3;] == [prevfloat(0.1), 0.2, 0.3]
 @test [nextfloat(0.1):0.1:0.3;] == [nextfloat(0.1), 0.2]
@@ -588,9 +592,11 @@ end
 
 # stringmime/writemime should display the range or linspace nicely
 # to test print_range in range.jl
-replstrmime(x) = stringmime("text/plain", x)
+replstrmime(x) = sprint((io,x) -> writemime(IOContext(io, multiline=true, limit=true), MIME("text/plain"), x), x)
 @test replstrmime(1:4) == "1:4"
-@test replstrmime(linspace(1,5,7)) == "7-element LinSpace{Float64}:\n 1.0,1.66667,2.33333,3.0,3.66667,4.33333,5.0"
+@test stringmime("text/plain", 1:4) == "1:4"
+@test stringmime("text/plain", linspace(1,5,7)) == "7-element LinSpace{Float64}:\n 1.0,1.66667,2.33333,3.0,3.66667,4.33333,5.0"
+@test repr(linspace(1,5,7)) == "linspace(1.0,5.0,7)"
 @test replstrmime(0:100.) == "0.0:1.0:100.0"
 # next is to test a very large range, which should be fast because print_range
 # only examines spacing of the left and right edges of the range, sufficient
@@ -743,4 +749,13 @@ let A = -1:1, B = -1.0:1.0
 
     @test ~A == [0,-1,-2]
     @test typeof(~A) == Vector{Int}
+end
+
+# conversion to Array
+let r = 1:3, a = [1,2,3]
+    @test convert(Array, r) == a
+    @test convert(Array{Int}, r) == a
+    @test convert(Array{Float64}, r) == a
+    @test convert(Array{Int,1}, r) == a
+    @test convert(Array{Float64,1}, r) == a
 end

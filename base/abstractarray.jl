@@ -912,9 +912,6 @@ function isequal(A::AbstractArray, B::AbstractArray)
     if size(A) != size(B)
         return false
     end
-    if isa(A,Range) != isa(B,Range)
-        return false
-    end
     for (a, b) in zip(A, B)
         if !isequal(a, b)
             return false
@@ -933,9 +930,6 @@ end
 
 function (==)(A::AbstractArray, B::AbstractArray)
     if size(A) != size(B)
-        return false
-    end
-    if isa(A,Range) != isa(B,Range)
         return false
     end
     for (a, b) in zip(A, B)
@@ -1158,7 +1152,7 @@ const hashaa_seed  = UInt === UInt64 ? 0x7f53e68ceb575e76 : 0xeb575e76
 const hashrle_seed = UInt === UInt64 ? 0x2aab8909bfea414c : 0xbfea414c
 const hashr_seed   = UInt === UInt64 ? 0x80707b6821b70087 : 0x21b70087
 
-function hash2(a::AbstractArray, h::UInt)
+function hash(a::AbstractArray, h::UInt)
     h += hashaa_seed
     h += hash(size(a))
 
@@ -1177,7 +1171,6 @@ function hash2(a::AbstractArray, h::UInt)
         # used in ranges but we wouldn't be able to hash them the same in vectors
         s = (l-f)/(length(a)-1)
         r = f:s:l
-        @show a, r, f, l
         @assert length(r) == length(a)
         rstate = start(r)
         y, rstate = next(r, rstate)
