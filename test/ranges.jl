@@ -266,29 +266,46 @@ end
 @test all(((1:5) - [1:5;]) .== 0)
 
 # tricky floating-point ranges
+for (start, step, stop, len) in ((1, 1, 3, 3), (0, 1, 3, 4),
+                                 (3, -1, -1, 5), (1, -1, -1, 5),
+                                 (0, 1, 1.0, 11), (0, 7, 21, 4),
+                                 (0, 11, 33, 4), (1, 11, 34, 4),
+                                 (0, 13, 39, 4), (1, 13, 40, 4),
+                                 (11, 11, 33, 3), (3, 1, 11, 9),
+                                 (0, 10, 0, 1), (0, -1, 0, 1),
+                                 (0, 10, 55, 0), (0, -1, 5, 0),
+                                 (0, 1, 5, 0))
+    r = start/10:step/10:stop/10;
+    a = collect(start:step:stop)./10
+    ra = collect(r)
 
-@test [0.1:0.1:0.3;]   == [linspace(0.1,0.3,3);]     == [1:3;]./10
-@test [0.0:0.1:0.3;]   == [linspace(0.0,0.3,4);]     == [0:3;]./10
-@test [0.3:-0.1:-0.1;] == [linspace(0.3,-0.1,5);]    == [3:-1:-1;]./10
-@test [0.1:-0.1:-0.3;] == [linspace(0.1,-0.3,5);]    == [1:-1:-3;]./10
-@test [0.0:0.1:1.0;]   == [linspace(0.0,1.0,11);]    == [0:10;]./10
-@test [0.0:-0.1:1.0;]  == [linspace(0.0,1.0,0);]     == []
-@test [0.0:0.1:-1.0;]  == [linspace(0.0,-1.0,0);]    == []
-@test [0.0:-0.1:-1.0;] == [linspace(0.0,-1.0,11);]   == [0:-1:-10;]./10
-@test [1.0:1/49:27.0;] == [linspace(1.0,27.0,1275);] == [49:1323;]./49
-@test [0.0:0.7:2.1;]   == [linspace(0.0,2.1,4);]     == [0:7:21;]./10
-@test [0.0:1.1:3.3;]   == [linspace(0.0,3.3,4);]     == [0:11:33;]./10
-@test [0.1:1.1:3.4;]   == [linspace(0.1,3.4,4);]     == [1:11:34;]./10
-@test [0.0:1.3:3.9;]   == [linspace(0.0,3.9,4);]     == [0:13:39;]./10
-@test [0.1:1.3:4.0;]   == [linspace(0.1,4.0,4);]     == [1:13:40;]./10
-@test [1.1:1.1:3.3;]   == [linspace(1.1,3.3,3);]     == [11:11:33;]./10
-@test [0.3:0.1:1.1;]   == [linspace(0.3,1.1,9);]     == [3:1:11;]./10
-@test [0.0:1.0:0.0;]   == [linspace(0.0,0.0,1);]     == [0.0]
-@test [0.0:-1.0:0.0;]  == [linspace(0.0,0.0,1);]     == [0.0]
+    @test r == a
+    @test isequal(r, a)
 
-@test [0.0:1.0:5.5;]   == [0:10:55;]./10
-@test [0.0:-1.0:0.5;]  == []
-@test [0.0:1.0:0.5;]   == [0.0]
+    @test r == ra
+    @test isequal(r, ra)
+
+    @test hash(r) == hash(a)
+    @test hash(r) == hash(ra)
+
+    if len > 0
+        l = linspace(start/10, stop/10, len)
+        la = collect(l)
+
+        @test a == l
+        @test r == l
+        @test isequal(a, l)
+        @test isequal(r, l)
+
+        @test l == la
+        @test isequal(l, la)
+
+        @test hash(l) == hash(a)
+        @test hash(l) == hash(la)
+    end
+end
+
+#@test [1.0:1/49:27.0;] == [linspace(1.0,27.0,1275);] == [49:1323;]./49
 
 @test [prevfloat(0.1):0.1:0.3;] == [prevfloat(0.1), 0.2, 0.3]
 @test [nextfloat(0.1):0.1:0.3;] == [nextfloat(0.1), 0.2]
@@ -393,16 +410,18 @@ end
 
 # comparing and hashing ranges
 let
-    Rs = Range[1:2, map(Int32,1:3:17), map(Int64,1:3:17), 1:0, 17:-3:0,
+    Rs = Range[1:1, 1:2, map(Int32,1:3:17), map(Int64,1:3:17), 1:0, 17:-3:0,
                0.0:0.1:1.0, map(Float32,0.0:0.1:1.0),
+               1.:eps():1+10eps(), 9007199254740990.:1.:9007199254740994,
                linspace(0, 1, 20), map(Float32, linspace(0, 1, 20))]
     for r in Rs
         ar = collect(r)
-        @test r != ar
-        @test !isequal(r,ar)
+        @test r == ar
+        @test isequal(r,ar)
+        @test hash(r) == hash(ar)
         for s in Rs
             as = collect(s)
-            @test !isequal(r,s) || hash(r)==hash(s)
+            @test isequal(r,s) == (hash(r)==hash(s))
             @test (r==s) == (ar==as)
         end
     end
