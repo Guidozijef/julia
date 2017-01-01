@@ -766,7 +766,7 @@ for fn in (:float,)
     @eval begin
         $fn(r::StepRange) = $fn(r.start):$fn(r.step):$fn(last(r))
         $fn(r::UnitRange) = $fn(r.start):$fn(last(r))
-        $fn(r::FloatRange) = FloatRange($fn(r.start), $fn(r.step), r.len, $fn(r.divisor))
+        $fn(r::StepRangeHiLo) = StepRangeHiLo($fn(r.ref_hi), $fn(r.ref_lo), $fn(r.step_hi), $fn(r.step_lo), r.offset, r.len)
         function $fn(r::LinSpace)
             LinSpace($fn(r.start), $fn(r.stop), length(r))
         end

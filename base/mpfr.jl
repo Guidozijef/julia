@@ -970,4 +970,6 @@ function lerpi(j::Integer, d::Integer, a::BigFloat, b::BigFloat)
     fma(t, b, fma(-t, a, a))
 end
 
+Base._linspace(start::BigFloat, stop::BigFloat, len) = Base.LinSpace{BigFloat}(start, stop, len)
+
 end #module

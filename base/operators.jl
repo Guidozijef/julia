@@ -892,25 +892,6 @@ for f in (:+, :-)
             range($f(first(r1),first(r2)), $f(step(r1),step(r2)), r1l)
         end
 
-        function $f{T<:AbstractFloat}(r1::FloatRange{T}, r2::FloatRange{T})
-            len = r1.len
-            (len == r2.len ||
-             throw(DimensionMismatch("argument dimensions must match")))
-            divisor1, divisor2 = r1.divisor, r2.divisor
-            if divisor1 == divisor2
-                FloatRange{T}($f(r1.start,r2.start), $f(r1.step,r2.step),
-                              len, divisor1)
-            else
-                d1 = Int(divisor1)
-                d2 = Int(divisor2)
-                d = lcm(d1,d2)
-                s1 = div(d,d1)
-                s2 = div(d,d2)
-                FloatRange{T}($f(r1.start*s1, r2.start*s2),
-                              $f(r1.step*s1, r2.step*s2),  len, d)
-            end
-        end
-
         function $f{T<:AbstractFloat}(r1::LinSpace{T}, r2::LinSpace{T})
             len = r1.len
             (len == r2.len ||
@@ -919,11 +900,32 @@ for f in (:+, :-)
                      convert(T, $f(last(r1), last(r2))), len)
         end
 
-        $f(r1::Union{FloatRange, OrdinalRange, LinSpace},
-           r2::Union{FloatRange, OrdinalRange, LinSpace}) =
+        $f(r1::Union{StepRangeHiLo, OrdinalRange, LinSpace},
+           r2::Union{StepRangeHiLo, OrdinalRange, LinSpace}) =
                $f(promote_noncircular(r1, r2)...)
     end
 end
+
+function +{T}(r1::StepRangeHiLo{T}, r2::StepRangeHiLo{T})
+    len = length(r1)
+    (len == length(r2) ||
+     throw(DimensionMismatch("argument dimensions must match")))
+    step_hi, step_lo = add2(r1.step_hi, r2.step_hi)
+    step_lo += r1.step_lo + r2.step_lo
+    if r1.offset == r2.offset
+        ref_hi, ref_lo = add2(r1.ref_hi, r2.ref_hi)
+        ref_lo += r1.ref_lo + r2.ref_lo
+    else
+        imid = round(Int, (r1.offset+r2.offset)/2)
+        v1mid_hi, v1mid_lo = _getindex_hiprec(r1, imid)
+        v2mid_hi, v2mid_lo = _getindex_hiprec(r2, imid)
+        ref_hi, ref_lo = add2(v1mid_hi, v2mid_hi)
+        ref_lo += v1mid_lo + v2mid_lo
+    end
+    StepRangeHiLo{T}(ref_hi, ref_lo, step_hi, step_lo, r1.offset, len)
+end
+
+-(r1::StepRangeHiLo, r2::StepRangeHiLo) = +(r1, -r2)
 
 # Pair
 
