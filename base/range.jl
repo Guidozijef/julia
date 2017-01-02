@@ -209,68 +209,29 @@ range(a::AbstractFloat, st::Real, len::Integer) = FloatRange(a, float(st), len, 
 
 ## linspace and logspace
 
-immutable LinSpace{T<:AbstractFloat} <: Range{T}
+immutable LinSpace{T} <: Range{T}
     start::T
     stop::T
-    len::T
-    divisor::T
+    len::Int
+    lendiv::Int
+
+    function LinSpace(start,stop,len)
+        len >= 0 || error("linspace($start, $stop, $len): negative length")
+        if len == 1
+            start == stop || error("linspace($start, $stop, $len): endpoints differ")
+            return new(start, stop, 1, 1)
+        end
+        new(start,stop,len,max(len-1,1))
+    end
 end
 
-function linspace{T<:AbstractFloat}(start::T, stop::T, len::T)
-    len == round(len) || throw(InexactError())
-    0 <= len || error("linspace($start, $stop, $len): negative length")
-    if len == 0
-        n = convert(T, 2)
-        if isinf(n*start) || isinf(n*stop)
-            start /= n; stop /= n; n = one(T)
-        end
-        return LinSpace(-start, -stop, -one(T), n)
-    end
-    if len == 1
-        start == stop || error("linspace($start, $stop, $len): endpoints differ")
-        return LinSpace(-start, -start, zero(T), one(T))
-    end
-    n = convert(T, len - 1)
-    len - n == 1 || error("linspace($start, $stop, $len): too long for $T")
-    a0, b = rat(start)
-    a = convert(T,a0)
-    if a/convert(T,b) == start
-        c0, d = rat(stop)
-        c = convert(T,c0)
-        if c/convert(T,d) == stop
-            e = lcm(b,d)
-            a *= div(e,b)
-            c *= div(e,d)
-            s = convert(T,n*e)
-            if isinf(a*n) || isinf(c*n)
-                s, p = frexp(s)
-                p2 = oftype(s,2)^p
-                a /= p2; c /= p2
-            end
-            if a*n/s == start && c*n/s == stop
-                return LinSpace(a, c, len, s)
-            end
-        end
-    end
-    a, c, s = start, stop, n
-    if isinf(a*n) || isinf(c*n)
-        s, p = frexp(s)
-        p2 = oftype(s,2)^p
-        a /= p2; c /= p2
-    end
-    if a*n/s == start && c*n/s == stop
-        return LinSpace(a, c, len, s)
-    end
-    return LinSpace(start, stop, len, n)
-end
-function linspace{T<:AbstractFloat}(start::T, stop::T, len::Real)
-    T_len = convert(T, len)
-    T_len == len || throw(InexactError())
-    linspace(start, stop, T_len)
+function LinSpace(start, stop, len::Integer)
+    T = typeof((stop-start)/len)
+    LinSpace{T}(start, stop, len)
 end
 
 """
-    linspace(start::Real, stop::Real, n::Real=50)
+    linspace(start, stop, n=50)
 
 Construct a range of `n` linearly spaced elements from `start` to `stop`.
 
@@ -280,8 +241,7 @@ julia> linspace(1.3,2.9,9)
  1.3,1.5,1.7,1.9,2.1,2.3,2.5,2.7,2.9
 ```
 """
-linspace(start::Real, stop::Real, len::Real=50) =
-    linspace(promote(AbstractFloat(start), AbstractFloat(stop))..., len)
+linspace(start, stop, len::Real=50) = LinSpace(start, stop, Int(len))
 
 function show(io::IO, r::LinSpace)
     print(io, "linspace(")
@@ -398,7 +358,7 @@ julia> step(linspace(2.5,10.9,85))
 step(r::StepRange) = r.step
 step(r::AbstractUnitRange) = 1
 step(r::FloatRange) = r.step/r.divisor
-step{T}(r::LinSpace{T}) = ifelse(r.len <= 0, convert(T,NaN), (r.stop-r.start)/r.divisor)
+step(r::LinSpace) = (last(r)-first(r))/r.lendiv
 
 unsafe_length(r::Range) = length(r)  # generic fallback
 
@@ -412,7 +372,7 @@ unsafe_length(r::OneTo) = r.stop
 length(r::AbstractUnitRange) = unsafe_length(r)
 length(r::OneTo) = unsafe_length(r)
 length(r::FloatRange) = Integer(r.len)
-length(r::LinSpace) = Integer(r.len + signbit(r.len - 1))
+length(r::LinSpace) = r.len
 
 function length{T<:Union{Int,UInt,Int64,UInt64}}(r::StepRange{T})
     isempty(r) && return zero(T)
@@ -452,11 +412,11 @@ end
 first{T}(r::OrdinalRange{T}) = convert(T, r.start)
 first{T}(r::OneTo{T}) = one(T)
 first{T}(r::FloatRange{T}) = convert(T, r.start/r.divisor)
-first{T}(r::LinSpace{T}) = convert(T, (r.len-1)*r.start/r.divisor)
+first(r::LinSpace) = r.start
 
 last{T}(r::OrdinalRange{T}) = convert(T, r.stop)
 last{T}(r::FloatRange{T}) = convert(T, (r.start + (r.len-1)*r.step)/r.divisor)
-last{T}(r::LinSpace{T}) = convert(T, (r.len-1)*r.stop/r.divisor)
+last(r::LinSpace) = r.stop
 
 minimum(r::AbstractUnitRange) = isempty(r) ? throw(ArgumentError("range must be non-empty")) : first(r)
 maximum(r::AbstractUnitRange) = isempty(r) ? throw(ArgumentError("range must be non-empty")) : last(r)
@@ -479,8 +439,10 @@ next{T}(r::FloatRange{T}, i::Int) =
 
 start(r::LinSpace) = 1
 done(r::LinSpace, i::Int) = length(r) < i
-next{T}(r::LinSpace{T}, i::Int) =
-    (convert(T, ((r.len-i)*r.start + (i-1)*r.stop)/r.divisor), i+1)
+function next(r::LinSpace, i::Int)
+    @_inline_meta
+    unsafe_getindex(r, i), i+1
+end
 
 start(r::StepRange) = oftype(r.start + r.step, r.start)
 next{T}(r::StepRange{T}, i) = (convert(T,i), i+r.step)
@@ -538,10 +500,25 @@ function getindex{T}(r::FloatRange{T}, i::Integer)
     convert(T, (r.start + (i-1)*r.step)/r.divisor)
 end
 
-function getindex{T}(r::LinSpace{T}, i::Integer)
+function getindex(r::LinSpace, i::Integer)
     @_inline_meta
     @boundscheck checkbounds(r, i)
-    convert(T, ((r.len-i)*r.start + (i-1)*r.stop)/r.divisor)
+    unsafe_getindex(r, i)
+end
+
+# This is separate to make it useful even when running with --check-bounds=yes
+function unsafe_getindex(r::LinSpace, i::Integer)
+    d = r.lendiv
+    j, a, b = ifelse(2i >= length(r), (i-1, r.start, r.stop), (length(r)-i, r.stop, r.start))
+    lerpi(j, d, a, b)
+end
+
+# High-precision interpolation. Accurate for t ∈ [0.5,1], so that 1-t is exact.
+function lerpi{T}(j::Integer, d::Integer, a::T, b::T)
+    @_inline_meta
+    t = j/d
+    # computes (1-t)*a + t*b
+    T(fma(t, b, fma(-t, a, a)))
 end
 
 getindex(r::Range, ::Colon) = copy(r)
@@ -583,11 +560,11 @@ end
 function getindex{T}(r::LinSpace{T}, s::OrdinalRange)
     @_inline_meta
     @boundscheck checkbounds(r, s)
-    sl::T = length(s)
+    sl = length(s)
     ifirst = first(s)
     ilast = last(s)
-    vfirst::T = ((r.len - ifirst) * r.start + (ifirst - 1) * r.stop) / r.divisor
-    vlast::T = ((r.len - ilast) * r.start + (ilast - 1) * r.stop) / r.divisor
+    vfirst = unsafe_getindex(r, ifirst)
+    vlast  = unsafe_getindex(r, ilast)
     return linspace(vfirst, vlast, sl)
 end
 
@@ -741,18 +718,18 @@ end
 
 -(r::OrdinalRange) = range(-first(r), -step(r), length(r))
 -(r::FloatRange)   = FloatRange(-r.start, -r.step, r.len, r.divisor)
--(r::LinSpace)     = LinSpace(-r.start, -r.stop, r.len, r.divisor)
+-(r::LinSpace) = LinSpace(-r.start, -r.stop, r.len)
 
 +(x::Real, r::AbstractUnitRange) = range(x + first(r), length(r))
 +(x::Real, r::Range) = (x+first(r)):step(r):(x+last(r))
 #+(x::Real, r::StepRange)  = range(x + r.start, r.step, length(r))
 +(x::Real, r::FloatRange) = FloatRange(r.divisor*x + r.start, r.step, r.len, r.divisor)
-function +{T}(x::Real, r::LinSpace{T})
-    x2 = x * r.divisor / (r.len - 1)
-    LinSpace(x2 + r.start, x2 + r.stop, r.len, r.divisor)
+function +(x::Real, r::LinSpace)
+    LinSpace(x + r.start, x + r.stop, r.len)
 end
-+(r::Range, x::Real)      = x + r
-#+(r::FloatRange, x::Real) = x + r
+function +(x::Number, r::LinSpace)
+    LinSpace(x + r.start, x + r.stop, r.len)
+end
 
 -(x::Real, r::Range)      = (x-first(r)):-step(r):(x-last(r))
 -(x::Real, r::FloatRange) = FloatRange(r.divisor*x - r.start, -r.step, r.len, r.divisor)
@@ -778,6 +755,42 @@ end
 /(r::OrdinalRange, x::Real) = range(first(r)/x, step(r)/x, length(r))
 /(r::FloatRange, x::Real)   = FloatRange(r.start/x, r.step/x, r.len, r.divisor)
 /(r::LinSpace, x::Real)     = LinSpace(r.start / x, r.stop / x, r.len, r.divisor)
+=======
+.-(x::Real, r::Range)      = (x-first(r)):-step(r):(x-last(r))
+.-(x::Real, r::FloatRange) = FloatRange(r.divisor*x - r.start, -r.step, r.len, r.divisor)
+function .-(x::Real, r::LinSpace)
+    LinSpace(x - r.start, x - r.stop, r.len)
+end
+function .-(x::Number, r::LinSpace)
+    LinSpace(x - r.start, x - r.stop, r.len)
+end
+function .-{T}(x::Ref{T}, r::LinSpace{T})
+    LinSpace(x - r.start, x - r.stop, r.len)
+end
+.-(r::AbstractUnitRange, x::Real) = range(first(r)-x, length(r))
+.-(r::StepRange , x::Real) = range(r.start-x, r.step, length(r))
+.-(r::FloatRange, x::Real) = FloatRange(r.start - r.divisor*x, r.step, r.len, r.divisor)
+function .-(r::LinSpace, x::Real)
+    LinSpace(r.start - x, r.stop - x, r.len)
+end
+function .-(r::LinSpace, x::Number)
+    LinSpace(r.start - x, r.stop - x, r.len)
+end
+function .-{T}(r::LinSpace{T}, x::Ref{T})
+    LinSpace(r.start - x, r.stop - x, r.len)
+end
+
+.*(x::Real, r::OrdinalRange) = range(x*first(r), x*step(r), length(r))
+.*(x::Real, r::FloatRange)   = FloatRange(x*r.start, x*r.step, r.len, r.divisor)
+.*(x::Real, r::LinSpace)     = LinSpace(x * r.start, x * r.stop, r.len)
+.*(r::Range, x::Real)        = x .* r
+.*(r::FloatRange, x::Real)   = x .* r
+.*(r::LinSpace, x::Real)     = x .* r
+
+./(r::OrdinalRange, x::Real) = range(first(r)/x, step(r)/x, length(r))
+./(r::FloatRange, x::Real)   = FloatRange(r.start/x, r.step/x, r.len, r.divisor)
+./(r::LinSpace, x::Real)     = LinSpace(r.start / x, r.stop / x, r.len)
+>>>>>>> 6f27d2b... Make LinSpace generic and endpoint-preserving. Fixes #14420.
 
 promote_rule{T1,T2}(::Type{UnitRange{T1}},::Type{UnitRange{T2}}) =
     UnitRange{promote_type(T1,T2)}
@@ -822,12 +835,12 @@ promote_rule{T1,T2}(::Type{LinSpace{T1}},::Type{LinSpace{T2}}) =
     LinSpace{promote_type(T1,T2)}
 convert{T<:AbstractFloat}(::Type{LinSpace{T}}, r::LinSpace{T}) = r
 convert{T<:AbstractFloat}(::Type{LinSpace{T}}, r::LinSpace) =
-    LinSpace{T}(r.start, r.stop, r.len, r.divisor)
+    LinSpace{T}(r.start, r.stop, r.len)
 
 promote_rule{F,OR<:OrdinalRange}(::Type{LinSpace{F}}, ::Type{OR}) =
     LinSpace{promote_type(F,eltype(OR))}
 convert{T<:AbstractFloat}(::Type{LinSpace{T}}, r::OrdinalRange) =
-    linspace(convert(T, first(r)), convert(T, last(r)), convert(T, length(r)))
+    linspace(convert(T, first(r)), convert(T, last(r)), length(r))
 convert{T}(::Type{LinSpace}, r::OrdinalRange{T}) =
     convert(LinSpace{typeof(float(first(r)))}, r)
 
@@ -835,7 +848,7 @@ convert{T}(::Type{LinSpace}, r::OrdinalRange{T}) =
 promote_rule{F,OR<:FloatRange}(::Type{LinSpace{F}}, ::Type{OR}) =
     LinSpace{promote_type(F,eltype(OR))}
 convert{T<:AbstractFloat}(::Type{LinSpace{T}}, r::FloatRange) =
-    linspace(convert(T, first(r)), convert(T, last(r)), convert(T, length(r)))
+    linspace(convert(T, first(r)), convert(T, last(r)), length(r))
 convert{T<:AbstractFloat}(::Type{LinSpace}, r::FloatRange{T}) =
     convert(LinSpace{T}, r)
 
@@ -877,7 +890,7 @@ collect(r::Range) = vcat(r)
 
 reverse(r::OrdinalRange) = colon(last(r), -step(r), first(r))
 reverse(r::FloatRange)   = FloatRange(r.start + (r.len-1)*r.step, -r.step, r.len, r.divisor)
-reverse(r::LinSpace)     = LinSpace(r.stop, r.start, r.len, r.divisor)
+reverse(r::LinSpace)     = LinSpace(r.stop, r.start, length(r))
 
 ## sorting ##
 

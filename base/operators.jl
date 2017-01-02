@@ -915,14 +915,8 @@ for f in (:+, :-)
             len = r1.len
             (len == r2.len ||
              throw(DimensionMismatch("argument dimensions must match")))
-            divisor1, divisor2 = r1.divisor, r2.divisor
-            if divisor1 == divisor2
-                LinSpace{T}($f(r1.start, r2.start), $f(r1.stop, r2.stop),
-                            len, divisor1)
-            else
-                linspace(convert(T, $f(first(r1), first(r2))),
-                         convert(T, $f(last(r1), last(r2))), len)
-            end
+            linspace(convert(T, $f(first(r1), first(r2))),
+                     convert(T, $f(last(r1), last(r2))), len)
         end
 
         $f(r1::Union{FloatRange, OrdinalRange, LinSpace},

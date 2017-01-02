@@ -1,5 +1,19 @@
 # This file is a part of Julia. License is MIT: http://julialang.org/license
 
+# Test whether r[i] has full precision
+function test_linspace{T<:AbstractFloat}(r::LinSpace{T})
+    isempty(r) && return nothing
+    n = length(r)
+    f, l = first(r), last(r)
+    a, b, d = BigFloat(f), BigFloat(l), max(n-1,1)
+    Δ = max(eps(f), eps(l))
+    for i = 1:n
+        c = b*(BigFloat(i-1)/d) + a*(BigFloat(d-i+1)/d)
+        @test abs(r[i]-T(c)) <= Δ
+    end
+    nothing
+end
+
 # ranges
 @test size(10:1:0) == (0,)
 @test length(1:.2:2) == 6
@@ -786,3 +800,24 @@ io = IOBuffer()
 show(io, r)
 str = String(take!(io))
 @test str == "Base.OneTo(3)"
+
+# linspace of other types
+r = linspace(0, 3//10, 4)
+@test eltype(r) == Rational{Int}
+@test r[2] === 1//10
+
+a, b = 1.0, nextfloat(1.0)
+ba, bb = BigFloat(a), BigFloat(b)
+r = linspace(ba, bb, 3)
+@test eltype(r) == BigFloat
+@test r[1] == a && r[3] == b
+@test r[2] == (ba+bb)/2
+
+a, b = rand(10), rand(10)
+ba, bb = big(a), big(b)
+r = linspace(a, b, 5)
+@test r[1] == a && r[5] == b
+for i = 2:4
+    x = ((5-i)//4)*ba + ((i-1)//4)*bb
+    @test r[i] == Float64.(x)
+end
