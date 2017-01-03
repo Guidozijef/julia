@@ -892,7 +892,7 @@ for f in (:+, :-)
             range($f(first(r1),first(r2)), $f(step(r1),step(r2)), r1l)
         end
 
-        function $f{T<:AbstractFloat}(r1::LinSpace{T}, r2::LinSpace{T})
+        function $f{T}(r1::LinSpace{T}, r2::LinSpace{T})
             len = r1.len
             (len == r2.len ||
              throw(DimensionMismatch("argument dimensions must match")))
@@ -900,32 +900,20 @@ for f in (:+, :-)
                      convert(T, $f(last(r1), last(r2))), len)
         end
 
-        $f(r1::Union{StepRangeHiLo, OrdinalRange, LinSpace},
-           r2::Union{StepRangeHiLo, OrdinalRange, LinSpace}) =
+        $f(r1::Union{StepRangeLen, OrdinalRange, LinSpace},
+           r2::Union{StepRangeLen, OrdinalRange, LinSpace}) =
                $f(promote_noncircular(r1, r2)...)
     end
 end
 
-function +{T}(r1::StepRangeHiLo{T}, r2::StepRangeHiLo{T})
+function +{T,S}(r1::StepRangeLen{T,S}, r2::StepRangeLen{T,S})
     len = length(r1)
     (len == length(r2) ||
-     throw(DimensionMismatch("argument dimensions must match")))
-    step_hi, step_lo = add2(r1.step_hi, r2.step_hi)
-    step_lo += r1.step_lo + r2.step_lo
-    if r1.offset == r2.offset
-        ref_hi, ref_lo = add2(r1.ref_hi, r2.ref_hi)
-        ref_lo += r1.ref_lo + r2.ref_lo
-    else
-        imid = round(Int, (r1.offset+r2.offset)/2)
-        v1mid_hi, v1mid_lo = _getindex_hiprec(r1, imid)
-        v2mid_hi, v2mid_lo = _getindex_hiprec(r2, imid)
-        ref_hi, ref_lo = add2(v1mid_hi, v2mid_hi)
-        ref_lo += v1mid_lo + v2mid_lo
-    end
-    StepRangeHiLo{T}(ref_hi, ref_lo, step_hi, step_lo, r1.offset, len)
+        throw(DimensionMismatch("argument dimensions must match")))
+    StepRangeLen(first(r1)+first(r2), step(r1)+step(r2), len)
 end
 
--(r1::StepRangeHiLo, r2::StepRangeHiLo) = +(r1, -r2)
+-(r1::StepRangeLen, r2::StepRangeLen) = +(r1, -r2)
 
 # Pair
 

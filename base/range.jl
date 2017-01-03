@@ -9,11 +9,6 @@ abstract Range{T} <: AbstractArray{T,1}
 abstract OrdinalRange{T,S} <: Range{T}
 abstract AbstractUnitRange{T} <: OrdinalRange{T,Int}
 
-# ordinal ranges rely on having an ordering
-immutable HasOrder{b} end
-HasOrder{T<:Real}(::Type{T}) = HasOrder{true}()
-HasOrder{T}(::Type{T}) = HasOrder{false}()
-
 immutable StepRange{T,S} <: OrdinalRange{T,S}
     start::T
     step::S
@@ -139,145 +134,55 @@ colon{T}(start::T, step, stop::T) = StepRange(start, step, stop)
 
 Construct a range by length, given a starting value and optional step (defaults to 1).
 """
-range{T,S}(a::T, step::S, len::Integer) = _range(HasOrder(T), a, step, len)
-_range{T,S}(::HasOrder{true}, a::T, step::S, len::Integer) = StepRange{T,S}(a, step, convert(T, a+step*(len-1)))
-_range{T,S}(::HasOrder{false}, a::T, step::S, len::Integer) = StepRangeHiLo(promote(a, step)..., len)
+range{T}(a::T, step, len::Integer) = _range(TypeOrder(T), TypeArithmetic(T), a, step, len)
+_range{T,S}(::HasOrder, ::ArithmeticOverflows, a::T, step::S, len::Integer) = StepRange{T,S}(a, step, convert(T, a+step*(len-1)))
+_range{T,S}(::TypeOrder, ::TypeArithmetic, a::T, step::S, len::Integer) = StepRangeLen{typeof(a+0*step),T,S}(a, step, len)
 
-## Roundoff-compensating ranges
+## Step ranges parametrized by length
 
-# Use 2x arithmetic to achieve high precision.
-# Necessary for ranges like 0.1:0.1:0.3, since 0.1+2*0.1 = 0.30000000000000004
+"""
+    StepRangeLen{T,R,S}(ref::R, step::S, len, [offset=1])
 
-immutable StepRangeHiLo{T} <: Range{T}
-    # ref is the smallest-magnitude element in the range (not necessarily start or stop)
-    ref_hi::T    # most significant bits
-    ref_lo::T    # least significant bits
-
-    # step is the separation between r[i] and r[i+1]
-    step_hi::T   # ideally, has enough trailing zeros that (0:len-1)*step_hi is exact
-    step_lo::T   # remaining bits of step
-
-    offset::Int  # the index of ref
+A range `r` where `r[i]` produces values of type `T`, parametrized by
+a `ref`erence value, a `step`, and the `len`gth.  By default `ref` is
+the starting value `r[1]`, but alternatively you can supply it as the
+value of `r[offset]` for some other index `1 <= offset <= len`.  In
+conjunction with `TwicePrecision` this can be used to implement ranges
+that are free of roundoff error.
+"""
+immutable StepRangeLen{T,R,S} <: Range{T}
+    ref::R       # reference value (might be smallest-magnitude value in the range)
+    step::S      # step value
     len::Int     # length of the range
+    offset::Int  # the index of ref
 
-    function StepRangeHiLo(ref_hi, ref_lo, step_hi, step_lo, offset, len)
+    function StepRangeLen(ref::R, step::S, len::Integer, offset::Integer = 1)
         len >= 0 || throw(ArgumentError("length cannot be negative, got $len"))
-        1 <= offset <= max(len,1) || throw(ArgumentError("StepRangeHiLo: offset must be in [1,$len], got $offset"))
-        len > 1 && step_hi == 0 && step_lo == 0 && throw(ArgumentError("range step cannot be 0"))
-        new(ref_hi, ref_lo, step_hi, step_lo, offset, len)
+        1 <= offset <= max(1,len) || throw(ArgumentError("StepRangeLen: offset must be in [1,$len], got $offset"))
+        new(ref, step, len, offset)
     end
 end
 
-# promote types without risking a StackOverflowError
-StepRangeHiLo(ref_hi, ref_lo, step_hi, step_lo, offset, len) =
-    _srhl(promote(ref_hi, ref_lo, step_hi, step_lo)..., offset, len)
-_srhl{T}(ref_hi::T, ref_lo::T, step_hi::T, step_lo::T, offset::Integer, len::Integer) =
-    StepRangeHiLo{T}(ref_hi, ref_lo, step_hi, step_lo, Int(offset), Int(len))
-_srhl(ref_hi, ref_lo, step_hi, step_lo, offset::Integer, len::Integer) =
-    throw(ArgumentError("$ref_hi::$(typeof(ref_hi)), $ref_hi::$(typeof(ref_lo)), $ref_hi::$(typeof(step_hi)), and $ref_hi::$(typeof(step_lo)) cannot be promoted to a common type"))
-
-function (::Type{StepRangeHiLo{T}}){T}(start::Integer, step::Integer, len::Integer, den::Integer)
-    step == 0 && throw(ArgumentError("range step cannot be zero"))
-    if len < 2
-        return StepRangeHiLo{T}(div2(Int(start), 0, den)..., step/den, zero(T), 1, Int(len))
-    end
-    # index of smallest-magnitude value
-    imin = clamp(round(Int, -start/step+1), 1, Int(len))
-    # Compute smallest-magnitude element to 2x precision
-    ref_n = start+(imin-1)*step  # this shouldn't overflow, so don't check
-    ref_hi, ref_lo = div2(T(ref_n), 0, den)
-    step_hi, step_lo = step2x(T, step, den, len)
-    StepRangeHiLo{T}(ref_hi, ref_lo, step_hi, step_lo, imin, Int(len))
-end
-
-function (::Type{StepRangeHiLo{T}}){T}(start::T, step::T, len::Integer)
-    step == 0 && throw(ArgumentError("range step cannot be zero"))
-    StepRangeHiLo{T}(start, zero(T), step, zero(T), 1, Int(len))
-end
-
-function step2x{T}(::Type{T}, step_n::Integer, step_d::Integer, len::Integer)
-    # This computes step=step_n/step_d to 2x precision...
-    step_hi_pre, step_lo = div2(T(step_n), zero(T), step_d)
-    # ...and then truncates enough low bits of step_hi to ensure that
-    # multiplication by 0:(len-1) is exact
-    nb = ceil(UInt, log2(len-1))
-    step_hi = truncbits(step_hi_pre, nb)
-    step_lo += step_hi_pre - step_hi
-    step_hi, step_lo
-end
-
-function StepRangeHiLo(a::AbstractFloat, st::AbstractFloat, len::Real, divisor::AbstractFloat)
-    T = promote_type(typeof(a), typeof(st), typeof(divisor))
-    m = maxintfloat(T)
-    if abs(a) <= m && abs(st) <= m && abs(divisor) <= m
-        ia, ist, idivisor = round(Int, a), round(Int, st), round(Int, divisor)
-        if ia == a && ist == st && idivisor == divisor
-            # We can return the high-precision range
-            return StepRangeHiLo{T}(ia, ist, Int(len), idivisor)
-        end
-    end
-    # Fall back to 1x-precision range
-    StepRangeHiLo{T}(T(a/divisor), zero(T), T(st/divisor), zero(T), 1, Int(len))
-end
-
-function colon{T<:Union{Float16,Float32,Float64}}(start::T, step::T, stop::T)
-    step == 0 && throw(ArgumentError("range step cannot be zero"))
-    len = max(0, floor(Int, (stop-start)/step) + 1)
-    # Because len might be too small by 1 due to roundoff error, let's
-    # see if the inputs have exact rational approximations (and if so,
-    # perform all computations in terms of the rationals)
-    step_n, step_d = rat(step)
-    if T(step_n/step_d) == step
-        start_n, start_d = rat(start)
-        stop_n, stop_d = rat(stop)
-        if T(start_n/start_d) == start && T(stop_n/stop_d) == stop
-            den = lcm(start_d, step_d) # use same denominator for start and step
-            m = maxintfloat(T)
-            if abs(start*den) <= m && abs(step*den) <= m
-                start_n = round(Int, start*den)
-                step_n = round(Int, step*den)
-                len = max(0, div(den*stop_n - stop_d*start_n + step_n*stop_d, step_n*stop_d))
-                # Integer ops could overflow, so check that this makes sense
-                if T(start_n/den) == start && T(step_n/den) == step &&
-                    (isbetween(start, start + (len-1)*step, stop + step/2) &&
-                     !isbetween(start, start + len*step, stop))
-                    # Return a 2x precision range
-                    return StepRangeHiLo{T}(start_n, step_n, len, den)
-                end
-            end
-        end
-    end
-    # Fall back to the 1x precision range
-    StepRangeHiLo{T}(start, zero(T), step, zero(T), 1, len)
-end
+StepRangeLen{R,S}(ref::R, step::S, len::Integer, offset::Integer = 1) =
+    StepRangeLen{typeof(ref+0*step),R,S}(ref, step, len, offset)
 
 colon{T<:AbstractFloat}(a::T, b::T) = colon(a, one(a), b)
 
+colon{T}(a::T, b::T, c::T) = StepRangeLen(a, b, floor(Int, (c-a)/b)+1) # see twiceprecision.jl
+# promote without risking a StackOverflowError
 colon{T<:Real}(a::T, b::AbstractFloat, c::T) = _colon(promote(a,b,c)...)
 colon{T<:AbstractFloat}(a::T, b::AbstractFloat, c::T) = _colon(promote(a,b,c)...)
 colon{T<:AbstractFloat}(a::T, b::Real, c::T) = _colon(promote(a,b,c)...)
 _colon{T}(a::T, b::T, c::T) = colon(a, b, c)
 _colon(a, b, c) = throw(ArgumentError("$a::$(typeof(a)), $b::$(typeof(b)), and $c::$(typeof(c)) cannot be promoted to a common type"))
 
-range(a::AbstractFloat, len::Integer) = StepRangeHiLo(a,zero(a),one(a),zero(a),1,len)
+range(a::AbstractFloat, len::Integer) = range(a, one(a), len)
+
+range(a, st, len::Integer) = StepRangeLen(a, st, len)
 range(a::AbstractFloat, st::AbstractFloat, len::Integer) = _range(promote(a, st)..., len)
 range(a::Real, st::AbstractFloat, len::Integer) = range(float(a), st, len)
 range(a::AbstractFloat, st::Real, len::Integer) = range(a, float(st), len)
-function _range{T<:Union{Float16,Float32,Float64}}(a::T, st::T, len::Integer)
-    start_n, start_d = rat(a)
-    step_n, step_d = rat(st)
-    if T(start_n/start_d) == a && T(step_n/step_d) == st
-        den = lcm(start_d, step_d)
-        m = maxintfloat(T)
-        if abs(den*a) <= m && abs(den*st) <= m
-            start_n = round(Int, den*a)
-            step_n = round(Int, den*st)
-            return StepRangeHiLo{T}(start_n, step_n, len, den)
-        end
-    end
-    StepRangeHiLo{T}(a, zero(a), st, zero(st), 1, Int(len))
-end
-_range{T<:AbstractFloat}(a::T, st::T, len::Integer) = StepRangeHiLo{T}(a, zero(a), st, zero(st), 1, Int(len))
+_range{T}(a::T, st::T, len::Integer) = range(a, st, len)
 _range(a, st, len::Integer) = throw(ArgumentError("range: $a::$(typeof(a)) and $st::$(typeof(st)) cannot be promoted to a common type"))
 
 ## linspace and logspace
@@ -316,110 +221,10 @@ julia> linspace(1.3,2.9,9)
 """
 linspace(start, stop, len::Real=50) = LinSpace(start, stop, Int(len))
 
-# For Float16, Float32, and Float64, linspace returns a StepRangeHiLo
-function linspace{T<:Union{Float16,Float32,Float64}}(start::T, stop::T, len::Integer)
-    len < 2 && return _linspace1(T, start, stop, len)
-    # Attempt to find exact rational approximations
-    start_n, start_d = rat(start)
-    stop_n, stop_d = rat(stop)
-    den = lcm(start_d, stop_d)
-    m = maxintfloat(T)
-    if abs(den*start) <= m && abs(den*stop) <= m
-        start_n = round(Int, den*start)
-        stop_n = round(Int, den*stop)
-        if T(start_n/den) == start && T(stop_n/den) == stop
-            return linspace(T, start_n, stop_n, len, den)
-        end
-    end
-    _linspace(start, stop, len)
-end
-
-function _linspace{T<:Union{Float16,Float32,Float64}}(start::T, stop::T, len)
-    if !isfinite(start) || !isfinite(stop)
-        len > 2 && throw(ArgumentError("start and stop must be finite, got $start and $stop"))
-        return StepRangeHiLo{T}(start, zero(T), -start, stop, 1, len)
-    end
-    # Find the index that returns the smallest-magnitude element
-    Δ, Δfac = stop-start, 1
-    if ~isfinite(Δ)   # handle overflow
-        Δ, Δfac = stop/len - start/len, Int(len)
-    end
-    tmin = -(start/Δ)/Δfac            # interpolation t such that return value is 0
-    imin = round(Int, tmin*(len-1)+1)
-    if 1 < imin < len
-        # The smallest-magnitude element is in the interior
-        t = (imin-1)/(len-1)
-        ref = T((1-t)*start + t*stop)
-        step = imin-1 < len-imin ? (ref-start)/(imin-1) : (stop-ref)/(len-imin)
-    elseif imin <= 1
-        imin = 1
-        ref = start
-        step = (Δ/(len-1))*Δfac
-    else
-        imin = Int(len)
-        ref = stop
-        step = (Δ/(len-1))*Δfac
-    end
-    if len == 2 && ~isfinite(step)
-        # For very large endpoints where step overflows, exploit the
-        # split-representation to handle the overflow
-        return StepRangeHiLo{T}(start, zero(T), -start, stop, 1, 2)
-    end
-    # 2x calculations to get high precision endpoint matching while also
-    # preventing overflow in ref_hi+(i-offset)*step_hi
-    t, k = prevfloat(realmax(T)), max(imin-1, len-imin)
-    step_hi_pre = clamp(step, max(-(t+ref)/k, (-t+ref)/k), min((t-ref)/k, (t+ref)/k))
-    nb = ceil(UInt, log2(len-1))
-    step_hi = truncbits(step_hi_pre, nb)
-    x1_hi, x1_lo = add2((1-imin)*step_hi, ref)
-    x2_hi, x2_lo = add2((len-imin)*step_hi, ref)
-    a, b = (start - x1_hi) - x1_lo, (stop - x2_hi) - x2_lo
-    step_lo = (b - a)/(len - 1)
-    ref_lo = abs(ref) < eps(max(abs(start), abs(stop))) ? zero(T) : a - (1 - imin)*step_lo
-    StepRangeHiLo(ref, ref_lo, step_hi, step_lo, imin, Int(len))
-end
-
-# linspace for rational numbers, start = start_n/den, stop = stop_n/den
-# Note this returns a StepRangeHiLo
-function linspace{T}(::Type{T}, start_n::Integer, stop_n::Integer, len::Integer, den::Integer)
-    len < 2 && return _linspace1(T, start_n/den, stop_n/den, len)
-    tmin = -start_n/(Float64(stop_n) - Float64(start_n))
-    imin = round(Int, tmin*(len-1)+1)
-    imin = clamp(imin, 1, Int(len))
-    # Compute (1-t)*a and t*b separately in 2x precision (itp = interpolant)...
-    dent = (den, len-1)  # represent products as a tuple to eliminate risk of overflow
-    start_itp_hi, start_itp_lo = proddiv(T, (len-imin, start_n), dent)
-    stop_itp_hi, stop_itp_lo = proddiv(T, (imin-1, stop_n), dent)
-    # ...and then combine them to make ref
-    ref_hi, ref_lo = add2(start_itp_hi, stop_itp_hi)
-    ref_hi, ref_lo = add2(ref_hi, ref_lo + (start_itp_lo + stop_itp_lo))
-    # Compute step to 2x precision without risking overflow...
-    end_hi, end_lo = proddiv(T, (stop_n,), dent)
-    beg_hi, beg_lo = proddiv(T, (-start_n,), dent)
-    step_hi_pre, step_lo = add2(end_hi, beg_hi)
-    step_hi_pre, step_lo = add2(step_hi_pre, step_lo + (end_lo + beg_lo))
-    # ...and then truncate enough low-bits of step_hi to ensure that
-    # multiplication by 0:len-1 is exact
-    nb = ceil(UInt, log2(len-1))
-    step_hi = truncbits(step_hi_pre, nb)
-    step_lo += step_hi_pre - step_hi
-    StepRangeHiLo(ref_hi, ref_lo, step_hi, step_lo, imin, Int(len))
-end
-
-# For len < 2
-function _linspace1{T}(::Type{T}, start, stop, len)
-    len >= 0 || throw(ArgumentError("linspace($start, $stop, $len): negative length"))
-    if len <= 1
-        len == 1 && (start == stop || throw(ArgumentError("linspace($start, $stop, $len): endpoints differ")))
-        # Ensure that first(r)==start and last(r)==stop even for len==0
-        return StepRangeHiLo(start, zero(T), start, -stop, 1, len)
-    end
-    throw(ArgumentError("should only be called for len < 2, got $len"))
-end
-
 linspace(start::Real, stop::Real, len::Integer) = _linspace(promote(start, stop)..., len)
-_linspace{T<:AbstractFloat}(start::T, stop::T, len) = linspace(start, stop, len)
+# for Float16, Float32, and Float64 see twiceprecision.jl
 _linspace{T<:Integer}(start::T, stop::T, len) = linspace(Float64, start, stop, len, 1)
+_linspace{T}(start::T, stop::T, len) = LinSpace{T}(start, stop, len)
 _linspace(start, stop, len) = throw(ArgumentError("$start::$(typeof(start)) and $stop::$(typeof(stop)) cannot be promoted to a common type"))
 
 function show(io::IO, r::LinSpace)
@@ -513,7 +318,7 @@ size(r::Range) = (length(r),)
 isempty(r::StepRange) =
     (r.start != r.stop) & ((r.step > zero(r.step)) != (r.stop > r.start))
 isempty(r::AbstractUnitRange) = first(r) > last(r)
-isempty(r::StepRangeHiLo) = length(r) == 0
+isempty(r::StepRangeLen) = length(r) == 0
 isempty(r::LinSpace) = length(r) == 0
 
 """
@@ -536,7 +341,7 @@ julia> step(linspace(2.5,10.9,85))
 """
 step(r::StepRange) = r.step
 step(r::AbstractUnitRange) = 1
-step(r::StepRangeHiLo) = r.step_hi + r.step_lo
+step(r::StepRangeLen) = r.step
 step(r::LinSpace) = (last(r)-first(r))/r.lendiv
 
 unsafe_length(r::Range) = length(r)  # generic fallback
@@ -550,7 +355,7 @@ unsafe_length(r::AbstractUnitRange) = Integer(last(r) - first(r) + 1)
 unsafe_length(r::OneTo) = r.stop
 length(r::AbstractUnitRange) = unsafe_length(r)
 length(r::OneTo) = unsafe_length(r)
-length(r::StepRangeHiLo) = Integer(r.len)
+length(r::StepRangeLen) = r.len
 length(r::LinSpace) = r.len
 
 function length{T<:Union{Int,UInt,Int64,UInt64}}(r::StepRange{T})
@@ -590,11 +395,11 @@ end
 
 first{T}(r::OrdinalRange{T}) = convert(T, r.start)
 first{T}(r::OneTo{T}) = one(T)
-first(r::StepRangeHiLo) = unsafe_getindex(r, 1)
+first(r::StepRangeLen) = unsafe_getindex(r, 1)
 first(r::LinSpace) = r.start
 
 last{T}(r::OrdinalRange{T}) = convert(T, r.stop)
-last(r::StepRangeHiLo) = unsafe_getindex(r, length(r))
+last(r::StepRangeLen) = unsafe_getindex(r, length(r))
 last(r::LinSpace) = r.stop
 
 minimum(r::AbstractUnitRange) = isempty(r) ? throw(ArgumentError("range must be non-empty")) : first(r)
@@ -611,9 +416,9 @@ copy(r::Range) = r
 
 ## iteration
 
-start(r::Union{StepRangeHiLo,LinSpace}) = 1
-done(r::Union{StepRangeHiLo,LinSpace}, i::Int) = length(r) < i
-function next(r::Union{StepRangeHiLo,LinSpace}, i::Int)
+start(r::LinSpace) = 1
+done(r::LinSpace, i::Int) = length(r) < i
+function next(r::LinSpace, i::Int)
     @_inline_meta
     unsafe_getindex(r, i), i+1
 end
@@ -623,6 +428,11 @@ next{T}(r::StepRange{T}, i) = (convert(T,i), i+r.step)
 done{T,S}(r::StepRange{T,S}, i) = isempty(r) | (i < min(r.start, r.stop)) | (i > max(r.start, r.stop))
 done{T,S}(r::StepRange{T,S}, i::Integer) =
     isempty(r) | (i == oftype(i, r.stop) + r.step)
+
+# see also twiceprecision.jl
+start{T}(r::StepRangeLen{T}) = (unsafe_getindex(r, 1), 1)
+next{T}(r::StepRangeLen{T}, s) = s[1], (T(s[1]+r.step), s[2]+1)
+done{T}(r::StepRangeLen{T}, s) = s[2] > length(r)
 
 start{T}(r::UnitRange{T}) = oftype(r.start + one(T), r.start)
 next{T}(r::AbstractUnitRange{T}, i) = (convert(T, i), i + one(T))
@@ -668,40 +478,25 @@ function getindex{T}(v::Range{T}, i::Integer)
     ret
 end
 
-function getindex(r::Union{StepRangeHiLo,LinSpace}, i::Integer)
+function getindex(r::Union{StepRangeLen,LinSpace}, i::Integer)
     @_inline_meta
     @boundscheck checkbounds(r, i)
     unsafe_getindex(r, i)
 end
 
 # This is separate to make it useful even when running with --check-bounds=yes
-function unsafe_getindex(r::StepRangeHiLo, i::Integer)
-    # Use 2x arithmetic for high precision
+function unsafe_getindex{T}(r::StepRangeLen{T}, i::Integer)
     u = i - r.offset
-    shift_hi, shift_lo = u*r.step_hi, u*r.step_lo
-    x_hi, x_lo = add2(r.ref_hi, shift_hi)
-    x_hi + (x_lo + (shift_lo + r.ref_lo))
-end
-
-function _getindex_hiprec(r::StepRangeHiLo, i::Integer)
-    u = i - r.offset
-    shift_hi, shift_lo = u*r.step_hi, u*r.step_lo
-    x_hi, x_lo = add2(r.ref_hi, shift_hi)
-    add2(x_hi, x_lo + (shift_lo + r.ref_lo))
+    T(r.ref + u*r.step)
 end
 
 function unsafe_getindex(r::LinSpace, i::Integer)
-    d = r.lendiv
-    j, a, b = ifelse(2i >= length(r), (i-1, r.start, r.stop), (length(r)-i, r.stop, r.start))
-    lerpi(j, d, a, b)
+    lerpi(i-1, r.lendiv, r.start, r.stop)
 end
 
-# High-precision interpolation. Accurate for t ∈ [0.5,1], so that 1-t is exact.
 function lerpi{T}(j::Integer, d::Integer, a::T, b::T)
     @_inline_meta
     t = j/d
-    # computes (1-t)*a + t*b
-    # T(fma(t, b, fma(-t, a, a)))
     T((1-t)*a + t*b)
 end
 
@@ -735,15 +530,19 @@ function getindex{T<:Integer}(r::StepRange, s::Range{T})
     range(st, step(r)*step(s), length(s))
 end
 
-function getindex(r::Union{StepRangeHiLo,LinSpace}, s::OrdinalRange)
+function getindex{T<:Integer}(r::StepRangeLen, s::OrdinalRange{T})
     @_inline_meta
     @boundscheck checkbounds(r, s)
-    sl = length(s)
-    ifirst = first(s)
-    ilast = last(s)
-    vfirst = unsafe_getindex(r, ifirst)
-    vlast  = unsafe_getindex(r, ilast)
-    return linspace(vfirst, vlast, sl)
+    vfirst = unsafe_getindex(r, first(s))
+    return StepRangeLen(vfirst, r.step*step(s), length(s))
+end
+
+function getindex{T<:Integer}(r::LinSpace, s::OrdinalRange{T})
+    @_inline_meta
+    @boundscheck checkbounds(r, s)
+    vfirst = unsafe_getindex(r, first(s))
+    vlast  = unsafe_getindex(r, last(s))
+    return linspace(vfirst, vlast, length(s))
 end
 
 show(io::IO, r::Range) = print(io, repr(first(r)), ':', repr(step(r)), ':', repr(last(r)))
@@ -752,7 +551,8 @@ show(io::IO, r::OneTo) = print(io, "Base.OneTo(", r.stop, ")")
 
 =={T<:Range}(r::T, s::T) = (first(r) == first(s)) & (step(r) == step(s)) & (last(r) == last(s))
 ==(r::OrdinalRange, s::OrdinalRange) = (first(r) == first(s)) & (step(r) == step(s)) & (last(r) == last(s))
-=={T<:Union{StepRangeHiLo,LinSpace}}(r::T, s::T) = (first(r) == first(s)) & (length(r) == length(s)) & (last(r) == last(s))
+=={T<:Union{StepRangeLen,LinSpace}}(r::T, s::T) = (first(r) == first(s)) & (length(r) == length(s)) & (last(r) == last(s))
+=={T}(r::Union{StepRange{T},StepRangeLen{T,T}}, s::Union{StepRange{T},StepRangeLen{T,T}}) = (first(r) == first(s)) & (last(r) == last(s)) & (step(r) == step(s))
 
 function ==(r::Range, s::Range)
     lr = length(r)
@@ -895,19 +695,24 @@ end
 ## linear operations on ranges ##
 
 -(r::OrdinalRange) = range(-first(r), -step(r), length(r))
--(r::StepRangeHiLo) = StepRangeHiLo(-r.ref_hi, -r.ref_lo, -r.step_hi, -r.step_lo, r.offset, length(r))
--(r::LinSpace) = LinSpace(-r.start, -r.stop, r.len)
+-(r::StepRangeLen) = StepRangeLen(-r.ref, -r.step, length(r), r.offset)
+-(r::LinSpace) = LinSpace(-r.start, -r.stop, length(r))
 
-+(x::Number, r::AbstractUnitRange) = range(x + first(r), length(r))
++(x::Real, r::AbstractUnitRange) = range(x + first(r), length(r))
+# For #18336 we need to prevent promotion of the step type:
++(x::Number, r::AbstractUnitRange) = range(x + first(r), step(r), length(r))
 +(x::Number, r::Range) = (x+first(r)):step(r):(x+last(r))
-+(x::Number, r::StepRangeHiLo) = StepRangeHiLo(add2(r.ref_hi, r.ref_lo, x)..., r.step_hi, r.step_lo, r.offset, r.len)
+function +(x::Number, r::StepRangeLen)
+    newref = x + r.ref
+    StepRangeLen{eltype(newref),typeof(newref),typeof(r.step)}(newref, r.step, length(r), r.offset)
+end
 function +(x::Number, r::LinSpace)
     LinSpace(x + r.start, x + r.stop, r.len)
 end
 +(r::Range, x::Number) = x + r
 
 -(x::Number, r::Range)      = (x-first(r)):-step(r):(x-last(r))
--(x::Number, r::StepRangeHiLo) = +(x, -r)
+-(x::Number, r::StepRangeLen) = +(x, -r)
 function -(x::Number, r::LinSpace)
     LinSpace(x - r.start, x - r.stop, r.len)
 end
@@ -915,12 +720,12 @@ end
 -(r::Range, x::Number) = +(-x, r)
 
 *(x::Number, r::OrdinalRange) = range(x*first(r), x*step(r), length(r))
-*(x::Number, r::StepRangeHiLo)   = StepRangeHiLo(mul2(r.ref_hi, r.ref_lo, x)..., mul2(r.step_hi, r.step_lo, x)..., r.offset, r.len)
+*(x::Number, r::StepRangeLen)   = StepRangeLen(x*r.ref, x*r.step, length(r), r.offset)
 *(x::Number, r::LinSpace)     = LinSpace(x * r.start, x * r.stop, r.len)
 *(r::Range, x::Number)        = x * r
 
 /(r::OrdinalRange, x::Number) = range(first(r)/x, step(r)/x, length(r))
-/(r::StepRangeHiLo, x::Number)   = StepRangeHiLo(div2(r.ref_hi, r.ref_lo, x)..., div2(r.step_hi, r.step_lo, x)..., r.offset, r.len)
+/(r::StepRangeLen, x::Number)   = StepRangeLen(r.ref/x, r.step/x, length(r), r.offset)
 /(r::LinSpace, x::Number)     = LinSpace(r.start / x, r.stop / x, r.len)
 
 promote_rule{T1,T2}(::Type{UnitRange{T1}},::Type{UnitRange{T2}}) =
@@ -949,61 +754,37 @@ convert{T1,T2}(::Type{StepRange{T1,T2}}, r::Range) =
 convert{T}(::Type{StepRange}, r::AbstractUnitRange{T}) =
     StepRange{T,T}(first(r), step(r), last(r))
 
-promote_rule{T1,T2}(::Type{StepRangeHiLo{T1}},::Type{StepRangeHiLo{T2}}) =
-    StepRangeHiLo{promote_type(T1,T2)}
-convert{T}(::Type{StepRangeHiLo{T}}, r::StepRangeHiLo{T}) = r
-function convert{T<:AbstractFloat,S}(::Type{StepRangeHiLo{T}}, r::StepRangeHiLo{S})
-    # if start and step have a rational approximation in the old type,
-    # then we transfer that rational approximation to the new type
-    f, s = first(r), step(r)
-    start_n, start_d = rat(f)
-    step_n, step_d = rat(s)
-    if S(start_n/start_d) == f && S(step_n/step_d) == s
-        den = lcm(start_d, step_d)
-        m = maxintfloat(T)
-        if abs(f*den) <= m && abs(s*den) <= m
-            start_n = round(Int, f*den)
-            step_n = round(Int, s*den)
-            if S(start_n/den) == f && S(step_n/den) == s
-                return StepRangeHiLo{T}(start_n, step_n, length(r), den)
-            end
-        end
-    end
-    StepRangeHiLo{T}(r.ref_hi, r.ref_lo, r.step_hi, r.step_lo, r.offset, r.len)
-end
-convert{T}(::Type{StepRangeHiLo{T}}, r::StepRangeHiLo) =
-    StepRangeHiLo{T}(r.ref_hi, r.ref_lo, r.step_hi, r.step_lo, r.offset, r.len)
+promote_rule{T1,T2,R1,R2,S1,S2}(::Type{StepRangeLen{T1,R1,S1}},::Type{StepRangeLen{T2,R2,S2}}) =
+    StepRangeLen{promote_type(T1,T2), promote_type(R1,R2), promote_type(S1,S2)}
+convert{T,R,S}(::Type{StepRangeLen{T,R,S}}, r::StepRangeLen{T,R,S}) = r
+convert{T,R,S}(::Type{StepRangeLen{T,R,S}}, r::StepRangeLen) =
+    StepRangeLen{T,R,S}(convert(R, r.ref), convert(S, r.step), length(r), r.offset)
+convert{T}(::Type{StepRangeLen{T}}, r::StepRangeLen) =
+    StepRangeLen(convert(T, r.ref), convert(T, r.step), length(r), r.offset)
 
-promote_rule{F,OR<:OrdinalRange}(::Type{StepRangeHiLo{F}}, ::Type{OR}) =
-    StepRangeHiLo{promote_type(F,eltype(OR))}
-convert{T<:Union{Float16,Float32,Float64}}(::Type{StepRangeHiLo{T}}, r::OrdinalRange) =
-    linspace(first(r), last(r), length(r))
-convert{T<:AbstractFloat}(::Type{StepRangeHiLo{T}}, r::OrdinalRange) =
-    StepRangeHiLo{T}(first(r), zero(T), step(r), zero(T), 1, length(r))
-convert{T}(::Type{StepRangeHiLo}, r::OrdinalRange{T}) =
-    convert(StepRangeHiLo{typeof(float(first(r)))}, r)
+promote_rule{T,R,S,OR<:Range}(::Type{StepRangeLen{T,R,S}}, ::Type{OR}) =
+    StepRangeLen{promote_type(T,eltype(OR)),promote_type(R,eltype(OR)),promote_type(S,eltype(OR))}
+convert{T,R,S}(::Type{StepRangeLen{T,R,S}}, r::Range) =
+    StepRangeLen{T,R,S}(R(first(r)), S(step(r)), length(r))
+convert{T}(::Type{StepRangeLen{T}}, r::Range) =
+    StepRangeLen(T(first(r)), T(step(r)), length(r))
+convert(::Type{StepRangeLen}, r::Range) = convert(StepRangeLen{eltype(r)}, r)
 
 promote_rule{T1,T2}(::Type{LinSpace{T1}},::Type{LinSpace{T2}}) =
     LinSpace{promote_type(T1,T2)}
-convert{T<:AbstractFloat}(::Type{LinSpace{T}}, r::LinSpace{T}) = r
-convert{T<:AbstractFloat}(::Type{LinSpace{T}}, r::LinSpace) =
-    LinSpace{T}(r.start, r.stop, r.len)
+convert{T}(::Type{LinSpace{T}}, r::LinSpace{T}) = r
+convert{T}(::Type{LinSpace{T}}, r::Range) =
+    LinSpace{T}(first(r), last(r), r.len)
 
-promote_rule{F,OR<:OrdinalRange}(::Type{LinSpace{F}}, ::Type{OR}) =
-    LinSpace{promote_type(F,eltype(OR))}
-convert{T<:AbstractFloat}(::Type{LinSpace{T}}, r::OrdinalRange) =
+promote_rule{T,OR<:OrdinalRange}(::Type{LinSpace{T}}, ::Type{OR}) =
+    LinSpace{promote_type(T,eltype(OR))}
+convert{T}(::Type{LinSpace{T}}, r::OrdinalRange) =
     linspace(convert(T, first(r)), convert(T, last(r)), length(r))
 convert{T}(::Type{LinSpace}, r::OrdinalRange{T}) =
     convert(LinSpace{typeof(float(first(r)))}, r)
 
-# Promote StepRangeHiLo to LinSpace
-promote_rule{F,OR<:StepRangeHiLo}(::Type{LinSpace{F}}, ::Type{OR}) =
-    LinSpace{promote_type(F,eltype(OR))}
-convert{T<:AbstractFloat}(::Type{LinSpace{T}}, r::StepRangeHiLo) =
-    LinSpace{T}(convert(T, first(r)), convert(T, last(r)), length(r))
-convert{T<:AbstractFloat}(::Type{LinSpace}, r::StepRangeHiLo{T}) =
-    convert(LinSpace{T}, r)
-
+promote_rule{L,T,R,S}(::Type{LinSpace{L}}, ::Type{StepRangeLen{T,R,S}}) =
+    StepRangeLen{promote_type(L,T),promote_type(L,R),promote_type(L,S)}
 
 # +/- of ranges is defined in operators.jl (to be able to use @eval etc.)
 
@@ -1027,7 +808,7 @@ convert{T}(::Type{Array{T,1}}, r::Range{T}) = vcat(r)
 collect(r::Range) = vcat(r)
 
 reverse(r::OrdinalRange) = colon(last(r), -step(r), first(r))
-reverse(r::StepRangeHiLo)   = StepRangeHiLo(r.ref_hi, r.ref_lo, -r.step_hi, -r.step_lo, length(r)-r.offset+1, length(r))
+reverse(r::StepRangeLen) = StepRangeLen(r.ref, -r.step, length(r), length(r)-r.offset+1)
 reverse(r::LinSpace)     = LinSpace(r.stop, r.start, length(r))
 
 ## sorting ##
@@ -1050,20 +831,6 @@ function sum{T<:Real}(r::Range{T})
                                      : (step(r) * l) * ((l-1)>>1))
 end
 
-function sum(r::StepRangeHiLo)
-    l = length(r)
-    np, nn = l - r.offset, r.offset - 1
-    sp, sn = sumints(np), sumints(nn)
-    s_hi, s_lo = mul2(r.step_hi, r.step_lo, sp - sn)
-    r_hi, r_lo = mul2(r.ref_hi, r.ref_lo, l)
-    sm_hi, sm_lo = add2(s_hi, r_hi)
-    add2(sm_hi, sm_lo + r_lo)[1]
-end
-
-# sum(1:n)
-sumints(n::Integer) = iseven(n) ? (n+1)*(n>>1) : n*((n+1)>>1)
-
-
 function mean{T<:Real}(r::Range{T})
     isempty(r) && throw(ArgumentError("mean of an empty range is undefined"))
     (first(r) + last(r)) / 2
@@ -1079,100 +846,3 @@ end
 in{T<:Integer}(x::Integer, r::AbstractUnitRange{T}) = (first(r) <= x) & (x <= last(r))
 in{T<:Integer}(x, r::Range{T}) = isinteger(x) && !isempty(r) && x>=minimum(r) && x<=maximum(r) && (mod(convert(T,x),step(r))-mod(first(r),step(r)) == 0)
 in(x::Char, r::Range{Char}) = !isempty(r) && x >= minimum(r) && x <= maximum(r) && (mod(Int(x) - Int(first(r)), step(r)) == 0)
-
-### Numeric utilities
-
-function rat(x)
-    y = x
-    a = d = 1
-    b = c = 0
-    m = maxintfloat(narrow(typeof(x)))
-    while abs(y) <= m
-        f = trunc(Int,y)
-        y -= f
-        a, c = f*a + c, a
-        b, d = f*b + d, b
-        max(abs(a), abs(b)) <= convert(Int,m) || return c, d
-        oftype(x,a)/oftype(x,b) == x && break
-        y = inv(y)
-    end
-    return a, b
-end
-
-narrow(::Type{Float64}) = Float32
-narrow(::Type{Float32}) = Float16
-narrow(::Type{Float16}) = Float16
-
-truncbits(x::Float16, nb) = box(Float16, unbox(UInt16, _truncbits(box(UInt16, unbox(Float16, x)), nb)))
-truncbits(x::Float32, nb) = box(Float32, unbox(UInt32, _truncbits(box(UInt32, unbox(Float32, x)), nb)))
-truncbits(x::Float64, nb) = box(Float64, unbox(UInt64, _truncbits(box(UInt64, unbox(Float64, x)), nb)))
-function _truncbits{U<:Unsigned}(xi::U, nb::Integer)
-    @_inline_meta
-    mask = typemax(U)
-    xi & (mask << nb)
-end
-splitprec(x::Float16) = truncbits(x, UInt(5))
-splitprec(x::Float32) = truncbits(x, UInt(11))
-splitprec(x::Float64) = truncbits(x, UInt(26))
-
-function add2{T<:Number}(u::T, v::T)
-    if abs(v) > abs(u)
-        return add2(v, u)
-    end
-    w = u + v
-    w, (u-w) + v
-end
-
-add2(u, v) = _add2(promote(u, v)...)
-_add2{T<:Number}(u::T, v::T) = add2(u, v)
-_add2(u, v) = error("$u::$(typeof(u)) and $v::$(typeof(v)) cannot be promoted to a common type")
-
-function add2(u, v, x)
-    s_hi, s_lo = add2(u, x)
-    s_hi, s_lo+v
-end
-
-function mul2(u_hi, u_lo, v::Integer)
-    v == 0 && return zero(u_hi), zero(u_lo)
-    nb = ceil(Int, log2(abs(v)))
-    ut = truncbits(u_hi, nb)
-    add2(ut*v, ((u_hi-ut) + u_lo)*v)
-end
-
-function _mul2{T<:Union{Float16,Float32,Float64}}(u_hi::T, u_lo::T, v::T)
-    v == 0 && return u_hi*v, u_lo*v
-    uhh, uhl = splitprec(u_hi)
-    vh, vl = splitprec(v)
-    z = u_hi*v
-    add2(z, ((uhh*vh-z) + uhh*vl + uhl*vh) + uhl*vl)
-end
-
-_mul2(u_hi, u_lo, v) = u_hi*v, u_lo*v
-
-mul2(u_hi, u_lo, v) = _mul2(promote(u_hi, u_lo, v)...)
-
-function div2(u_hi, u_lo, v)
-    hi = u_hi/v
-    w_hi, w_lo = mul2(hi, zero(hi), v)
-    lo = (((u_hi - w_hi) - w_lo) + u_lo)/v
-    add2(hi, lo)
-end
-
-function proddiv(T, num, den)
-    @_inline_meta
-    v_hi = T(num[1])
-    v_hi, v_lo = _prod(v_hi, zero(T), tail(num)...)
-    _div(v_hi, v_lo, den...)
-end
-function _prod(v_hi, v_lo, x, y...)
-    @_inline_meta
-    _prod(mul2(v_hi, v_lo, x)..., y...)
-end
-_prod(v_hi, v_lo) = v_hi, v_lo
-function _div(v_hi, v_lo, x, y...)
-    @_inline_meta
-    _div(div2(v_hi, v_lo, x)..., y...)
-end
-_div(v_hi, v_lo) = v_hi, v_lo
-
-isbetween(a, x, b) = a <= x <= b || b <= x <= a

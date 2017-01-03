@@ -402,5 +402,3 @@ end
 function lerpi(j::Integer, d::Integer, a::Rational, b::Rational)
     ((d-j)*a)/d + (j*b)/d
 end
-
-_linspace{T<:Rational}(start::T, stop::T, len) = LinSpace{T}(start, stop, len)
