@@ -175,15 +175,16 @@ function next{T,R<:TwicePrecision,S<:TwicePrecision}(r::StepRangeLen{T,R,S}, i::
     unsafe_getindex(r, i), i+1
 end
 
+# This assumes that r.step has already been split so that (0:len-1)*r.step.hi is exact
 function unsafe_getindex{T,R<:TwicePrecision,S<:TwicePrecision}(r::StepRangeLen{T,R,S}, i::Integer)
     # Very similar to _getindex_hiprec, but optimized to avoid a 2nd call to add2
+    @_inline_meta
     u = i - r.offset
     shift_hi, shift_lo = u*r.step.hi, u*r.step.lo
     x_hi, x_lo = add2(r.ref.hi, shift_hi)
     T(x_hi + (x_lo + (shift_lo + r.ref.lo)))
 end
 
-# This assumes that r.step has already been split so that (0:len-1)*r.step.hi is exact
 function _getindex_hiprec{T,R<:TwicePrecision,S<:TwicePrecision}(r::StepRangeLen{T,R,S}, i::Integer)
     u = i - r.offset
     shift_hi, shift_lo = u*r.step.hi, u*r.step.lo
@@ -423,9 +424,7 @@ narrow(::Type{Float16}) = Float16
 
 function add2{T<:Number}(u::T, v::T)
     @_inline_meta
-    if abs(v) > abs(u)
-        return add2(v, u)
-    end
+    u, v = ifelse(abs(v) > abs(u), (v, u), (u, v))
     w = u + v
     w, (u-w) + v
 end
