@@ -1540,6 +1540,7 @@ unsafe_wrap(::Type{String}, p::Cstring, len::Integer, own::Bool=false) =
 # Rename LibGit2.GitAnyObject to LibGit2.GitUnknownObject (part of #19839)
 eval(LibGit2, :(Base.@deprecate_binding GitAnyObject GitUnknownObject))
 
+# FloatRange replaced by StepRangeLen
 @deprecate FloatRange{T}(start::T, step, len, den) Base.floatrange(T, start, step, len, den)
 
 # End deprecations scheduled for 0.6

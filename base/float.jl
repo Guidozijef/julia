@@ -752,6 +752,7 @@ fpinttype(::Type{Float16}) = UInt16
 @pure exponent_raw_max{T<:AbstractFloat}(::Type{T}) = Int(exponent_mask(T) >> significand_bits(T))
 
 ## TwicePrecision utilities
+# The numeric constants are half the number of bits in the mantissa
 for (F, T, n) in ((Float16, UInt16, 5), (Float32, UInt32, 12), (Float64, UInt64, 26))
     @eval begin
         function truncbits(x::$F, nb)
@@ -784,15 +785,11 @@ function float{T}(A::AbstractArray{T})
     convert(AbstractArray{typeof(float(zero(T)))}, A)
 end
 
-for fn in (:float,)
-    @eval begin
-        $fn(r::StepRange) = $fn(r.start):$fn(r.step):$fn(last(r))
-        $fn(r::UnitRange) = $fn(r.start):$fn(last(r))
-        $fn(r::StepRangeLen) = StepRangeLen($fn(r.ref), $fn(r.step), length(r), r.offset)
-        function $fn(r::LinSpace)
-            LinSpace($fn(r.start), $fn(r.stop), length(r))
-        end
-    end
+float(r::StepRange) = float(r.start):float(r.step):float(last(r))
+float(r::UnitRange) = float(r.start):float(last(r))
+float(r::StepRangeLen) = StepRangeLen(float(r.ref), float(r.step), length(r), r.offset)
+function float(r::LinSpace)
+    LinSpace(float(r.start), float(r.stop), length(r))
 end
 
 # big, broadcast over arrays

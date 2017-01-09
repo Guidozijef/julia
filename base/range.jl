@@ -168,22 +168,19 @@ StepRangeLen{R,S}(ref::R, step::S, len::Integer, offset::Integer = 1) =
 
 colon{T<:AbstractFloat}(a::T, b::T) = colon(a, one(a), b)
 
-colon{T}(a::T, b::T, c::T) = StepRangeLen(a, b, floor(Int, (c-a)/b)+1) # see twiceprecision.jl
-# promote without risking a StackOverflowError
-colon{T<:Real}(a::T, b::AbstractFloat, c::T) = _colon(promote(a,b,c)...)
-colon{T<:AbstractFloat}(a::T, b::AbstractFloat, c::T) = _colon(promote(a,b,c)...)
-colon{T<:AbstractFloat}(a::T, b::Real, c::T) = _colon(promote(a,b,c)...)
-_colon{T}(a::T, b::T, c::T) = colon(a, b, c)
-_colon(a, b, c) = throw(ArgumentError("$a::$(typeof(a)), $b::$(typeof(b)), and $c::$(typeof(c)) cannot be promoted to a common type"))
+# for Float16, Float32, and Float64 see twiceprecision.jl
+colon{T}(a::T, b::T, c::T) = StepRangeLen(a, b, floor(Int, (c-a)/b)+1)
+
+colon{T<:Real}(a::T, b::AbstractFloat, c::T) = colon(promote(a,b,c)...)
+colon{T<:AbstractFloat}(a::T, b::AbstractFloat, c::T) = colon(promote(a,b,c)...)
+colon{T<:AbstractFloat}(a::T, b::Real, c::T) = colon(promote(a,b,c)...)
 
 range(a::AbstractFloat, len::Integer) = range(a, one(a), len)
 
 range(a, st, len::Integer) = StepRangeLen(a, st, len)
-range(a::AbstractFloat, st::AbstractFloat, len::Integer) = _range(promote(a, st)..., len)
+range(a::AbstractFloat, st::AbstractFloat, len::Integer) = range(promote(a, st)..., len)
 range(a::Real, st::AbstractFloat, len::Integer) = range(float(a), st, len)
 range(a::AbstractFloat, st::Real, len::Integer) = range(a, float(st), len)
-_range{T}(a::T, st::T, len::Integer) = range(a, st, len)
-_range(a, st, len::Integer) = throw(ArgumentError("range: $a::$(typeof(a)) and $st::$(typeof(st)) cannot be promoted to a common type"))
 
 ## linspace and logspace
 
@@ -215,17 +212,16 @@ Construct a range of `n` linearly spaced elements from `start` to `stop`.
 
 ```jldoctest
 julia> linspace(1.3,2.9,9)
-9-element LinSpace{Float64}:
- 1.3,1.5,1.7,1.9,2.1,2.3,2.5,2.7,2.9
+1.3:0.2:2.9
 ```
 """
-linspace(start, stop, len::Real=50) = LinSpace(start, stop, Int(len))
+linspace(start, stop, len::Real=50) = linspace(start, stop, Int(len))
 
-linspace(start::Real, stop::Real, len::Integer) = _linspace(promote(start, stop)..., len)
+linspace(start::Real, stop::Real, len::Integer) = linspace(promote(start, stop)..., len)
+linspace{T<:Integer}(start::T, stop::T, len::Integer) = linspace(Float64, start, stop, len, 1)
 # for Float16, Float32, and Float64 see twiceprecision.jl
-_linspace{T<:Integer}(start::T, stop::T, len) = linspace(Float64, start, stop, len, 1)
-_linspace{T}(start::T, stop::T, len) = LinSpace{T}(start, stop, len)
-_linspace(start, stop, len) = throw(ArgumentError("$start::$(typeof(start)) and $stop::$(typeof(stop)) cannot be promoted to a common type"))
+linspace{T<:Real}(start::T, stop::T, len::Integer) = LinSpace{T}(start, stop, len)
+linspace{T}(start::T, stop::T, len::Integer) = LinSpace{T}(start, stop, len)
 
 function show(io::IO, r::LinSpace)
     print(io, "linspace(")
@@ -549,10 +545,14 @@ show(io::IO, r::Range) = print(io, repr(first(r)), ':', repr(step(r)), ':', repr
 show(io::IO, r::UnitRange) = print(io, repr(first(r)), ':', repr(last(r)))
 show(io::IO, r::OneTo) = print(io, "Base.OneTo(", r.stop, ")")
 
-=={T<:Range}(r::T, s::T) = (first(r) == first(s)) & (step(r) == step(s)) & (last(r) == last(s))
-==(r::OrdinalRange, s::OrdinalRange) = (first(r) == first(s)) & (step(r) == step(s)) & (last(r) == last(s))
-=={T<:Union{StepRangeLen,LinSpace}}(r::T, s::T) = (first(r) == first(s)) & (length(r) == length(s)) & (last(r) == last(s))
-=={T}(r::Union{StepRange{T},StepRangeLen{T,T}}, s::Union{StepRange{T},StepRangeLen{T,T}}) = (first(r) == first(s)) & (last(r) == last(s)) & (step(r) == step(s))
+=={T<:Range}(r::T, s::T) =
+    (first(r) == first(s)) & (step(r) == step(s)) & (last(r) == last(s))
+==(r::OrdinalRange, s::OrdinalRange) =
+    (first(r) == first(s)) & (step(r) == step(s)) & (last(r) == last(s))
+=={T<:Union{StepRangeLen,LinSpace}}(r::T, s::T) =
+    (first(r) == first(s)) & (length(r) == length(s)) & (last(r) == last(s))
+=={T}(r::Union{StepRange{T},StepRangeLen{T,T}}, s::Union{StepRange{T},StepRangeLen{T,T}}) =
+    (first(r) == first(s)) & (last(r) == last(s)) & (step(r) == step(s))
 
 function ==(r::Range, s::Range)
     lr = length(r)
@@ -709,7 +709,7 @@ end
 function +(x::Number, r::LinSpace)
     LinSpace(x + r.start, x + r.stop, r.len)
 end
-+(r::Range, x::Number) = x + r
++(r::Range, x::Number) = x + r  # assumes addition is commutative
 
 -(x::Number, r::Range)      = (x-first(r)):-step(r):(x-last(r))
 -(x::Number, r::StepRangeLen) = +(x, -r)
@@ -719,14 +719,19 @@ end
 
 -(r::Range, x::Number) = +(-x, r)
 
-*(x::Number, r::OrdinalRange) = range(x*first(r), x*step(r), length(r))
-*(x::Number, r::StepRangeLen)   = StepRangeLen(x*r.ref, x*r.step, length(r), r.offset)
+*(x::Number, r::Range)        = range(x*first(r), x*step(r), length(r))
+*(x::Number, r::StepRangeLen) = StepRangeLen(x*r.ref, x*r.step, length(r), r.offset)
 *(x::Number, r::LinSpace)     = LinSpace(x * r.start, x * r.stop, r.len)
-*(r::Range, x::Number)        = x * r
+# separate in case of noncommutative multiplication
+*(r::Range, x::Number)        = range(first(r)*x, step(r)*x, length(r))
+*(r::StepRangeLen, x::Number) = StepRangeLen(r.ref*x, r.step*x, length(r), r.offset)
+*(r::LinSpace, x::Number)     = LinSpace(r.start * x, r.stop * x, r.len)
 
-/(r::OrdinalRange, x::Number) = range(first(r)/x, step(r)/x, length(r))
-/(r::StepRangeLen, x::Number)   = StepRangeLen(r.ref/x, r.step/x, length(r), r.offset)
+/(r::Range, x::Number)        = range(first(r)/x, step(r)/x, length(r))
+/(r::StepRangeLen, x::Number) = StepRangeLen(r.ref/x, r.step/x, length(r), r.offset)
 /(r::LinSpace, x::Number)     = LinSpace(r.start / x, r.stop / x, r.len)
+
+/(x::Number, r::Range) = [ x/y for y=r ]
 
 promote_rule{T1,T2}(::Type{UnitRange{T1}},::Type{UnitRange{T2}}) =
     UnitRange{promote_type(T1,T2)}
@@ -774,14 +779,12 @@ promote_rule{T1,T2}(::Type{LinSpace{T1}},::Type{LinSpace{T2}}) =
     LinSpace{promote_type(T1,T2)}
 convert{T}(::Type{LinSpace{T}}, r::LinSpace{T}) = r
 convert{T}(::Type{LinSpace{T}}, r::Range) =
-    LinSpace{T}(first(r), last(r), r.len)
+    LinSpace{T}(first(r), last(r), length(r))
+convert{T}(::Type{LinSpace}, r::Range{T}) =
+    convert(LinSpace{T}, r)
 
 promote_rule{T,OR<:OrdinalRange}(::Type{LinSpace{T}}, ::Type{OR}) =
     LinSpace{promote_type(T,eltype(OR))}
-convert{T}(::Type{LinSpace{T}}, r::OrdinalRange) =
-    linspace(convert(T, first(r)), convert(T, last(r)), length(r))
-convert{T}(::Type{LinSpace}, r::OrdinalRange{T}) =
-    convert(LinSpace{typeof(float(first(r)))}, r)
 
 promote_rule{L,T,R,S}(::Type{LinSpace{L}}, ::Type{StepRangeLen{T,R,S}}) =
     StepRangeLen{promote_type(L,T),promote_type(L,R),promote_type(L,S)}

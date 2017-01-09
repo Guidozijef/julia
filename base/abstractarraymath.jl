@@ -93,7 +93,7 @@ imag{T<:Real}(x::AbstractArray{T}) = zero(x)
 *{T<:Number}(x::AbstractArray{T,2}) = x
 
 function lerpi(j::Integer, d::Integer, A::AbstractArray, B::AbstractArray)
-    broadcast((a,b) -> lerpi(j, d, a, b), A, B)
+    lerpi.(j, d, A, B)
 end
 
 # index A[:,:,...,i,:,:,...] where "i" is in dimension "d"

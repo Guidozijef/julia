@@ -54,7 +54,10 @@ function twiceprecision{T<:Number}(val::TwicePrecision{T}, nb::Integer)
     TwicePrecision{T}(hi, (val.hi - hi) + val.lo)
 end
 
-nbitslen(r::StepRangeLen) = nbitslen(length(r), r.offset)
+nbitslen(r::StepRangeLen) = nbitslen(eltype(r), length(r), r.offset)
+nbitslen(::Type{Float64}, len, offset) = min(26, nbitslen(len, offset))
+nbitslen(::Type{Float32}, len, offset) = min(12, nbitslen(len, offset))
+nbitslen(::Type{Float16}, len, offset) = min(5,  nbitslen(len, offset))
 nbitslen(len, offset) = len < 2 ? 0 : ceil(Int, log2(max(offset-1, len-offset)))
 
 eltype{T}(::Type{TwicePrecision{T}}) = T
@@ -96,7 +99,7 @@ function floatrange{T}(::Type{T}, start_n::Integer, step_n::Integer, len::Intege
     imin = clamp(round(Int, -start_n/step_n+1), 1, Int(len))
     # Compute smallest-magnitude element to 2x precision
     ref_n = start_n+(imin-1)*step_n  # this shouldn't overflow, so don't check
-    nb = nbitslen(len, imin)
+    nb = nbitslen(T, len, imin)
     StepRangeLen(TwicePrecision{T}((ref_n, den)),
                  TwicePrecision{T}((step_n, den), nb), Int(len), imin)
 end
@@ -114,7 +117,7 @@ function floatrange(a::AbstractFloat, st::AbstractFloat, len::Real, divisor::Abs
     # Fallback (misses the opportunity to set offset different from 1,
     # but otherwise this is still high-precision)
     StepRangeLen(TwicePrecision{T}((a,divisor)),
-                 TwicePrecision{T}((st,divisor), nbitslen(len, 1)), Int(len), 1)
+                 TwicePrecision{T}((st,divisor), nbitslen(T, len, 1)), Int(len), 1)
 end
 
 function colon{T<:Union{Float16,Float32,Float64}}(start::T, step::T, stop::T)
@@ -146,10 +149,10 @@ function colon{T<:Union{Float16,Float32,Float64}}(start::T, step::T, stop::T)
         end
     end
     # Fallback, taking start and step literally
-    StepRangeLen(TwicePrecision(start, zero(T)), twiceprecision(step, nbitslen(len, 1)), len)
+    StepRangeLen(TwicePrecision(start, zero(T)), twiceprecision(step, nbitslen(T, len, 1)), len)
 end
 
-function _range{T<:Union{Float16,Float32,Float64}}(a::T, st::T, len::Integer)
+function range{T<:Union{Float16,Float32,Float64}}(a::T, st::T, len::Integer)
     start_n, start_d = rat(a)
     step_n, step_d = rat(st)
     if start_d != 0 && step_d != 0 &&
@@ -202,7 +205,7 @@ function getindex{T,R<:TwicePrecision,S<:TwicePrecision,I<:Integer}(r::StepRange
     if step(s) == 1 || length(s) < 2
         newstep = r.step
     else
-        newstep = twiceprecision(r.step*step(s), nbitslen(length(s), soffset))
+        newstep = twiceprecision(r.step*step(s), nbitslen(T, length(s), soffset))
     end
     if ioffset == r.offset
         StepRangeLen(r.ref, newstep, length(s), max(1,soffset))
@@ -213,6 +216,7 @@ end
 
 *{T<:Real,R<:TwicePrecision}(x::Real, r::StepRangeLen{T,R}) =
     StepRangeLen(x*r.ref, twiceprecision(x*r.step, nbitslen(r)), length(r), r.offset)
+*{T<:Real,R<:TwicePrecision}(r::StepRangeLen{T,R}, x::Real) = x*r
 /{T<:Real,R<:TwicePrecision}(r::StepRangeLen{T,R}, x::Real) =
     StepRangeLen(r.ref/x, twiceprecision(r.step/x, nbitslen(r)), length(r), r.offset)
 
@@ -296,7 +300,7 @@ function +{T,R<:TwicePrecision}(r1::StepRangeLen{T,R}, r2::StepRangeLen{T,R})
         ref2mid = _getindex_hiprec(r2, imid)
         ref = ref1mid + ref2mid
     end
-    step = twiceprecision(r1.step + r2.step, nbitslen(len, imid))
+    step = twiceprecision(r1.step + r2.step, nbitslen(T, len, imid))
     StepRangeLen{T,typeof(ref),typeof(step)}(ref, step, len, imid)
 end
 
@@ -326,7 +330,7 @@ function _linspace{T<:Union{Float16,Float32,Float64}}(start::T, stop::T, len)
     (isfinite(start) && isfinite(stop)) || throw(ArgumentError("start and stop must be finite, got $start and $stop"))
     # Find the index that returns the smallest-magnitude element
     Δ, Δfac = stop-start, 1
-    if ~isfinite(Δ)   # handle overflow for large endpoints
+    if !isfinite(Δ)   # handle overflow for large endpoints
         Δ, Δfac = stop/len - start/len, Int(len)
     end
     tmin = -(start/Δ)/Δfac            # interpolation t such that return value is 0
@@ -353,15 +357,15 @@ function _linspace{T<:Union{Float16,Float32,Float64}}(start::T, stop::T, len)
     end
     # 2x calculations to get high precision endpoint matching while also
     # preventing overflow in ref_hi+(i-offset)*step_hi
-    t, k = prevfloat(realmax(T)), max(imin-1, len-imin)
-    step_hi_pre = clamp(step, max(-(t+ref)/k, (-t+ref)/k), min((t-ref)/k, (t+ref)/k))
-    nb = nbitslen(len, imin)
+    m, k = prevfloat(realmax(T)), max(imin-1, len-imin)
+    step_hi_pre = clamp(step, max(-(m+ref)/k, (-m+ref)/k), min((m-ref)/k, (m+ref)/k))
+    nb = nbitslen(T, len, imin)
     step_hi = truncbits(step_hi_pre, nb)
     x1_hi, x1_lo = add2((1-imin)*step_hi, ref)
     x2_hi, x2_lo = add2((len-imin)*step_hi, ref)
     a, b = (start - x1_hi) - x1_lo, (stop - x2_hi) - x2_lo
     step_lo = (b - a)/(len - 1)
-    ref_lo = abs(ref) < eps(max(abs(start), abs(stop))) ? zero(T) : a - (1 - imin)*step_lo
+    ref_lo = a - (1 - imin)*step_lo
     StepRangeLen(TwicePrecision(ref, ref_lo), TwicePrecision(step_hi, step_lo), Int(len), imin)
 end
 
@@ -382,7 +386,7 @@ function linspace{T}(::Type{T}, start_n::Integer, stop_n::Integer, len::Integer,
     # Compute step to 2x precision without risking overflow...
     rend = proddiv(T, (stop_n,), dent)
     rbeg = proddiv(T, (-start_n,), dent)
-    step = twiceprecision(rbeg + rend, nbitslen(len, imin)) # ...and truncate hi-bits as needed
+    step = twiceprecision(rbeg + rend, nbitslen(T, len, imin)) # ...and truncate hi-bits as needed
     StepRangeLen(ref, step, Int(len), imin)
 end
 
@@ -399,8 +403,9 @@ end
 
 ### Numeric utilities
 
-# approximate x with a rational representation. Guaranteed to return,
+# Approximate x with a rational representation. Guaranteed to return,
 # but not guaranteed to return a precise answer.
+# https://en.wikipedia.org/wiki/Continued_fraction#Best_rational_approximations
 function rat(x)
     y = x
     a = d = 1

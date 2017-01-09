@@ -572,6 +572,10 @@ end
 @test convert(StepRangeLen, 0:5) == 0:5
 @test convert(StepRangeLen, 0:1:5) == 0:1:5
 
+@test convert(LinSpace{Float64}, 0.0:0.1:0.3) === LinSpace{Float64}(0.0, 0.3, 4)
+@test convert(LinSpace, 0.0:0.1:0.3) === LinSpace{Float64}(0.0, 0.3, 4)
+@test convert(LinSpace, 0:3) === LinSpace{Int}(0, 3, 4)
+
 # Issue #11245
 let io = IOBuffer()
     show(io, linspace(1, 2, 3))
@@ -618,10 +622,10 @@ replstrmime(x) = sprint((io,x) -> show(IOContext(io, limit=true), MIME("text/pla
 
 @test promote(linspace(0., 1., 3), 0:5) === (linspace(0., 1., 3),
                                              linspace(0., 5., 6))
-@test convert(LinSpace{Float64}, 0:5) === linspace(0., 5., 6)
-@test convert(LinSpace{Float64}, 0:1:5) === linspace(0., 5., 6)
-@test convert(LinSpace, 0:5) === linspace(0., 5., 6)
-@test convert(LinSpace, 0:1:5) === linspace(0., 5., 6)
+@test convert(LinSpace{Float64}, 0:5) === LinSpace(0., 5., 6)
+@test convert(LinSpace{Float64}, 0:1:5) === LinSpace(0., 5., 6)
+@test convert(LinSpace, 0:5) === LinSpace{Int}(0, 5, 6)
+@test convert(LinSpace, 0:1:5) === LinSpace{Int}(0, 5, 6)
 
 function test_range_index(r, s)
     @test typeof(r[s]) == typeof(r)
