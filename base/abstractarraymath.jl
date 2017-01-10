@@ -92,10 +92,6 @@ imag{T<:Real}(x::AbstractArray{T}) = zero(x)
 +{T<:Number}(x::AbstractArray{T}) = x
 *{T<:Number}(x::AbstractArray{T,2}) = x
 
-function lerpi(j::Integer, d::Integer, A::AbstractArray, B::AbstractArray)
-    lerpi.(j, d, A, B)
-end
-
 # index A[:,:,...,i,:,:,...] where "i" is in dimension "d"
 
 """

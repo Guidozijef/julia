@@ -487,7 +487,7 @@ function unsafe_getindex{T}(r::StepRangeLen{T}, i::Integer)
 end
 
 function unsafe_getindex(r::LinSpace, i::Integer)
-    lerpi(i-1, r.lendiv, r.start, r.stop)
+    lerpi.(i-1, r.lendiv, r.start, r.stop)
 end
 
 function lerpi{T}(j::Integer, d::Integer, a::T, b::T)
