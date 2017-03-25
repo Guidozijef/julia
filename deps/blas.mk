@@ -103,7 +103,7 @@ $(BUILDDIR)/$(OPENBLAS_SRC_DIR)/openblas-power-assembly-fixes.patch-applied: $(B
 	cd $(BUILDDIR)/$(OPENBLAS_SRC_DIR) && patch -p1 -f < $(SRCDIR)/patches/openblas-power-assembly-fixes.patch
 	echo 1 > $@
 
-$(BUILDDIR)/$(OPENBLAS_SRC_DIR)/build-configured: $(BUILDDIR)/$(OPENBLAS_SRC_DIR)/openblas-power-assembly-fixes.patch-applied
+$(BUILDDIR)/$(OPENBLAS_SRC_DIR)/build-configured:
 	perl -i -ple 's/^\s*(EXTRALIB\s*\+=\s*-lSystemStubs)\s*$$/# $$1/g' $(dir $<)/Makefile.system
 	echo 1 > $@
 
