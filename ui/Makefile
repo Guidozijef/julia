@@ -66,8 +66,13 @@ else
 CXXLD := $(LD)
 endif
 
+$(eval $(shell $(MAKE) -s -C $(SRCDIR)/../src BUILDDIR="$(BUILDDIR)/../src" print-RELEASE_LIBS))
+JLDFLAGS += $(RELEASE_LIBS)
+#JLDFLAGS +=  -Wl,--start-group ${MKLROOT}/lib/mic/libmkl_intel_ilp64.a ${MKLROOT}/lib/mic/libmkl_intel_thread.a ${MKLROOT}/lib/mic/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl
+
 $(build_bindir)/julia$(EXE): $(OBJS)
-	@$(call PRINT_LINK, $(CXXLD) $(CXXFLAGS) $(CXXLDFLAGS) $(LINK_FLAGS) $(SHIPFLAGS) $^ -o $@ -L$(build_private_libdir) -L$(build_libdir) -L$(build_shlibdir) -ljulia $(JLDFLAGS) $(CXXLDFLAGS))
+	@$(call PRINT_LINK, $(CXXLD) $(CXXFLAGS) $(CXXLDFLAGS) $(LINK_FLAGS) $(SHIPFLAGS) $^ -o $@ -L$(build_private_libdir) -L$(build_libdir) -L$(build_shlibdir) \
+		$(BUILDDIR)/../src/libjulia.a $(JLDFLAGS) $(CXXLDFLAGS))
 $(build_bindir)/julia-debug$(EXE): $(DOBJS)
 	@$(call PRINT_LINK, $(CXXLD) $(CXXFLAGS) $(CXXLDFLAGS) $(LINK_FLAGS) $(DEBUGFLAGS) $^ -o $@ -L$(build_private_libdir) -L$(build_libdir) -L$(build_shlibdir) -ljulia-debug $(JLDFLAGS) $(CXXLDFLAGS))
 

@@ -345,7 +345,7 @@ for op in (:(!=), :≠, :+, :-, :*, :/, :÷, :%, :<, :(<=), :≤, :(==), :>, :>=
 end
 
 # Devectorize manually vectorized abs methods in favor of compact broadcast syntax
-@deprecate abs(f::Base.Pkg.Resolve.MaxSum.Field) abs.(f)
+# @deprecate abs(f::Base.Pkg.Resolve.MaxSum.Field) abs.(f)
 @deprecate abs(B::BitArray) abs.(B)
 @deprecate abs(M::Bidiagonal) abs.(M)
 @deprecate abs(D::Diagonal) abs.(D)
@@ -881,8 +881,8 @@ unsafe_wrap(::Type{String}, p::Cstring, len::Integer, own::Bool=false) =
     unsafe_wrap(String, convert(Ptr{UInt8}, p), len, own)
 
 # #19660
-@deprecate finalize(sa::LibGit2.StrArrayStruct) LibGit2.free(sa)
-@deprecate finalize(sa::LibGit2.Buffer) LibGit2.free(sa)
+# @deprecate finalize(sa::LibGit2.StrArrayStruct) LibGit2.free(sa)
+# @deprecate finalize(sa::LibGit2.Buffer) LibGit2.free(sa)
 
 ## produce, consume, and task iteration
 # NOTE: When removing produce/consume, also remove field Task.consumers and related code in
@@ -1128,28 +1128,28 @@ function colon{T<:Dates.Period}(start::T, stop::T)
 end
 
 # LibGit2 refactor (#19839)
-@eval Base.LibGit2 begin
-     Base.@deprecate_binding Oid GitHash
-     Base.@deprecate_binding GitAnyObject GitUnknownObject
+# @eval Base.LibGit2 begin
+#      Base.@deprecate_binding Oid GitHash
+#      Base.@deprecate_binding GitAnyObject GitUnknownObject
 
-     @deprecate owner(x) repository(x) false
-     @deprecate get{T<:GitObject}(::Type{T}, repo::GitRepo, x) T(repo, x) false
-     @deprecate get{T<:GitObject}(::Type{T}, repo::GitRepo, oid::GitHash, oid_size::Int) T(repo, GitShortHash(oid, oid_size)) false
-     @deprecate revparse(repo::GitRepo, objname::AbstractString) GitObject(repo, objname) false
-     @deprecate object(repo::GitRepo, te::GitTreeEntry) GitObject(repo, te) false
-     @deprecate commit(ann::GitAnnotated) GitHash(ann) false
-     @deprecate lookup(repo::GitRepo, oid::GitHash) GitBlob(repo, oid) false
-    function Base.cat{T<:GitObject}(repo::GitRepo, ::Type{T}, spec::Union{AbstractString,AbstractGitHash})
-        Base.depwarn("cat(repo::GitRepo, T, spec) is deprecated, use content(T(repo, spec))", :cat)
-        try
-            return content(GitBlob(repo, spec))
-        catch e
-            isa(e, LibGit2.GitError) && return nothing
-            rethrow(e)
-        end
-    end
-    Base.cat(repo::GitRepo, spec::Union{AbstractString,AbstractGitHash}) = cat(repo, GitBlob, spec)
-end
+#      @deprecate owner(x) repository(x) false
+#      @deprecate get{T<:GitObject}(::Type{T}, repo::GitRepo, x) T(repo, x) false
+#      @deprecate get{T<:GitObject}(::Type{T}, repo::GitRepo, oid::GitHash, oid_size::Int) T(repo, GitShortHash(oid, oid_size)) false
+#      @deprecate revparse(repo::GitRepo, objname::AbstractString) GitObject(repo, objname) false
+#      @deprecate object(repo::GitRepo, te::GitTreeEntry) GitObject(repo, te) false
+#      @deprecate commit(ann::GitAnnotated) GitHash(ann) false
+#      @deprecate lookup(repo::GitRepo, oid::GitHash) GitBlob(repo, oid) false
+#     function Base.cat{T<:GitObject}(repo::GitRepo, ::Type{T}, spec::Union{AbstractString,AbstractGitHash})
+#         Base.depwarn("cat(repo::GitRepo, T, spec) is deprecated, use content(T(repo, spec))", :cat)
+#         try
+#             return content(GitBlob(repo, spec))
+#         catch e
+#             isa(e, LibGit2.GitError) && return nothing
+#             rethrow(e)
+#         end
+#     end
+#     Base.cat(repo::GitRepo, spec::Union{AbstractString,AbstractGitHash}) = cat(repo, GitBlob, spec)
+# end
 
 # when this deprecation is deleted, remove all calls to it, and all
 # negate=nothing keyword arguments, from base/dates/adjusters.jl

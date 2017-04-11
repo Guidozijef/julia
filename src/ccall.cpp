@@ -808,7 +808,9 @@ static jl_cgval_t emit_cglobal(jl_value_t **args, size_t nargs, jl_codectx_t *ct
             res = runtime_sym_lookup((PointerType*)lrt, sym.f_lib, sym.f_name, ctx->f);
         }
         else {
-            void *symaddr = jl_dlsym_e(jl_get_library(sym.f_lib), sym.f_name);
+            void *symaddr = jl_dlsym_e(jl_dl_handle, sym.f_name);
+            if (symaddr == NULL)
+                symaddr = jl_dlsym_e(jl_get_library(sym.f_lib), sym.f_name);
             if (symaddr == NULL) {
                 std::stringstream msg;
                 msg << "cglobal: could not find symbol ";
@@ -2003,7 +2005,9 @@ jl_cgval_t function_sig_t::emit_a_ccall(
                 llvmf = emit_plt(functype, attributes, cc, symarg.f_lib, symarg.f_name);
         }
         else {
-            void *symaddr = jl_dlsym_e(jl_get_library(symarg.f_lib), symarg.f_name);
+            void *symaddr = jl_dlsym_e(jl_dl_handle, symarg.f_name);
+            if (symaddr == NULL)
+                symaddr = jl_dlsym_e(jl_get_library(symarg.f_lib), symarg.f_name);
             if (symaddr == NULL) {
                 std::stringstream msg;
                 msg << "ccall: could not find function ";

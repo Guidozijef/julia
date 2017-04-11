@@ -13,17 +13,17 @@ function hash_integer(n::Integer, h::UInt)
     return h
 end
 
-function hash_integer(n::BigInt, h::UInt)
-    s = n.size
-    s == 0 && return hash_integer(0, h)
-    p = convert(Ptr{UInt}, n.d)
-    b = unsafe_load(p)
-    h ⊻= hash_uint(ifelse(s < 0, -b, b) ⊻ h)
-    for k = 2:abs(s)
-        h ⊻= hash_uint(unsafe_load(p, k) ⊻ h)
-    end
-    return h
-end
+# function hash_integer(n::BigInt, h::UInt)
+#     s = n.size
+#     s == 0 && return hash_integer(0, h)
+#     p = convert(Ptr{UInt}, n.d)
+#     b = unsafe_load(p)
+#     h ⊻= hash_uint(ifelse(s < 0, -b, b) ⊻ h)
+#     for k = 2:abs(s)
+#         h ⊻= hash_uint(unsafe_load(p, k) ⊻ h)
+#     end
+#     return h
+# end
 
 ## generic hashing for rational values ##
 
@@ -129,17 +129,17 @@ function decompose(x::Float64)::Tuple{Int64, Int, Int}
     s, e - 1075 + (e == 0), d
 end
 
-function decompose(x::BigFloat)::Tuple{BigInt, Int, Int}
-    isnan(x) && return 0, 0, 0
-    isinf(x) && return x.sign, 0, 0
-    x == 0 && return 0, 0, x.sign
-    s = BigInt()
-    s.size = cld(x.prec, 8*sizeof(GMP.Limb)) # limbs
-    b = s.size * sizeof(GMP.Limb)            # bytes
-    ccall((:__gmpz_realloc2, :libgmp), Void, (Ptr{BigInt}, Culong), &s, 8b) # bits
-    ccall(:memcpy, Ptr{Void}, (Ptr{Void}, Ptr{Void}, Csize_t), s.d, x.d, b) # bytes
-    s, x.exp - 8b, x.sign
-end
+# function decompose(x::BigFloat)::Tuple{BigInt, Int, Int}
+#     isnan(x) && return 0, 0, 0
+#     isinf(x) && return x.sign, 0, 0
+#     x == 0 && return 0, 0, x.sign
+#     s = BigInt()
+#     s.size = cld(x.prec, 8*sizeof(GMP.Limb)) # limbs
+#     b = s.size * sizeof(GMP.Limb)            # bytes
+#     ccall((:__gmpz_realloc2, :libgmp), Void, (Ptr{BigInt}, Culong), &s, 8b) # bits
+#     ccall(:memcpy, Ptr{Void}, (Ptr{Void}, Ptr{Void}, Csize_t), s.d, x.d, b) # bytes
+#     s, x.exp - 8b, x.sign
+# end
 
 ## streamlined hashing for smallish rational types ##
 

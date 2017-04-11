@@ -3,7 +3,7 @@
 module Random
 
 using Base.dSFMT
-using Base.GMP: GMP_VERSION, Limb
+# using Base.GMP: GMP_VERSION, Limb
 import Base: copymutable, copy, copy!, ==
 
 export srand,
@@ -561,35 +561,35 @@ for (T, U) in [(UInt8, UInt32), (UInt16, UInt32),
     end
 end
 
-if GMP_VERSION.major >= 6
-    struct RangeGeneratorBigInt <: RangeGenerator
-        a::BigInt             # first
-        m::BigInt             # range length - 1
-        nlimbs::Int           # number of limbs in generated BigInt's
-        mask::Limb            # applied to the highest limb
-    end
+# if GMP_VERSION.major >= 6
+#     struct RangeGeneratorBigInt <: RangeGenerator
+#         a::BigInt             # first
+#         m::BigInt             # range length - 1
+#         nlimbs::Int           # number of limbs in generated BigInt's
+#         mask::Limb            # applied to the highest limb
+#     end
 
-else
-    struct RangeGeneratorBigInt <: RangeGenerator
-        a::BigInt             # first
-        m::BigInt             # range length - 1
-        limbs::Vector{Limb}   # buffer to be copied into generated BigInt's
-        mask::Limb            # applied to the highest limb
+# else
+#     struct RangeGeneratorBigInt <: RangeGenerator
+#         a::BigInt             # first
+#         m::BigInt             # range length - 1
+#         limbs::Vector{Limb}   # buffer to be copied into generated BigInt's
+#         mask::Limb            # applied to the highest limb
 
-        RangeGeneratorBigInt(a, m, nlimbs, mask) = new(a, m, Array{Limb}(nlimbs), mask)
-    end
-end
+#         RangeGeneratorBigInt(a, m, nlimbs, mask) = new(a, m, Array{Limb}(nlimbs), mask)
+#     end
+# end
 
 
-function RangeGenerator(r::UnitRange{BigInt})
-    m = last(r) - first(r)
-    m < 0 && throw(ArgumentError("range must be non-empty"))
-    nd = ndigits(m, 2)
-    nlimbs, highbits = divrem(nd, 8*sizeof(Limb))
-    highbits > 0 && (nlimbs += 1)
-    mask = highbits == 0 ? ~zero(Limb) : one(Limb)<<highbits - one(Limb)
-    return RangeGeneratorBigInt(first(r), m, nlimbs, mask)
-end
+# function RangeGenerator(r::UnitRange{BigInt})
+#     m = last(r) - first(r)
+#     m < 0 && throw(ArgumentError("range must be non-empty"))
+#     nd = ndigits(m, 2)
+#     nlimbs, highbits = divrem(nd, 8*sizeof(Limb))
+#     highbits > 0 && (nlimbs += 1)
+#     mask = highbits == 0 ? ~zero(Limb) : one(Limb)<<highbits - one(Limb)
+#     return RangeGeneratorBigInt(first(r), m, nlimbs, mask)
+# end
 
 
 # this function uses 32 bit entropy for small ranges of length <= typemax(UInt32) + 1
@@ -618,39 +618,39 @@ function rand{T<:Integer, U<:Unsigned}(rng::AbstractRNG, g::RangeGeneratorInt{T,
     (unsigned(g.a) + rem_knuth(x, g.k)) % T
 end
 
-if GMP_VERSION.major >= 6
-    # mpz_limbs_write and mpz_limbs_finish are available only in GMP version 6
-    function rand(rng::AbstractRNG, g::RangeGeneratorBigInt)
-        x = BigInt()
-        while true
-            # note: on CRAY computers, the second argument may be of type Cint (48 bits) and not Clong
-            xd = ccall((:__gmpz_limbs_write, :libgmp), Ptr{Limb}, (Ptr{BigInt}, Clong), &x, g.nlimbs)
-            limbs = unsafe_wrap(Array, xd, g.nlimbs)
-            rand!(rng, limbs)
-            limbs[end] &= g.mask
-            ccall((:__gmpz_limbs_finish, :libgmp), Void, (Ptr{BigInt}, Clong), &x, g.nlimbs)
-            x <= g.m && break
-        end
-        ccall((:__gmpz_add, :libgmp), Void, (Ptr{BigInt}, Ptr{BigInt}, Ptr{BigInt}), &x, &x, &g.a)
-        return x
-    end
-else
-    function rand(rng::AbstractRNG, g::RangeGeneratorBigInt)
-        x = BigInt()
-        while true
-            rand!(rng, g.limbs)
-            g.limbs[end] &= g.mask
-            ccall((:__gmpz_import, :libgmp), Void,
-                  (Ptr{BigInt}, Csize_t, Cint, Csize_t, Cint, Csize_t, Ptr{Limb}),
-                  &x, length(g.limbs), -1, sizeof(Limb), 0, 0, g.limbs)
-            x <= g.m && break
-        end
-        ccall((:__gmpz_add, :libgmp), Void, (Ptr{BigInt}, Ptr{BigInt}, Ptr{BigInt}), &x, &x, &g.a)
-        return x
-    end
-end
+# if GMP_VERSION.major >= 6
+#     # mpz_limbs_write and mpz_limbs_finish are available only in GMP version 6
+#     function rand(rng::AbstractRNG, g::RangeGeneratorBigInt)
+#         x = BigInt()
+#         while true
+#             # note: on CRAY computers, the second argument may be of type Cint (48 bits) and not Clong
+#             xd = ccall((:__gmpz_limbs_write, :libgmp), Ptr{Limb}, (Ptr{BigInt}, Clong), &x, g.nlimbs)
+#             limbs = unsafe_wrap(Array, xd, g.nlimbs)
+#             rand!(rng, limbs)
+#             limbs[end] &= g.mask
+#             ccall((:__gmpz_limbs_finish, :libgmp), Void, (Ptr{BigInt}, Clong), &x, g.nlimbs)
+#             x <= g.m && break
+#         end
+#         ccall((:__gmpz_add, :libgmp), Void, (Ptr{BigInt}, Ptr{BigInt}, Ptr{BigInt}), &x, &x, &g.a)
+#         return x
+#     end
+# else
+#     function rand(rng::AbstractRNG, g::RangeGeneratorBigInt)
+#         x = BigInt()
+#         while true
+#             rand!(rng, g.limbs)
+#             g.limbs[end] &= g.mask
+#             ccall((:__gmpz_import, :libgmp), Void,
+#                   (Ptr{BigInt}, Csize_t, Cint, Csize_t, Cint, Csize_t, Ptr{Limb}),
+#                   &x, length(g.limbs), -1, sizeof(Limb), 0, 0, g.limbs)
+#             x <= g.m && break
+#         end
+#         ccall((:__gmpz_add, :libgmp), Void, (Ptr{BigInt}, Ptr{BigInt}, Ptr{BigInt}), &x, &x, &g.a)
+#         return x
+#     end
+# end
 
-rand(rng::AbstractRNG, r::UnitRange{<:Union{Signed,Unsigned,BigInt,Bool}}) = rand(rng, RangeGenerator(r))
+rand(rng::AbstractRNG, r::UnitRange{<:Union{Signed,Unsigned,Bool}}) = rand(rng, RangeGenerator(r))
 
 
 # Randomly draw a sample from an AbstractArray r
@@ -664,7 +664,7 @@ function rand!(rng::AbstractRNG, A::AbstractArray, g::RangeGenerator)
     return A
 end
 
-rand!(rng::AbstractRNG, A::AbstractArray, r::UnitRange{<:Union{Signed,Unsigned,BigInt,Bool,Char}}) = rand!(rng, A, RangeGenerator(r))
+rand!(rng::AbstractRNG, A::AbstractArray, r::UnitRange{<:Union{Signed,Unsigned,Bool,Char}}) = rand!(rng, A, RangeGenerator(r))
 
 function rand!(rng::AbstractRNG, A::AbstractArray, r::AbstractArray)
     g = RangeGenerator(1:(length(r)))

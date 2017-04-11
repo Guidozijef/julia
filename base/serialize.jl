@@ -274,15 +274,15 @@ function serialize(s::AbstractSerializer, r::Regex)
     serialize(s, r.match_options)
 end
 
-function serialize(s::AbstractSerializer, n::BigInt)
-    serialize_type(s, BigInt)
-    serialize(s, base(62,n))
-end
+# function serialize(s::AbstractSerializer, n::BigInt)
+#     serialize_type(s, BigInt)
+#     serialize(s, base(62,n))
+# end
 
-function serialize(s::AbstractSerializer, n::BigFloat)
-    serialize_type(s, BigFloat)
-    serialize(s, string(n))
-end
+# function serialize(s::AbstractSerializer, n::BigFloat)
+#     serialize_type(s, BigFloat)
+#     serialize(s, string(n))
+# end
 
 function serialize(s::AbstractSerializer, ex::Expr)
     serialize_cycle(s, ex) && return
@@ -970,9 +970,9 @@ function deserialize{K,V}(s::AbstractSerializer, T::Type{Dict{K,V}})
     return t
 end
 
-deserialize(s::AbstractSerializer, ::Type{BigFloat}) = parse(BigFloat, deserialize(s))
+# deserialize(s::AbstractSerializer, ::Type{BigFloat}) = parse(BigFloat, deserialize(s))
 
-deserialize(s::AbstractSerializer, ::Type{BigInt}) = parse(BigInt, deserialize(s), 62)
+# deserialize(s::AbstractSerializer, ::Type{BigInt}) = parse(BigInt, deserialize(s), 62)
 
 function deserialize(s::AbstractSerializer, t::Type{Regex})
     pattern = deserialize(s)

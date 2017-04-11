@@ -175,7 +175,7 @@ $(build_datarootdir)/julia/julia-config.jl : $(JULIAHOME)/contrib/julia-config.j
 
 $(build_private_libdir)/%.$(SHLIB_EXT): $(build_private_libdir)/%.o
 	@$(call PRINT_LINK, $(CXX) $(LDFLAGS) -shared $(fPIC) -L$(build_private_libdir) -L$(build_libdir) -L$(build_shlibdir) -o $@ $< \
-		$(if $(findstring -debug,$(notdir $@)),-ljulia-debug,-ljulia) \
+		$(if $(findstring -debug,$(notdir $@)),,) \
 		$$([ $(OS) = WINNT ] && echo '' -lssp))
 	@$(INSTALL_NAME_CMD)$(notdir $@) $@
 	@$(DSYMUTIL) $@

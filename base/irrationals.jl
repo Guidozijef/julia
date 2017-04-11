@@ -29,7 +29,7 @@ convert{T<:Real}(::Type{Complex{T}}, x::Irrational) = convert(Complex{T}, conver
         p += 32
     end
 end
-convert(::Type{Rational{BigInt}}, x::Irrational) = throw(ArgumentError("Cannot convert an Irrational to a Rational{BigInt}: use rationalize(Rational{BigInt}, x) instead"))
+# convert(::Type{Rational{BigInt}}, x::Irrational) = throw(ArgumentError("Cannot convert an Irrational to a Rational{BigInt}: use rationalize(Rational{BigInt}, x) instead"))
 
 @pure function (t::Type{T}){T<:Union{Float32,Float64}}(x::Irrational, r::RoundingMode)
     setprecision(BigFloat, 256) do
@@ -51,12 +51,12 @@ end
 <(x::Float32, y::Irrational) = x <= Float32(y,RoundDown)
 <(x::Irrational, y::Float16) = Float32(x,RoundUp) <= y
 <(x::Float16, y::Irrational) = x <= Float32(y,RoundDown)
-<(x::Irrational, y::BigFloat) = setprecision(precision(y)+32) do
-    big(x) < y
-end
-<(x::BigFloat, y::Irrational) = setprecision(precision(x)+32) do
-    x < big(y)
-end
+# <(x::Irrational, y::BigFloat) = setprecision(precision(y)+32) do
+    # big(x) < y
+# end
+# <(x::BigFloat, y::Irrational) = setprecision(precision(x)+32) do
+    # x < big(y)
+# end
 
 <=(x::Irrational, y::AbstractFloat) = x < y
 <=(x::AbstractFloat, y::Irrational) = x < y
@@ -88,8 +88,8 @@ function <{T}(x::Rational{T}, y::Irrational)
         return x < ry
     end
 end
-<(x::Irrational, y::Rational{BigInt}) = big(x) < y
-<(x::Rational{BigInt}, y::Irrational) = x < big(y)
+# <(x::Irrational, y::Rational{BigInt}) = big(x) < y
+# <(x::Rational{BigInt}, y::Irrational) = x < big(y)
 
 <=(x::Irrational, y::Rational) = x < y
 <=(x::Rational, y::Irrational) = x < y
@@ -107,25 +107,25 @@ end
 macro irrational(sym, val, def)
     esym = esc(sym)
     qsym = esc(Expr(:quote, sym))
-    bigconvert = isa(def,Symbol) ? quote
-        function Base.convert(::Type{BigFloat}, ::Irrational{$qsym})
-            c = BigFloat()
-            ccall(($(string("mpfr_const_", def)), :libmpfr),
-                  Cint, (Ptr{BigFloat}, Int32),
-                  &c, MPFR.ROUNDING_MODE[])
-            return c
-        end
-    end : quote
-        Base.convert(::Type{BigFloat}, ::Irrational{$qsym}) = $(esc(def))
-    end
+    # bigconvert = isa(def,Symbol) ? quote
+    #     function Base.convert(::Type{BigFloat}, ::Irrational{$qsym})
+    #         c = BigFloat()
+    #         ccall(($(string("mpfr_const_", def)), :libmpfr),
+    #               Cint, (Ptr{BigFloat}, Int32),
+    #               &c, MPFR.ROUNDING_MODE[])
+    #         return c
+    #     end
+    # end : quote
+    #     Base.convert(::Type{BigFloat}, ::Irrational{$qsym}) = $(esc(def))
+    # end
     quote
         const $esym = Irrational{$qsym}()
-        $bigconvert
+        # $bigconvert
         Base.convert(::Type{Float64}, ::Irrational{$qsym}) = $val
         Base.convert(::Type{Float32}, ::Irrational{$qsym}) = $(Float32(val))
-        @assert isa(big($esym), BigFloat)
-        @assert Float64($esym) == Float64(big($esym))
-        @assert Float32($esym) == Float32(big($esym))
+        # @assert isa(big($esym), BigFloat)
+        # @assert Float64($esym) == Float64(big($esym))
+        # @assert Float32($esym) == Float32(big($esym))
     end
 end
 

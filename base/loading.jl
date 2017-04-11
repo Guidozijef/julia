@@ -197,13 +197,13 @@ function _require_from_serialized(node::Int, mod::Symbol, path_to_try::String, t
         restored = _include_from_serialized(content)
     end
 
-    if !isa(restored, Exception)
-        for M in restored::Vector{Any}
-            if isdefined(M, Base.Docs.META)
-                push!(Base.Docs.modules, M)
-            end
-        end
-    end
+    # if !isa(restored, Exception)
+        # for M in restored::Vector{Any}
+            # if isdefined(M, Base.Docs.META)
+                # push!(Base.Docs.modules, M)
+            # end
+        # end
+    # end
     return restored
 end
 

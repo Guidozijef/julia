@@ -258,13 +258,13 @@ importall .Sort
 function deepcopy_internal end
 
 # BigInts and BigFloats
-include("gmp.jl")
-importall .GMP
-include("mpfr.jl")
-importall .MPFR
-big(n::Integer) = convert(BigInt,n)
-big(x::AbstractFloat) = convert(BigFloat,x)
-big(q::Rational) = big(numerator(q))//big(denominator(q))
+# include("gmp.jl")
+# importall .GMP
+# include("mpfr.jl")
+# importall .MPFR
+# big(n::Integer) = convert(BigInt,n)
+# big(x::AbstractFloat) = convert(BigFloat,x)
+# big(q::Rational) = big(numerator(q))//big(denominator(q))
 
 include("combinatorics.jl")
 
@@ -345,10 +345,26 @@ include("fastmath.jl")
 importall .FastMath
 
 # libgit2 support
-include("libgit2/libgit2.jl")
+# include("libgit2/libgit2.jl")
 
 # package manager
-include("pkg/pkg.jl")
+# include("pkg/pkg.jl")
+
+module Pkg
+    const DIR_NAME = ".julia"
+    _pkgroot() = abspath(get(ENV,"JULIA_PKGDIR",joinpath(homedir(),DIR_NAME)))
+    function path()
+        b = _pkgroot()
+        x, y = VERSION.major, VERSION.minor
+        d = joinpath(b,"v$x.$y")
+        if isdir(d) || !isdir(b) || !isdir(joinpath(b, "METADATA"))
+            return d
+        end
+        return b
+    end
+    path(pkg::AbstractString...) = normpath(path(),pkg...)
+    dir(pth...) = path(pth...)
+end
 
 # profiler
 include("profile.jl")
@@ -378,14 +394,18 @@ include("threadcall.jl")
 include("deprecated.jl")
 
 # Some basic documentation
-include("docs/helpdb.jl")
-include("docs/basedocs.jl")
+# include("docs/helpdb.jl")
+# include("docs/basedocs.jl")
 
 # Documentation -- should always be included last in sysimg.
-include("markdown/Markdown.jl")
-include("docs/Docs.jl")
-using .Docs, .Markdown
-isdefined(Core, :Inference) && Docs.loaddocs(Core.Inference.CoreDocs.DOCS)
+# include("markdown/Markdown.jl")
+# include("docs/Docs.jl")
+# using .Docs, .Markdown
+# isdefined(Core, :Inference) && Docs.loaddocs(Core.Inference.CoreDocs.DOCS)
+immutable BigFloat end
+immutable BigInt end
+
+module Docs; helpmode() = nothing; end
 
 function __init__()
     # Base library init
@@ -395,10 +415,15 @@ function __init__()
     init_load_path()
     Distributed.init_parallel()
     init_threadcall()
+
+    vers = "v$(VERSION.major).$(VERSION.minor)"
+    vers = ccall(:jl_uses_cpuid_tag, Cint, ()) == 0 ? vers :
+    joinpath(vers,hex(ccall(:jl_cpuid_tag, UInt64, ()), 2*sizeof(UInt64)))
+    unshift!(Base.LOAD_CACHE_PATH, abspath(Pkg._pkgroot(), "lib", vers))
 end
 
 INCLUDE_STATE = 3 # include = include_from_node1
-include("precompile.jl")
+# include("precompile.jl")
 
 end # baremodule Base
 

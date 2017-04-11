@@ -876,36 +876,36 @@ const HEX_symbols = b"0123456789ABCDEF"
 decode_hex(x::Integer) = decode_hex(x,hex_symbols)
 decode_HEX(x::Integer) = decode_hex(x,HEX_symbols)
 
-function decode(b::Int, x::BigInt)
-    neg = x.size < 0
-    pt = Base.ndigits(x, abs(b))
-    length(DIGITS) < pt+1 && resize!(DIGITS, pt+1)
-    neg && (x.size = -x.size)
-    ccall((:__gmpz_get_str, :libgmp), Cstring,
-          (Ptr{UInt8}, Cint, Ptr{BigInt}), DIGITS, b, &x)
-    neg && (x.size = -x.size)
-    return Int32(pt), Int32(pt), neg
-end
-decode_oct(x::BigInt) = decode(8, x)
-decode_dec(x::BigInt) = decode(10, x)
-decode_hex(x::BigInt) = decode(16, x)
-decode_HEX(x::BigInt) = decode(-16, x)
+# function decode(b::Int, x::BigInt)
+#     neg = x.size < 0
+#     pt = Base.ndigits(x, abs(b))
+#     length(DIGITS) < pt+1 && resize!(DIGITS, pt+1)
+#     neg && (x.size = -x.size)
+#     ccall((:__gmpz_get_str, :libgmp), Cstring,
+#           (Ptr{UInt8}, Cint, Ptr{BigInt}), DIGITS, b, &x)
+#     neg && (x.size = -x.size)
+#     return Int32(pt), Int32(pt), neg
+# end
+# decode_oct(x::BigInt) = decode(8, x)
+# decode_dec(x::BigInt) = decode(10, x)
+# decode_hex(x::BigInt) = decode(16, x)
+# decode_HEX(x::BigInt) = decode(-16, x)
 
-function decode_0ct(x::BigInt)
-    neg = x.size < 0
-    DIGITS[1] = '0'
-    if x.size == 0
-        return Int32(1), Int32(1), neg
-    end
-    pt = Base.ndigits0z(x, 8) + 1
-    length(DIGITS) < pt+1 && resize!(DIGITS, pt+1)
-    neg && (x.size = -x.size)
-    p = convert(Ptr{UInt8}, DIGITS) + 1
-    ccall((:__gmpz_get_str, :libgmp), Cstring,
-          (Ptr{UInt8}, Cint, Ptr{BigInt}), p, 8, &x)
-    neg && (x.size = -x.size)
-    return neg, Int32(pt), Int32(pt)
-end
+# function decode_0ct(x::BigInt)
+#     neg = x.size < 0
+#     DIGITS[1] = '0'
+#     if x.size == 0
+#         return Int32(1), Int32(1), neg
+#     end
+#     pt = Base.ndigits0z(x, 8) + 1
+#     length(DIGITS) < pt+1 && resize!(DIGITS, pt+1)
+#     neg && (x.size = -x.size)
+#     p = convert(Ptr{UInt8}, DIGITS) + 1
+#     ccall((:__gmpz_get_str, :libgmp), Cstring,
+#           (Ptr{UInt8}, Cint, Ptr{BigInt}), p, 8, &x)
+#     neg && (x.size = -x.size)
+#     return neg, Int32(pt), Int32(pt)
+# end
 
 ### decoding functions directly used by printf generated code ###
 
@@ -1011,21 +1011,21 @@ function ini_dec(x::SmallFloatingPoint, n::Int)
     return Int32(len), Int32(pt), neg
 end
 
-function ini_dec(x::BigInt, n::Int)
-    if x.size == 0
-        ccall(:memset, Ptr{Void}, (Ptr{Void}, Cint, Csize_t), DIGITS, '0', n)
-        return Int32(1), Int32(1), false
-    end
-    d = Base.ndigits0z(x)
-    if d <= n
-        info = decode_dec(x)
-        d == n && return info
-        p = convert(Ptr{Void}, DIGITS) + info[2]
-        ccall(:memset, Ptr{Void}, (Ptr{Void}, Cint, Csize_t), p, '0', n - info[2])
-        return info
-    end
-    return (n, d, decode_dec(round(BigInt,x/big(10)^(d-n)))[3])
-end
+# function ini_dec(x::BigInt, n::Int)
+#     if x.size == 0
+#         ccall(:memset, Ptr{Void}, (Ptr{Void}, Cint, Csize_t), DIGITS, '0', n)
+#         return Int32(1), Int32(1), false
+#     end
+#     d = Base.ndigits0z(x)
+#     if d <= n
+#         info = decode_dec(x)
+#         d == n && return info
+#         p = convert(Ptr{Void}, DIGITS) + info[2]
+#         ccall(:memset, Ptr{Void}, (Ptr{Void}, Cint, Csize_t), p, '0', n - info[2])
+#         return info
+#     end
+#     return (n, d, decode_dec(round(BigInt,x/big(10)^(d-n)))[3])
+# end
 
 
 ini_hex(x::Real, n::Int) = ini_hex(x,n,hex_symbols)
@@ -1098,44 +1098,44 @@ end
 ini_hex(x::Integer,ndigits::Int) = throw(MethodError(ini_hex,(x,ndigits)))
 
 #BigFloat
-fix_dec(out, d::BigFloat, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
-ini_dec(out, d::BigFloat, ndigits::Int, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
-ini_hex(out, d::BigFloat, ndigits::Int, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
-ini_HEX(out, d::BigFloat, ndigits::Int, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
-ini_hex(out, d::BigFloat, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
-ini_HEX(out, d::BigFloat, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
-function bigfloat_printf(out, d, flags::String, width::Int, precision::Int, c::Char)
-    fmt_len = sizeof(flags)+4
-    if width > 0
-        fmt_len += ndigits(width)
-    end
-    if precision >= 0
-        fmt_len += ndigits(precision)+1
-    end
-    fmt = IOBuffer(fmt_len)
-    write(fmt, '%')
-    write(fmt, flags)
-    if width > 0
-        print(fmt, width)
-    end
-    if precision == 0
-        write(fmt, '.')
-        write(fmt, '0')
-    elseif precision > 0
-        write(fmt, '.')
-        print(fmt, precision)
-    end
-    write(fmt, 'R')
-    write(fmt, c)
-    write(fmt, UInt8(0))
-    printf_fmt = take!(fmt)
-    @assert length(printf_fmt) == fmt_len
-    bufsiz = length(DIGITS) - 1
-    lng = ccall((:mpfr_snprintf,:libmpfr), Int32, (Ptr{UInt8}, Culong, Ptr{UInt8}, Ptr{BigFloat}...), DIGITS, bufsiz, printf_fmt, &d)
-    lng > 0 || error("invalid printf formatting for BigFloat")
-    unsafe_write(out, pointer(DIGITS), min(lng,bufsiz))
-    return (false, ())
-end
+# fix_dec(out, d::BigFloat, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
+# ini_dec(out, d::BigFloat, ndigits::Int, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
+# ini_hex(out, d::BigFloat, ndigits::Int, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
+# ini_HEX(out, d::BigFloat, ndigits::Int, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
+# ini_hex(out, d::BigFloat, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
+# ini_HEX(out, d::BigFloat, flags::String, width::Int, precision::Int, c::Char) = bigfloat_printf(out, d, flags, width, precision, c)
+# function bigfloat_printf(out, d, flags::String, width::Int, precision::Int, c::Char)
+#     fmt_len = sizeof(flags)+4
+#     if width > 0
+#         fmt_len += ndigits(width)
+#     end
+#     if precision >= 0
+#         fmt_len += ndigits(precision)+1
+#     end
+#     fmt = IOBuffer(fmt_len)
+#     write(fmt, '%')
+#     write(fmt, flags)
+#     if width > 0
+#         print(fmt, width)
+#     end
+#     if precision == 0
+#         write(fmt, '.')
+#         write(fmt, '0')
+#     elseif precision > 0
+#         write(fmt, '.')
+#         print(fmt, precision)
+#     end
+#     write(fmt, 'R')
+#     write(fmt, c)
+#     write(fmt, UInt8(0))
+#     printf_fmt = take!(fmt)
+#     @assert length(printf_fmt) == fmt_len
+#     bufsiz = length(DIGITS) - 1
+#     lng = ccall((:mpfr_snprintf,:libmpfr), Int32, (Ptr{UInt8}, Culong, Ptr{UInt8}, Ptr{BigFloat}...), DIGITS, bufsiz, printf_fmt, &d)
+#     lng > 0 || error("invalid printf formatting for BigFloat")
+#     unsafe_write(out, pointer(DIGITS), min(lng,bufsiz))
+#     return (false, ())
+# end
 
 ### external printf interface ###
 

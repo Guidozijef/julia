@@ -275,8 +275,8 @@ include("special.jl")
 include("bitarray.jl")
 include("ldlt.jl")
 
-include("arpack.jl")
-include("arnoldi.jl")
+# include("arpack.jl")
+# include("arnoldi.jl")
 
 function __init__()
     try
