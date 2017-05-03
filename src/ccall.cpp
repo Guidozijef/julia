@@ -1795,7 +1795,7 @@ static jl_cgval_t emit_ccall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
         jl_value_t *aryty = expr_type(aryex, ctx);
         if (jl_is_array_type(aryty)) {
             jl_value_t *ety = jl_tparam0(aryty);
-            if (jl_isbits(ety)) {
+            if (jl_isbits(ety) || jl_array_store_unboxed(ety)) {
                 emit_expr(aryex, ctx);
                 emit_expr(idxex, ctx);
                 JL_GC_POP();

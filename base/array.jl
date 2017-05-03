@@ -100,6 +100,13 @@ function isassigned(a::Array, i::Int...)
     ccall(:jl_array_isassigned, Cint, (Any, UInt), a, ii) == 1
 end
 
+## Union isbits selector bytes
+function selectorbytes(a::Array{T, N}) where {T, N}
+    (T isa Union && all(isbits.(Base.uniontypes(T)))) || return UInt8[]
+    elsize = maximum(sizeof, Base.uniontypes(T))
+    return unsafe_wrap(Array{UInt8, N}, convert(Ptr{UInt8}, pointer(a)) + length(a) * elsize, size(a))
+end
+
 ## copy ##
 
 function unsafe_copy!(dest::Ptr{T}, src::Ptr{T}, n) where T

@@ -628,13 +628,13 @@ static unsigned get_box_tindex(jl_datatype_t *jt, jl_value_t *ut)
 
 static Value *emit_nthptr_addr(Value *v, ssize_t n, bool gctracked = true)
 {
-    return builder.CreateGEP(emit_bitcast(gctracked ? decay_derived(v) : v, T_pprjlvalue),
+    return builder.CreateGEP(T_prjlvalue, emit_bitcast(gctracked ? decay_derived(v) : v, T_pprjlvalue),
                              ConstantInt::get(T_size, n));
 }
 
 static Value *emit_nthptr_addr(Value *v, Value *idx, bool gctracked = true)
 {
-    return builder.CreateGEP(emit_bitcast(gctracked ? decay_derived(v) : v, T_pprjlvalue), idx);
+    return builder.CreateGEP(T_prjlvalue, emit_bitcast(gctracked ? decay_derived(v) : v, T_pprjlvalue), idx);
 }
 
 static Value *emit_nthptr(Value *v, ssize_t n, MDNode *tbaa)
@@ -750,7 +750,7 @@ static Value *emit_datatype_types(Value *dt)
 {
     return tbaa_decorate(tbaa_const, builder.
         CreateLoad(emit_bitcast(builder.
-                                CreateGEP(emit_bitcast(decay_derived(dt), T_pint8),
+                                CreateGEP(T_int8, emit_bitcast(decay_derived(dt), T_pint8),
                                           ConstantInt::get(T_size, offsetof(jl_datatype_t, types))),
                                 T_ppjlvalue)));
 }
@@ -760,7 +760,7 @@ static Value *emit_datatype_nfields(Value *dt)
     Value *nf = tbaa_decorate(tbaa_const, builder.CreateLoad(
         tbaa_decorate(tbaa_const, builder.CreateLoad(
             emit_bitcast(
-                builder.CreateGEP(
+                builder.CreateGEP(T_int8,
                     emit_bitcast(decay_derived(dt), T_pint8),
                     ConstantInt::get(T_size, offsetof(jl_datatype_t, types))),
                 T_pint32->getPointerTo())))));
@@ -774,7 +774,7 @@ static Value *emit_datatype_size(Value *dt)
 {
     Value *size = tbaa_decorate(tbaa_const, builder.
         CreateLoad(emit_bitcast(builder.
-                                CreateGEP(emit_bitcast(decay_derived(dt), T_pint8),
+                                CreateGEP(T_int8, emit_bitcast(decay_derived(dt), T_pint8),
                                           ConstantInt::get(T_size, offsetof(jl_datatype_t, size))),
                                 T_pint32)));
     return size;
@@ -832,7 +832,7 @@ static Value *emit_sizeof(const jl_cgval_t &p, jl_codectx_t *ctx)
 static Value *emit_datatype_mutabl(Value *dt)
 {
     Value *mutabl = tbaa_decorate(tbaa_const, builder.
-        CreateLoad(builder.CreateGEP(emit_bitcast(decay_derived(dt), T_pint8),
+        CreateLoad(builder.CreateGEP(T_int8, emit_bitcast(decay_derived(dt), T_pint8),
                                      ConstantInt::get(T_size, offsetof(jl_datatype_t, mutabl)))));
     return builder.CreateTrunc(mutabl, T_int1);
 }
@@ -840,7 +840,7 @@ static Value *emit_datatype_mutabl(Value *dt)
 static Value *emit_datatype_abstract(Value *dt)
 {
     Value *abstract = tbaa_decorate(tbaa_const, builder.
-        CreateLoad(builder.CreateGEP(emit_bitcast(decay_derived(dt), T_pint8),
+        CreateLoad(builder.CreateGEP(T_int8, emit_bitcast(decay_derived(dt), T_pint8),
                                      ConstantInt::get(T_size, offsetof(jl_datatype_t, abstract)))));
     return builder.CreateTrunc(abstract, T_int1);
 }
@@ -1141,35 +1141,6 @@ static Value *emit_bounds_check(const jl_cgval_t &ainfo, jl_value_t *ty, Value *
     return im1;
 }
 
-// --- loading and storing ---
-
-static Value *compute_box_tindex(Value *datatype, jl_value_t *supertype, jl_value_t *ut, jl_codectx_t *ctx)
-{
-    Value *tindex = ConstantInt::get(T_int8, 0);
-    unsigned counter = 0;
-    for_each_uniontype_small(
-            [&](unsigned idx, jl_datatype_t *jt) {
-                if (jl_subtype((jl_value_t*)jt, supertype)) {
-                    Value *cmp = builder.CreateICmpEQ(literal_pointer_val((jl_value_t*)jt), datatype);
-                    tindex = builder.CreateSelect(cmp, ConstantInt::get(T_int8, idx), tindex);
-                }
-            },
-            ut,
-            counter);
-    return tindex;
-}
-
-// get the runtime tindex value
-static Value *compute_tindex_unboxed(const jl_cgval_t &val, jl_value_t *typ, jl_codectx_t *ctx)
-{
-    if (val.constant)
-        return ConstantInt::get(T_int8, get_box_tindex((jl_datatype_t*)jl_typeof(val.constant), typ));
-    if (val.isboxed)
-        return compute_box_tindex(emit_typeof_boxed(val, ctx), val.typ, typ, ctx);
-    assert(val.TIndex);
-    return builder.CreateAnd(val.TIndex, ConstantInt::get(T_int8, 0x7f));
-}
-
 // If given alignment is 0 and LLVM's assumed alignment for a load/store via ptr
 // might be stricter than the Julia alignment for jltype, return the alignment of jltype.
 // Otherwise return the given alignment.
@@ -1195,16 +1166,13 @@ static jl_cgval_t typed_load(Value *ptr, Value *idx_0based, jl_value_t *jltype,
     Type *elty = julia_type_to_llvm(jltype, &isboxed);
     if (type_is_ghost(elty))
         return ghostValue(jltype);
-    Value *data;
     if (isboxed)
         elty = T_prjlvalue;
-    // TODO: preserving_pointercast?
+    Value *data = ptr;
     if (ptr->getType()->getContainedType(0) != elty)
         data = emit_bitcast(ptr, PointerType::get(elty, 0));
-    else
-        data = ptr;
     if (idx_0based)
-        data = builder.CreateGEP(data, idx_0based);
+        data = builder.CreateGEP(elty, data, idx_0based);
     Value *elt;
     // TODO: can only lazy load if we can create a gc root for ptr for the lifetime of elt
     //if (elty->isAggregateType() && tbaa == tbaa_immut && !alignment) { // can lazy load on demand, no copy needed
@@ -1244,17 +1212,12 @@ static void typed_store(Value *ptr, Value *idx_0based, const jl_cgval_t &rhs,
     else {
         r = maybe_decay_untracked(boxed(rhs, ctx, root_box));
         if (parent != NULL) emit_write_barrier(ctx, parent, r);
+        elty = T_prjlvalue;
     }
-    Value *data;
-    if (ptr->getType()->getContainedType(0) != elty) {
-        if (isboxed) {
-            data = emit_bitcast(ptr, T_pprjlvalue);
-        } else {
-            data = emit_bitcast(ptr, PointerType::get(elty, cast<PointerType>(ptr->getType())->getAddressSpace()));
-        }
-    } else
-        data = ptr;
-    Instruction *store = builder.CreateAlignedStore(r, builder.CreateGEP(data,
+    Value *data = ptr;
+    if (ptr->getType()->getContainedType(0) != elty)
+        data = emit_bitcast(ptr, elty->getPointerTo());
+    Instruction *store = builder.CreateAlignedStore(r, builder.CreateGEP(elty, data,
         idx_0based), isboxed ? alignment : julia_alignment(r, jltype, alignment));
     if (tbaa)
         tbaa_decorate(tbaa, store);
@@ -1488,7 +1451,7 @@ static jl_cgval_t emit_getfield_knownidx(const jl_cgval_t &strct, unsigned idx, 
         }
         else if (jl_is_uniontype(jfty)) {
             int fsz = jl_field_size(jt, idx);
-            Value *ptindex = builder.CreateGEP(LLVM37_param(T_int8) emit_bitcast(addr, T_pint8), ConstantInt::get(T_size, fsz - 1));
+            Value *ptindex = builder.CreateGEP(T_int8, emit_bitcast(addr, T_pint8), ConstantInt::get(T_size, fsz - 1));
             Value *tindex = builder.CreateNUWAdd(ConstantInt::get(T_int8, 1), builder.CreateLoad(ptindex));
             bool isimmutable = strct.isimmutable;
             Value *gcroot = strct.gcroot;
@@ -1643,7 +1606,7 @@ static Value *emit_arraylen_prim(const jl_cgval_t &tinfo, jl_codectx_t *ctx)
 static Value *emit_arraylen(const jl_cgval_t &tinfo, jl_value_t *ex, jl_codectx_t *ctx)
 {
     jl_arrayvar_t *av = arrayvar_for(ex, ctx);
-    if (av!=NULL)
+    if (av != NULL)
         return builder.CreateLoad(av->len);
     return emit_arraylen_prim(tinfo, ctx);
 }
@@ -1813,7 +1776,7 @@ static Value *emit_array_nd_index(const jl_cgval_t &ainfo, jl_value_t *ex, ssize
         // CreateAlloca is OK here since we are on an error branch
         Value *tmp = builder.CreateAlloca(T_size, ConstantInt::get(T_size, nidxs));
         for(size_t k=0; k < nidxs; k++) {
-            builder.CreateStore(idxs[k], builder.CreateGEP(tmp, ConstantInt::get(T_size, k)));
+            builder.CreateStore(idxs[k], builder.CreateGEP(T_size, tmp, ConstantInt::get(T_size, k)));
         }
         builder.CreateCall(prepare_call(jlboundserrorv_func),
             { mark_callee_rooted(a), tmp, ConstantInt::get(T_size, nidxs) });
@@ -1995,7 +1958,32 @@ static Value *_boxed_special(const jl_cgval_t &vinfo, Type *t, jl_codectx_t *ctx
     return box;
 }
 
+static Value *compute_box_tindex(Value *datatype, jl_value_t *supertype, jl_value_t *ut, jl_codectx_t *ctx)
+{
+    Value *tindex = ConstantInt::get(T_int8, 0);
+    unsigned counter = 0;
+    for_each_uniontype_small(
+            [&](unsigned idx, jl_datatype_t *jt) {
+                if (jl_subtype((jl_value_t*)jt, supertype)) {
+                    Value *cmp = builder.CreateICmpEQ(maybe_decay_untracked(literal_pointer_val((jl_value_t*)jt)), datatype);
+                    tindex = builder.CreateSelect(cmp, ConstantInt::get(T_int8, idx), tindex);
+                }
+            },
+            ut,
+            counter);
+    return tindex;
+}
 
+// get the runtime tindex value
+static Value *compute_tindex_unboxed(const jl_cgval_t &val, jl_value_t *typ, jl_codectx_t *ctx)
+{
+    if (val.constant)
+        return ConstantInt::get(T_int8, get_box_tindex((jl_datatype_t*)jl_typeof(val.constant), typ));
+    if (val.isboxed)
+        return compute_box_tindex(emit_typeof_boxed(val, ctx), val.typ, typ, ctx);
+    assert(val.TIndex);
+    return builder.CreateAnd(val.TIndex, ConstantInt::get(T_int8, 0x7f));
+}
 
 static Value *box_union(const jl_cgval_t &vinfo, jl_codectx_t *ctx, const SmallBitVector &skip)
 {
@@ -2281,7 +2269,7 @@ static void emit_setfield(jl_datatype_t *sty, const jl_cgval_t &strct, size_t id
 {
     if (sty->mutabl || !checked) {
         assert(strct.ispointer());
-        Value *addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+        Value *addr = builder.CreateGEP(T_int8, data_pointer(strct, ctx, T_pint8),
                 ConstantInt::get(T_size, jl_field_offset(sty, idx0)));
         jl_value_t *jfty = jl_svecref(sty->types, idx0);
         if (jl_field_isptr(sty, idx0)) {
@@ -2295,9 +2283,9 @@ static void emit_setfield(jl_datatype_t *sty, const jl_cgval_t &strct, size_t id
                 int fsz = jl_field_size(sty, idx0);
                 // compute tindex from rhs
                 jl_cgval_t rhs_union = convert_julia_type(rhs, jfty, ctx);
-                Value *ptindex = builder.CreateGEP(LLVM37_param(T_int8) emit_bitcast(addr, T_pint8), ConstantInt::get(T_size, fsz - 1));
                 Value *tindex = compute_tindex_unboxed(rhs_union, jfty, ctx);
                 tindex = builder.CreateNUWSub(tindex, ConstantInt::get(T_int8, 1));
+                Value *ptindex = builder.CreateGEP(T_int8, emit_bitcast(addr, T_pint8), ConstantInt::get(T_size, fsz - 1));
                 builder.CreateStore(tindex, ptindex);
                 // copy data
                 emit_unionmove(addr, rhs, NULL, false, NULL, ctx);
@@ -2390,7 +2378,7 @@ static jl_cgval_t emit_new_struct(jl_value_t *ty, size_t nargs, jl_value_t **arg
                 tbaa_decorate(strctinfo.tbaa, builder.CreateStore(
                         ConstantPointerNull::get(cast<PointerType>(T_prjlvalue)),
                         emit_bitcast(
-                            builder.CreateGEP(emit_bitcast(decay_derived(strct), T_pint8),
+                            builder.CreateGEP(T_int8, emit_bitcast(decay_derived(strct), T_pint8),
                                 ConstantInt::get(T_size, jl_field_offset(sty, i))),
                             T_pprjlvalue)));
             }
@@ -2434,7 +2422,7 @@ static Value *emit_exc_in_transit(jl_codectx_t *ctx)
     Value *pexc_in_transit = emit_bitcast(ctx->ptlsStates, T_pprjlvalue);
     Constant *offset = ConstantInt::getSigned(T_int32,
         offsetof(jl_tls_states_t, exception_in_transit) / sizeof(void*));
-    return builder.CreateGEP(pexc_in_transit, ArrayRef<Value*>(offset), "jl_exception_in_transit");
+    return builder.CreateGEP(T_prjlvalue, pexc_in_transit, ArrayRef<Value*>(offset), "jl_exception_in_transit");
 }
 
 static void emit_signal_fence(void)
@@ -2457,7 +2445,7 @@ static Value *emit_defer_signal(jl_codectx_t *ctx)
                                         PointerType::get(T_sigatomic, 0));
     Constant *offset = ConstantInt::getSigned(T_int32,
         offsetof(jl_tls_states_t, defer_signal) / sizeof(sig_atomic_t));
-    return builder.CreateGEP(ptls, ArrayRef<Value*>(offset), "jl_defer_signal");
+    return builder.CreateGEP(T_sigatomic, ptls, ArrayRef<Value*>(offset), "jl_defer_signal");
 }
 
 static int compare_cgparams(const jl_cgparams_t *a, const jl_cgparams_t *b)

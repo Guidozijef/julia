@@ -5065,3 +5065,206 @@ f_isdefined_cl_6() = (local x; () -> @isdefined x)
 @test !f_isdefined_cl_4()
 @test f_isdefined_cl_5()()
 @test !f_isdefined_cl_6()()
+
+module UnionOptimizations
+
+using Base.Test
+
+const testuniontypes = []
+for i = 1:128
+    @eval struct $(Symbol("TestUnionType$i")); val::Int8; end
+    @eval push!(testuniontypes, $(Symbol("TestUnionType$i")))
+end
+
+const boxedunions = [Union{}, Union{String, Void}, Union{testuniontypes...}]
+const unboxedunions = [Union{Int8, Void}, Union{Int8, Float16, Void},
+                       Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64, UInt64, Int128, UInt128},
+                       Union{Char, Date, Number}]
+
+initvalue(::Type{Void}) = nothing
+initvalue(::Type{Char}) = '\0'
+initvalue(::Type{Date}) = Date(0, 12, 31)
+initvalue(::Type{T}) where {T <: Number} = T(0)
+
+initvalue2(::Type{Void}) = nothing
+initvalue2(::Type{Char}) = Char(0x01)
+initvalue2(::Type{Date}) = Date(1)
+initvalue2(::Type{T}) where {T <: Number} = T(1)
+
+
+for U in boxedunions
+    for N in (1, 2, 3, 4)
+        A = Array{U, N}(0)
+        @test isempty(A)
+        @test Core.sizeof(A) == 0
+
+        A = Array{U, N}(100)
+        @test length(A) == 100
+        @test Core.sizeof(A) == 800
+        @test !isassigned(A, 1)
+    end
+end
+
+# unsafe_wrap
+A4 = [1, 2, 3]
+@test_throws ArgumentError unsafe_wrap(Array, convert(Ptr{Union{Int, Void}}, pointer(A4)), 3)
+A5 = [1 2 3; 4 5 6]
+@test_throws ArgumentError unsafe_wrap(Array, convert(Ptr{Union{Int, Void}}, pointer(A5)), 6)
+
+for U in unboxedunions
+    for N in (1, 2, 3, 4)
+        A = Array{U, N}(0)
+        @test isempty(A)
+        @test Core.sizeof(A) == 0
+
+        len = ntuple(x->10, N)
+        mxsz = maximum(sizeof, Base.uniontypes(U))
+        A = Array{U, N}(len)
+        @test length(A) == prod(len)
+        @test Core.sizeof(A) == prod(len) * mxsz
+        @test isassigned(A, 1)
+        @test isassigned(A, length(A))
+
+        # arrayref / arrayset
+        F = Base.uniontypes(U)[1]
+        @test A[1] === initvalue(F)
+        A[1] = initvalue2(F)
+        @test A[1] === initvalue2(F)
+
+        F2 = Base.uniontypes(U)[2]
+        A[2] = initvalue(F2)
+        @test A[2] === initvalue(F2)
+
+        for (i, U2) in enumerate(Base.uniontypes(U))
+            A[i] = initvalue2(U2)
+            @test A[i] === initvalue2(U2)
+        end
+
+        # serialize / deserialize
+        #TODO
+        io = IOBuffer()
+        serialize(io, v)
+        seekstart(io)
+        A2 = deserialize(io)
+        @test A == A2
+
+        # reshape
+        A3 = reshape(A, (div(prod(len), 2), 2))
+        @test Core.sizeof(A) == prod(len) * mxsz
+        @test isassigned(A, 1)
+        @test A[1] === initvalue2(F)
+
+        if N == 1
+            ## Dequeue functions
+            # pop!
+            F2 = Base.uniontypes(U)[2]
+            len = len[1]
+            A = U[initvalue2(F2) for i = 1:len]
+            for i = 1:len
+                @test A[end] === initvalue2(F2)
+                v = pop!(A)
+                @test v === initvalue2(F2)
+            end
+            @test isempty(A)
+
+            # shift!
+            A = U[initvalue2(F2) for i = 1:len]
+            for i = 1:len
+                @test A[1] === initvalue2(F2)
+                shift!(A)
+            end
+            @test isempty(A)
+
+            # empty!
+            A = U[initvalue2(F2) for i = 1:len]
+            empty!(A)
+            @test isempty(A)
+
+            # resize!
+            A = U[initvalue2(F2) for i = 1:len]
+            resize!(A, 1)
+            @test length(A) === 1
+            @test A[1] === initvalue2(F2)
+            resize!(A, len)
+            @test length(A) === len
+            @test A[1] === initvalue2(F2)
+            @test typeof(A[end]) === F
+
+            # deleteat!
+            F = Base.uniontypes(U)[1]
+            A = U[rand(F(1):F(len)) for i = 1:len]
+            deleteat!(A, sort!(unique(A[1:4])))
+            A = U[initvalue2(F2) for i = 1:len]
+            deleteat!(A, 1:2)
+            @test length(A) == len - 2
+            @test all(A .== initvalue2(F2))
+            deleteat!(A, 1:2)
+            @test length(A) == len - 4
+            @test all(A .== initvalue2(F2))
+            A = U[initvalue2(F2) for i = 1:len]
+            deleteat!(A, length(A)-1:length(A))
+            @test length(A) == len - 2
+            @test all(A .== initvalue2(F2))
+            deleteat!(A, length(A)-1:length(A))
+            @test length(A) == len - 4
+            @test all(A .== initvalue2(F2))
+            A = U[initvalue2(F2) for i = 1:len]
+            deleteat!(A, 2:3)
+            @test length(A) == len - 2
+            @test all(A .== initvalue2(F2))
+            A = U[initvalue2(F2) for i = 1:len]
+            deleteat!(A, length(A)-2:length(A)-1)
+            @test length(A) == len - 2
+            @test all(A .== initvalue2(F2))
+
+            # unshift!
+            A = U[initvalue2(F2) for i = 1:len]
+            for i = 1:5
+                unshift!(A, initvalue2(F))
+                unshift!(A, initvalue(F2))
+                @test A[1] === initvalue(F2)
+                @test A[2] === initvalue2(F)
+            end
+
+            # push! / append! / prepend!
+            A = U[initvalue2(F2) for i = 1:len]
+            push!(A, initvalue2(F))
+            @test A[end] === initvalue2(F)
+            push!(A, initvalue2(F2))
+            @test A[end] === initvalue2(F2)
+            append!(A, [initvalue(F), initvalue2(F)])
+            @test A[end] === initvalue2(F)
+            @test A[end-1] === initvalue(F)
+            prepend!(A, [initvalue(F), initvalue2(F)])
+            @test A[2] === initvalue2(F)
+            @test A[1] === initvalue(F)
+
+            # insert! TODO
+            A = U[initvalue2(F2) for i = 1:len]
+            insert!(A, 2, initvalue2(F))
+            A = U[initvalue2(F2) for i = 1:len]
+            insert!(A, 8, initvalue2(F))
+
+            # splice!
+            A = U[initvalue2(F2) for i = 1:len]
+            V = splice!(A, 1:2)
+            @test length(A) == len - 2
+            @test length(V) == 2
+            @test V[1] == initvalue2(F2)
+            @test V[2] == initvalue2(F2)
+            @test A[1] == initvalue2(F2)
+            @test A[end] == initvalue2(F2)
+
+            A = U[initvalue2(F2) for i = 1:len]
+            V = splice!(A, 4:5)
+            @test length(A) == len - 2
+            @test length(V) == 2
+            @test V[1] == initvalue2(F2)
+            @test V[2] == initvalue2(F2)
+            @test A[1] == initvalue2(F2)
+            @test A[end] == initvalue2(F2)
+        end
+    end
+end
+
+end # module UnionOptimizations
