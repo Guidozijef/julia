@@ -36,7 +36,7 @@ JL_DLLEXPORT jl_methtable_t *jl_new_method_table(jl_sym_t *name, jl_module_t *mo
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     jl_methtable_t *mt =
-        (jl_methtable_t*)jl_gc_alloc(ptls, sizeof(jl_methtable_t),
+        (jl_methtable_t*)jl_gc_alloc(ptls, sizeof(jl_methtable_t), 0,
                                      jl_methtable_type);
     mt->name = jl_demangle_typename(name);
     mt->module = module;
@@ -53,7 +53,7 @@ JL_DLLEXPORT jl_typename_t *jl_new_typename_in(jl_sym_t *name, jl_module_t *modu
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     jl_typename_t *tn =
-        (jl_typename_t*)jl_gc_alloc(ptls, sizeof(jl_typename_t),
+        (jl_typename_t*)jl_gc_alloc(ptls, sizeof(jl_typename_t), 0,
                                     jl_typename_type);
     tn->name = name;
     tn->module = module;
@@ -76,7 +76,7 @@ jl_datatype_t *jl_new_abstracttype(jl_value_t *name, jl_module_t *module, jl_dat
 jl_datatype_t *jl_new_uninitialized_datatype(void)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
-    jl_datatype_t *t = (jl_datatype_t*)jl_gc_alloc(ptls, sizeof(jl_datatype_t), jl_datatype_type);
+    jl_datatype_t *t = (jl_datatype_t*)jl_gc_alloc(ptls, sizeof(jl_datatype_t), 0, jl_datatype_type);
     t->depth = 0;
     t->hasfreetypevars = 0;
     t->isleaftype = 1;
@@ -225,7 +225,7 @@ STATIC_INLINE int jl_is_datatype_make_singleton(jl_datatype_t *d)
 STATIC_INLINE void jl_allocate_singleton_instance(jl_datatype_t *st)
 {
     if (jl_is_datatype_make_singleton(st)) {
-        st->instance = jl_gc_alloc(jl_get_ptls_states(), 0, st);
+        st->instance = jl_gc_alloc(jl_get_ptls_states(), 0, 0, st);
         jl_gc_wb(st, st->instance);
     }
 }
@@ -504,7 +504,7 @@ JL_DLLEXPORT jl_value_t *jl_new_bits(jl_value_t *dt, void *data)
     if (bt == jl_int32_type)   return jl_box_int32(*(int32_t*)data);
     if (bt == jl_float64_type) return jl_box_float64(*(double*)data);
 
-    jl_value_t *v = jl_gc_alloc(ptls, nb, bt);
+    jl_value_t *v = jl_gc_alloc(ptls, nb, jl_datatype_align(bt), bt);
     switch (nb) {
     case  1: *(int8_t*)   jl_data_ptr(v) = *(int8_t*)data;    break;
     case  2: *(int16_t*)  jl_data_ptr(v) = *(int16_t*)data;   break;
@@ -520,7 +520,7 @@ JL_DLLEXPORT jl_value_t *jl_new_bits(jl_value_t *dt, void *data)
 JL_DLLEXPORT jl_value_t *jl_typemax_uint(jl_value_t *bt)
 {
     uint64_t data = 0xffffffffffffffffULL;
-    jl_value_t *v = jl_gc_alloc(jl_get_ptls_states(), sizeof(size_t), bt);
+    jl_value_t *v = jl_gc_alloc(jl_get_ptls_states(), sizeof(size_t), 0, bt);
     memcpy(jl_data_ptr(v), &data, sizeof(size_t));
     return v;
 }
@@ -545,7 +545,8 @@ void jl_assign_bits(void *dest, jl_value_t *bits)
         jl_ptls_t ptls = jl_get_ptls_states();                          \
         assert(jl_isbits(t));                                           \
         assert(jl_datatype_size(t) == sizeof(x));                       \
-        jl_value_t *v = jl_gc_alloc(ptls, nw * sizeof(void*), t);       \
+        size_t align = jl_datatype_align(t);                            \
+        jl_value_t *v = jl_gc_alloc(ptls, nw * sizeof(void*), align, t);\
         *(int##nb##_t*)jl_data_ptr(v) = x;                              \
         return v;                                                       \
     }                                                                   \
@@ -590,7 +591,7 @@ UNBOX_FUNC(voidpointer, void*)
     JL_DLLEXPORT jl_value_t *pfx##_##typ(c_type x)              \
     {                                                           \
         jl_ptls_t ptls = jl_get_ptls_states();                  \
-        jl_value_t *v = jl_gc_alloc(ptls, nw * sizeof(void*),   \
+        jl_value_t *v = jl_gc_alloc(ptls, nw * sizeof(void*), 0,\
                                     jl_##typ##_type);           \
         *(c_type*)jl_data_ptr(v) = x;                           \
         return v;                                               \
@@ -613,7 +614,7 @@ BOX_FUNC(float64, double, jl_box, 2)
         c_type idx = x+NBOX_C/2;                                \
         if ((u##c_type)idx < (u##c_type)NBOX_C)                 \
             return boxed_##typ##_cache[idx];                    \
-        jl_value_t *v = jl_gc_alloc(ptls, nw * sizeof(void*),   \
+        jl_value_t *v = jl_gc_alloc(ptls, nw * sizeof(void*), 0,\
                                     jl_##typ##_type);           \
         *(c_type*)jl_data_ptr(v) = x;                           \
         return v;                                               \
@@ -625,7 +626,7 @@ BOX_FUNC(float64, double, jl_box, 2)
         jl_ptls_t ptls = jl_get_ptls_states();                  \
         if (x < NBOX_C)                                         \
             return boxed_##typ##_cache[x];                      \
-        jl_value_t *v = jl_gc_alloc(ptls, nw * sizeof(void*),   \
+        jl_value_t *v = jl_gc_alloc(ptls, nw * sizeof(void*), 0,\
                                     jl_##typ##_type);           \
         *(c_type*)jl_data_ptr(v) = x;                           \
         return v;                                               \
@@ -706,7 +707,7 @@ JL_DLLEXPORT jl_value_t *jl_new_struct(jl_datatype_t *type, ...)
     va_list args;
     size_t nf = jl_datatype_nfields(type);
     va_start(args, type);
-    jl_value_t *jv = jl_gc_alloc(ptls, jl_datatype_size(type), type);
+    jl_value_t *jv = jl_gc_alloc(ptls, jl_datatype_size(type), jl_datatype_align(type), type);
     for (size_t i = 0; i < nf; i++) {
         jl_set_nth_field(jv, i, va_arg(args, jl_value_t*));
     }
@@ -720,7 +721,7 @@ JL_DLLEXPORT jl_value_t *jl_new_structv(jl_datatype_t *type, jl_value_t **args,
     jl_ptls_t ptls = jl_get_ptls_states();
     if (type->instance != NULL) return type->instance;
     size_t nf = jl_datatype_nfields(type);
-    jl_value_t *jv = jl_gc_alloc(ptls, jl_datatype_size(type), type);
+    jl_value_t *jv = jl_gc_alloc(ptls, jl_datatype_size(type), jl_datatype_align(type), type);
     for (size_t i = 0; i < na; i++) {
         jl_value_t *ft = jl_field_type(type, i);
         if (!jl_isa(args[i], ft))
@@ -739,8 +740,9 @@ JL_DLLEXPORT jl_value_t *jl_new_struct_uninit(jl_datatype_t *type)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     if (type->instance != NULL) return type->instance;
-    size_t size = jl_datatype_size(type);
-    jl_value_t *jv = jl_gc_alloc(ptls, size, type);
+    size_t size  = jl_datatype_size(type);
+    size_t align = jl_datatype_align(type);
+    jl_value_t *jv = jl_gc_alloc(ptls, size, align, type);
     if (size > 0)
         memset(jl_data_ptr(jv), 0, size);
     return jv;

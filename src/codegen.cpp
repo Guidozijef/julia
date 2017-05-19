@@ -4056,7 +4056,7 @@ static void emit_cfunc_invalidate(
     }
     case jl_returninfo_t::SRet: {
         unsigned sret_nbytes = jl_datatype_size(astrt);
-        emit_memcpy(ctx, &*gf_thunk->arg_begin(), gf_ret, sret_nbytes, jl_alignment(sret_nbytes));
+        emit_memcpy(ctx, &*gf_thunk->arg_begin(), gf_ret, sret_nbytes, jl_datatype_align(astrt));
         ctx.builder.CreateRetVoid();
         break;
     }
@@ -4240,7 +4240,7 @@ static Function *gen_cfun_wrapper(jl_function_t *ff, jl_value_t *jlrettype, jl_t
                 (void)julia_type_to_llvm(jargty, &isboxed);
                 if (isboxed) {
                     // passed an unboxed T, but want something boxed
-                    Value *mem = emit_allocobj(ctx, jl_datatype_size(jargty),
+                    Value *mem = emit_allocobj(ctx, jl_datatype_size(jargty), jl_datatype_align(jargty),
                                                literal_pointer_val(ctx, (jl_value_t*)jargty));
                     tbaa_decorate(jl_is_mutable(jargty) ? tbaa_mutab : tbaa_immut,
                                   ctx.builder.CreateAlignedStore(val,
@@ -6492,6 +6492,7 @@ static void init_julia_llvm_env(Module *m)
 
     std::vector<Type*> gc_alloc_args(0);
     gc_alloc_args.push_back(T_pint8);
+    gc_alloc_args.push_back(T_size);
     gc_alloc_args.push_back(T_size);
     gc_alloc_args.push_back(T_prjlvalue);
     jl_alloc_obj_func = Function::Create(FunctionType::get(T_prjlvalue, gc_alloc_args, false),

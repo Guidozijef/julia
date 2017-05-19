@@ -1142,8 +1142,9 @@ static jl_cgval_t mark_or_box_ccall_result(jl_codectx_t &ctx, Value *result, boo
         const DataLayout &DL = jl_ExecutionEngine->getDataLayout();
 #endif
         unsigned nb = DL.getTypeStoreSize(result->getType());
+        unsigned alignment = DL.getPrefTypeAlignment(result->getType());
         MDNode *tbaa = jl_is_mutable(rt) ? tbaa_mutab : tbaa_immut;
-        Value *strct = emit_allocobj(ctx, nb, runtime_dt);
+        Value *strct = emit_allocobj(ctx, nb, alignment, runtime_dt);
         init_bits_value(ctx, strct, result, tbaa);
         return mark_julia_type(ctx, strct, true, rt);
     }
@@ -1942,7 +1943,7 @@ jl_cgval_t function_sig_t::emit_a_ccall(
         else {
             // XXX: result needs to be zero'd and given a GC root here
             assert(jl_datatype_size(rt) > 0 && "sret shouldn't be a singleton instance");
-            result = emit_allocobj(ctx, jl_datatype_size(rt),
+            result = emit_allocobj(ctx, jl_datatype_size(rt), jl_datatype_align(rt),
                                    literal_pointer_val(ctx, (jl_value_t*)rt));
             sretboxed = true;
         }
@@ -2085,10 +2086,10 @@ jl_cgval_t function_sig_t::emit_a_ccall(
             if (static_rt) {
                 Value *runtime_bt = literal_pointer_val(ctx, rt);
                 size_t rtsz = jl_datatype_size(rt);
+                size_t rtal = jl_datatype_align(rt);
                 assert(rtsz > 0);
-                Value *strct = emit_allocobj(ctx, rtsz, runtime_bt);
+                Value *strct = emit_allocobj(ctx, rtsz, rtal, runtime_bt);
                 MDNode *tbaa = jl_is_mutable(rt) ? tbaa_mutab : tbaa_immut;
-                int boxalign = jl_datatype_align(rt);
                 // copy the data from the return value to the new struct
 #if JL_LLVM_VERSION >= 40000
                 const DataLayout &DL = jl_data_layout;
@@ -2100,12 +2101,12 @@ jl_cgval_t function_sig_t::emit_a_ccall(
                     // ARM and AArch64 can use a LLVM type larger than the julia type.
                     // When this happens, cast through memory.
                     auto slot = emit_static_alloca(ctx, resultTy);
-                    slot->setAlignment(boxalign);
-                    ctx.builder.CreateAlignedStore(result, slot, boxalign);
-                    emit_memcpy(ctx, strct, slot, rtsz, boxalign, tbaa);
+                    slot->setAlignment(rtal);
+                    ctx.builder.CreateAlignedStore(result, slot, rtal);
+                    emit_memcpy(ctx, strct, slot, rtsz, rtal, tbaa);
                 }
                 else {
-                    init_bits_value(ctx, strct, result, tbaa, boxalign);
+                    init_bits_value(ctx, strct, result, tbaa, rtal);
                 }
                 return mark_julia_type(ctx, strct, true, rt);
             }

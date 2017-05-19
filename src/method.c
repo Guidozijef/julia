@@ -197,7 +197,7 @@ JL_DLLEXPORT jl_method_instance_t *jl_new_method_instance_uninit(void)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     jl_method_instance_t *li =
-        (jl_method_instance_t*)jl_gc_alloc(ptls, sizeof(jl_method_instance_t),
+        (jl_method_instance_t*)jl_gc_alloc(ptls, sizeof(jl_method_instance_t), 0,
                                            jl_method_instance_type);
     li->inferred = NULL;
     li->inferred_const = NULL;
@@ -222,7 +222,7 @@ JL_DLLEXPORT jl_code_info_t *jl_new_code_info_uninit(void)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     jl_code_info_t *src =
-        (jl_code_info_t*)jl_gc_alloc(ptls, sizeof(jl_code_info_t),
+        (jl_code_info_t*)jl_gc_alloc(ptls, sizeof(jl_code_info_t), 0,
                                        jl_code_info_type);
     src->code = NULL;
     src->slotnames = NULL;
@@ -381,7 +381,7 @@ JL_DLLEXPORT jl_code_info_t *jl_copy_code_info(jl_code_info_t *src)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     jl_code_info_t *newsrc =
-        (jl_code_info_t*)jl_gc_alloc(ptls, sizeof(jl_code_info_t),
+        (jl_code_info_t*)jl_gc_alloc(ptls, sizeof(jl_code_info_t), 0,
                                        jl_code_info_type);
     *newsrc = *src;
     return newsrc;
@@ -489,7 +489,7 @@ JL_DLLEXPORT jl_method_t *jl_new_method_uninit(jl_module_t *module)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     jl_method_t *m =
-        (jl_method_t*)jl_gc_alloc(ptls, sizeof(jl_method_t), jl_method_type);
+        (jl_method_t*)jl_gc_alloc(ptls, sizeof(jl_method_t), 0, jl_method_type);
     m->specializations.unknown = jl_nothing;
     m->sig = NULL;
     m->sparam_syms = NULL;

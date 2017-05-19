@@ -1210,11 +1210,12 @@ bool LateLowerGCFrame::CleanupIR(Function &F) {
                 ptr->takeName(CI);
                 CI->replaceAllUsesWith(ptr);
             } else if (alloc_obj_func && callee == alloc_obj_func) {
-                assert(CI->getNumArgOperands() == 3);
+                assert(CI->getNumArgOperands() == 4);
                 auto sz = (size_t)cast<ConstantInt>(CI->getArgOperand(1))->getZExtValue();
+                auto al = (size_t)cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
                 // This is strongly architecture and OS dependent
                 int osize;
-                int offset = jl_gc_classify_pools(sz, &osize);
+                int offset = jl_gc_classify_pools(sz, al, &osize);
                 IRBuilder<> builder(CI);
                 builder.SetCurrentDebugLocation(CI->getDebugLoc());
                 auto ptls = CI->getArgOperand(0);
@@ -1236,7 +1237,7 @@ bool LateLowerGCFrame::CleanupIR(Function &F) {
                 auto cast = builder.CreateBitCast(derived, T_ppjlvalue_der);
                 auto tagaddr = builder.CreateGEP(T_prjlvalue, cast,
                                                  ConstantInt::get(T_size, -1));
-                auto store = builder.CreateStore(CI->getArgOperand(2), tagaddr);
+                auto store = builder.CreateStore(CI->getArgOperand(3), tagaddr);
                 store->setMetadata(LLVMContext::MD_tbaa, tbaa_tag);
                 CI->replaceAllUsesWith(newI);
             } else if (CC == JLCALL_CC ||

@@ -2,7 +2,7 @@
 
 using Core.Intrinsics: llvmcall
 
-import Base: setindex!, getindex, unsafe_convert
+import Base: setindex!, getindex, unsafe_convert, datatype_alignment
 import Base.Sys: ARCH, WORD_SIZE
 
 export
@@ -332,9 +332,6 @@ inttype(::Type{Float16}) = Int16
 inttype(::Type{Float32}) = Int32
 inttype(::Type{Float64}) = Int64
 
-
-alignment(::Type{T}) where {T} = ccall(:jl_alignment, Cint, (Csize_t,), sizeof(T))
-
 # All atomic operations have acquire and/or release semantics, depending on
 # whether the load or store values. Most of the time, this is what one wants
 # anyway, and it's only moderately expensive on most hardware.
@@ -346,13 +343,13 @@ for typ in atomictypes
     @eval getindex(x::Atomic{$typ}) =
         llvmcall($"""
                  %ptr = inttoptr i$WORD_SIZE %0 to $lt*
-                 %rv = load atomic $rt %ptr acquire, align $(alignment(typ))
+                 %rv = load atomic $rt %ptr acquire, align $(datatype_alignment(typ))
                  ret $lt %rv
                  """, $typ, Tuple{Ptr{$typ}}, unsafe_convert(Ptr{$typ}, x))
     @eval setindex!(x::Atomic{$typ}, v::$typ) =
         llvmcall($"""
                  %ptr = inttoptr i$WORD_SIZE %0 to $lt*
-                 store atomic $lt %1, $lt* %ptr release, align $(alignment(typ))
+                 store atomic $lt %1, $lt* %ptr release, align $(datatype_alignment(typ))
                  ret void
                  """, Void, Tuple{Ptr{$typ}, $typ}, unsafe_convert(Ptr{$typ}, x), v)
 

@@ -666,7 +666,7 @@ bool AllocOpt::runOnFunction(Function &F)
 {
     if (!alloc_obj)
         return false;
-    SmallVector<std::pair<CallInst*,size_t>,6> allocs;
+    SmallVector<std::tuple<CallInst*,size_t,size_t>,6> allocs;
     for (auto &bb: F) {
         for (auto &I: bb) {
             auto call = dyn_cast<CallInst>(&I);
@@ -676,15 +676,17 @@ bool AllocOpt::runOnFunction(Function &F)
             if (!callee)
                 continue;
             size_t sz;
+            size_t al;
             if (callee == alloc_obj) {
-                assert(call->getNumArgOperands() == 3);
+                assert(call->getNumArgOperands() == 4);
                 sz = (size_t)cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+                al = (size_t)cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
             }
             else {
                 continue;
             }
             if (sz < IntegerType::MAX_INT_BITS / 8 && sz < INT32_MAX) {
-                allocs.push_back(std::make_pair(call, sz));
+                allocs.push_back(std::make_tuple(call, sz, al));
             }
         }
     }
@@ -697,8 +699,9 @@ bool AllocOpt::runOnFunction(Function &F)
     LifetimeMarker lifetime(*this);
     for (auto &it: allocs) {
         bool ignore_tag = true;
-        auto orig = it.first;
-        size_t &sz = it.second;
+        auto orig = std::get<0>(it);
+        size_t &sz = std::get<1>(it);
+        size_t &align = std::get<2>(it);
         preserves.clear();
         if (!checkInst(orig, check_stack, alloc_uses, preserves, ignore_tag)) {
             sz = UINT32_MAX;
@@ -707,18 +710,10 @@ bool AllocOpt::runOnFunction(Function &F)
         // The allocation does not escape or get used in a phi node so none of the derived
         // SSA from it are live when we run the allocation again.
         // It is now safe to promote the allocation to an entry block alloca.
-        size_t align = 1;
-        // TODO make codegen handling of alignment consistent and pass that as a parameter
-        // to the allocation function directly.
+
+        // Someone might be reading the tag, make space for it.
         if (!ignore_tag) {
-            align = sz <= 8 ? 8 : JL_SMALL_BYTE_ALIGNMENT;
             sz += align;
-        }
-        else if (sz > 1) {
-            align = JL_SMALL_BYTE_ALIGNMENT;
-            while (sz < align) {
-                align = align / 2;
-            }
         }
         // No debug info for prolog instructions
         IRBuilder<> prolog_builder(&entry.front());
@@ -750,9 +745,9 @@ bool AllocOpt::runOnFunction(Function &F)
         replaceUsesWith(orig, cast<Instruction>(casti), replace_stack);
     }
     for (auto it: allocs) {
-        if (it.second == UINT32_MAX)
+        if (std::get<1>(it) == UINT32_MAX)
             continue;
-        it.first->eraseFromParent();
+        std::get<0>(it)->eraseFromParent();
     }
     return true;
 }
