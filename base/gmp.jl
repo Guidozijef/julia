@@ -42,9 +42,16 @@ mutable struct BigInt <: Integer
     alloc::Cint
     size::Cint
     d::Ptr{Limb}
+
     function BigInt()
-        b = new(zero(Cint), zero(Cint), C_NULL)
-        MPZ.init!(b)
+        b = MPZ.init!(new())
+        finalizer(b, cglobal((:__gmpz_clear, :libgmp)))
+        return b
+    end
+
+    # n is the number of bits to allocate
+    function BigInt(::typeof(sizehint!), n)
+        b = MPZ.init2!(new(), n)
         finalizer(b, cglobal((:__gmpz_clear, :libgmp)))
         return b
     end
