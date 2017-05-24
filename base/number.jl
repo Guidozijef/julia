@@ -182,8 +182,8 @@ julia> oneunit(Dates.Day)
 1 day
 ```
 """
-oneunit(x::T) where {T} = T(one(x))
-oneunit(::Type{T}) where {T} = T(one(T))
+oneunit(x::T) where {T}      = convert(T, one(x))
+oneunit(::Type{T}) where {T} = convert(T, one(T))
 
 _default_type(::Type{Number}) = Int
 

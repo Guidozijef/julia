@@ -211,3 +211,14 @@ end
 
 # Issue 21453.
 @test_throws ArgumentError LinAlg._cond1Inf(lufact(randn(5,5)), 2, 2.0)
+
+include(joinpath(dirname(@__FILE__()), "../../examples/ModInts.jl"))
+@testset "Pivot on non-zero" begin
+    r = MersenneTwister(123)
+    A = [ModInts.ModInt{5}(rand(r, 1:4)) for i in 1:5, j in 1:5]
+    A[1,1] = ModInts.ModInt{5}(0) # Make a zero pivot
+    x = [ModInts.ModInt{5}(1) for i in 1:5]
+    b = A*x
+    @test lufact(A, Val{false})\b == x
+end
+
