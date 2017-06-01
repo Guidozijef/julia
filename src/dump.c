@@ -574,14 +574,17 @@ static void jl_serialize_value_(jl_serializer_state *s, jl_value_t *v, int as_li
     }
     else if (jl_is_array(v)) {
         jl_array_t *ar = (jl_array_t*)v;
+	size_t elalign = ar->flags.ptrarray ? sizeof(void*) : jl_datatype_align(jl_tparam0(jl_typeof(ar)));
         if (ar->flags.ndims == 1 && ar->elsize < 128) {
             writetag(s->s, (jl_value_t*)Array1d_tag);
             write_uint8(s->s, (ar->flags.ptrarray<<7) | (ar->elsize & 0x7f));
+            write_uint8(s->s, elalign);
         }
         else {
             writetag(s->s, (jl_value_t*)jl_array_type);
             write_uint16(s->s, ar->flags.ndims);
             write_uint16(s->s, (ar->flags.ptrarray<<15) | (ar->elsize & 0x7fff));
+            write_uint16(s->s, elalign);
         }
         for (i=0; i < ar->flags.ndims; i++)
             jl_serialize_value(s, jl_box_long(jl_array_dim(ar,i)));
@@ -1329,18 +1332,22 @@ static jl_value_t *jl_deserialize_value_array(jl_serializer_state *s, jl_value_t
 {
     int usetable = (s->mode != MODE_AST);
     int16_t i, ndims;
-    int isunboxed, elsize;
+    int isunboxed, elsize, elalign;
     if (vtag == (jl_value_t*)Array1d_tag) {
         ndims = 1;
         elsize = read_uint8(s->s);
+        elalign = read_uint8(s->s);
         isunboxed = !(elsize >> 7);
         elsize = elsize & 0x7f;
+        elalign = elalign;
     }
     else {
         ndims = read_uint16(s->s);
         elsize = read_uint16(s->s);
+        elalign = read_uint16(s->s);
         isunboxed = !(elsize >> 15);
         elsize = elsize & 0x7fff;
+        elalign = elalign;
     }
     uintptr_t pos = backref_list.len;
     if (usetable)
@@ -1349,7 +1356,7 @@ static jl_value_t *jl_deserialize_value_array(jl_serializer_state *s, jl_value_t
     for (i = 0; i < ndims; i++) {
         dims[i] = jl_unbox_long(jl_deserialize_value(s, NULL));
     }
-    jl_array_t *a = jl_new_array_for_deserialization((jl_value_t*)NULL, ndims, dims, isunboxed, elsize);
+    jl_array_t *a = jl_new_array_for_deserialization((jl_value_t*)NULL, ndims, dims, isunboxed, elsize, elalign);
     if (usetable)
         backref_list.items[pos] = a;
     jl_value_t *aty = jl_deserialize_value(s, &jl_astaggedvalue(a)->type);
