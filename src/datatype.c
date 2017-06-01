@@ -81,6 +81,7 @@ jl_datatype_t *jl_new_uninitialized_datatype(void)
     t->hasfreetypevars = 0;
     t->isleaftype = 1;
     t->layout = NULL;
+    t->names = NULL;
     return t;
 }
 
@@ -224,7 +225,7 @@ void jl_compute_field_offsets(jl_datatype_t *st)
     uint64_t max_offset = (((uint64_t)1) << 32) - 1;
     uint64_t max_size = max_offset >> 1;
 
-    if (st->name->wrapper) {
+    if (st->name->wrapper && !jl_is_namedtuple_type(st)) {
         // If layout doesn't depend on type parameters, it's stored in st->name->wrapper
         // and reused by all subtypes.
         jl_datatype_t *w = (jl_datatype_t*)jl_unwrap_unionall(st->name->wrapper);
@@ -689,7 +690,7 @@ JL_DLLEXPORT jl_value_t *jl_new_struct_uninit(jl_datatype_t *type)
 
 JL_DLLEXPORT int jl_field_index(jl_datatype_t *t, jl_sym_t *fld, int err)
 {
-    jl_svec_t *fn = t->name->names;
+    jl_svec_t *fn = jl_field_names(t);
     for(size_t i=0; i < jl_svec_len(fn); i++) {
         if (jl_svecref(fn,i) == (jl_value_t*)fld) {
             return (int)i;

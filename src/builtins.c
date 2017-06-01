@@ -254,7 +254,7 @@ JL_CALLABLE(jl_f_sizeof)
         if (dx->name == jl_array_typename || dx == jl_symbol_type || dx == jl_simplevector_type ||
             dx == jl_string_type)
             jl_error("type does not have a canonical binary representation");
-        if (!(dx->name->names == jl_emptysvec && jl_datatype_size(dx) > 0)) {
+        if (!(jl_field_names(dx) == jl_emptysvec && jl_datatype_size(dx) > 0)) {
             // names===() and size > 0  =>  bitstype, size always known
             if (dx->abstract || !jl_is_leaf_type(x))
                 jl_error("argument is an abstract type; size is indeterminate");
@@ -1154,6 +1154,7 @@ void jl_init_primitives(void)
     add_builtin("QuoteNode", (jl_value_t*)jl_quotenode_type);
     add_builtin("NewvarNode", (jl_value_t*)jl_newvarnode_type);
     add_builtin("GlobalRef", (jl_value_t*)jl_globalref_type);
+    add_builtin("NamedTuple", (jl_value_t*)jl_namedtuple_type);
 
 #ifdef _P64
     add_builtin("Int", (jl_value_t*)jl_int64_type);

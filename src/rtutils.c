@@ -868,7 +868,7 @@ static size_t jl_static_show_x_(JL_STREAM *out, jl_value_t *v, jl_datatype_t *vt
                 i = 1;
             for (; i < tlen; i++) {
                 if (!istuple) {
-                    n += jl_printf(out, "%s", jl_symbol_name((jl_sym_t*)jl_svecref(vt->name->names, i)));
+                    n += jl_printf(out, "%s", jl_symbol_name((jl_sym_t*)jl_svecref(jl_field_names(vt), i)));
                     n += jl_printf(out, "=");
                 }
                 size_t offs = jl_field_offset(vt, i);

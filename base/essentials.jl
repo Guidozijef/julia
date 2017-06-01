@@ -359,3 +359,12 @@ call obsolete versions of a function `f`.
 `f` directly, and the type of the result cannot be inferred by the compiler.)
 """
 invokelatest(f, args...) = Core._apply_latest(f, args)
+
+@generated function namedtuple(::Type{NamedTuple{names,T} where T}, args...) where names
+    N = length(names)
+    if length(args) != N
+        :(throw(ArgumentError("wrong number of arguments to named tuple constructor")))
+    else
+        Expr(:new, :(NamedTuple{names,$(Tuple{args...})}), [ :(args[$i]) for i in 1:N ]...)
+    end
+end

@@ -118,7 +118,7 @@ julia> fieldname(SparseMatrixCSC,5)
 :nzval
 ```
 """
-fieldname(t::DataType, i::Integer) = t.name.names[i]::Symbol
+fieldname(t::DataType, i::Integer) = (isdefined(t,:names) ? t.names[i] : t.name.names[i])::Symbol
 fieldname(t::UnionAll, i::Integer) = fieldname(unwrap_unionall(t), i)
 fieldname(t::Type{<:Tuple}, i::Integer) = i < 1 || i > nfields(t) ? throw(BoundsError(t, i)) : Int(i)
 
