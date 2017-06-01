@@ -471,7 +471,7 @@ static jl_cgval_t generic_bitcast(const jl_cgval_t *argv, jl_codectx_t *ctx)
 }
 
 static jl_cgval_t generic_cast(
-        intrinsic f, Value *(*generic)(Type*, Value*, jl_codectx_t*, Value*),
+        intrinsic f, Value *(*generic)(Type*, Value*, jl_codectx_t*, Value*, Value*),
         const jl_cgval_t *argv, jl_codectx_t *ctx, bool toint, bool fromint)
 {
     const jl_cgval_t &targ = argv[0];
@@ -492,12 +492,13 @@ static jl_cgval_t generic_cast(
     if (!to || !vt)
         return emit_runtime_call(f, argv, 2, ctx);
     Value *from = emit_unbox(vt, v, v.typ);
-    Value *jltov = boxed(emit_expr(jlto, ctx), ctx, false);
-    Value *ans = generic(to, from, ctx, jltov);
+    Value *jltoboxed = boxed(emit_expr(jlto, ctx), ctx, false);
+    Value *vboxed = boxed(v, ctx, false);
+    Value *ans = generic(to, from, ctx, jltoboxed, vboxed);
     return mark_julia_type(ans, false, jlto, ctx);
 }
 
-static Value *generic_trunc(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_trunc(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     return builder.CreateTrunc(x, to);
 }
@@ -523,60 +524,60 @@ static Value *generic_trunc_exception(Type *to, Value *x, jl_codectx_t *ctx, Val
     return strct.V;
 }
 
-static Value *generic_trunc_uchecked(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_trunc_uchecked(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     Value *ans = builder.CreateTrunc(x, to);
     Value *back = builder.CreateZExt(ans, x->getType());
     raise_exception_unless(builder.CreateICmpEQ(back, x),
-                           generic_trunc_exception(to, x, ctx, jlto), ctx);
+                           generic_trunc_exception(to, xboxed, ctx, jlto), ctx);
     return ans;
 }
 
-static Value *generic_trunc_schecked(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_trunc_schecked(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     Value *ans = builder.CreateTrunc(x, to);
     Value *back = builder.CreateSExt(ans, x->getType());
     raise_exception_unless(builder.CreateICmpEQ(back, x),
-                           generic_trunc_exception(to, x, ctx, jlto), ctx);
+                           generic_trunc_exception(to, xboxed, ctx, jlto), ctx);
     return ans;
 }
 
-static Value *generic_sext(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_sext(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     return builder.CreateSExt(x, to);
 }
 
-static Value *generic_zext(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_zext(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     return builder.CreateZExt(x, to);
 }
 
-static Value *generic_uitofp(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_uitofp(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     return builder.CreateUIToFP(x, to);
 }
 
-static Value *generic_sitofp(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_sitofp(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     return builder.CreateSIToFP(x, to);
 }
 
-static Value *generic_fptoui(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_fptoui(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     return builder.CreateFPToUI(x, to);
 }
 
-static Value *generic_fptosi(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_fptosi(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     return builder.CreateFPToSI(x, to);
 }
 
-static Value *generic_fptrunc(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_fptrunc(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
     return builder.CreateFPTrunc(x, to);
 }
 
-static Value *generic_fpext(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
+static Value *generic_fpext(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
 {
 #ifdef JL_NEED_FLOATTEMP_VAR
     // Target platform might carry extra precision.
