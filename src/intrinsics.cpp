@@ -508,8 +508,7 @@ static Value *generic_trunc_exception(Type *to, Value *x, jl_codectx_t *ctx, Val
     jl_cgval_t strct = emit_uninitialized_struct((jl_value_t*)sty, ctx);
     Value *addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
                                     ConstantInt::get(T_size, jl_field_offset(sty, 0)));
-    Constant *funcsym = ConstantDataArray::getString(builder.getContext(),
-                                                     StringRef("convert"));
+    Value *funcsym = boxed(emit_expr((jl_value_t*)jl_symbol("convert"), ctx), ctx, true);
     tbaa_decorate(strct.tbaa, builder.CreateStore(funcsym,
                                                   emit_bitcast(addr, T_ppjlvalue)));
     addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
