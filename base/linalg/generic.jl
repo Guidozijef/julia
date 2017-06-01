@@ -50,7 +50,7 @@ Scale an array `A` by a scalar `b` overwriting `A` in-place.
 
 If `A` is a matrix and `b` is a vector, then `scale!(A,b)` scales each column `i` of `A` by
 `b[i]` (similar to `A*Diagonal(b)`), while `scale!(b,A)` scales each row `i` of `A` by `b[i]`
-(similar to `Diagonal(b)*A`), again operating in-place on `A`. An `InexactError` exception is
+(similar to `Diagonal(b)*A`), again operating in-place on `A`. An `InvalidValueError` exception is
 thrown if the scaling produces a number not representable by the element type of `A`,
 e.g. for integer types.
 

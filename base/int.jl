@@ -349,7 +349,7 @@ for to in BitInteger_types, from in (BitInteger_types..., Bool)
             end
         else
             if !(issubtype(from, Signed) === issubtype(to, Signed))
-                # raise InexactError if x's top bit is set
+                # raise InvalidValueError if x's top bit is set
                 @eval convert(::Type{$to}, x::($from)) = bitcast($to, check_top_bit(x))
             else
                 @eval convert(::Type{$to}, x::($from)) = bitcast($to, x)

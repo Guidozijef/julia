@@ -67,6 +67,7 @@ jl_datatype_t *jl_floatingpoint_type;
 jl_datatype_t *jl_number_type;
 jl_unionall_t *jl_complex_type;
 jl_datatype_t *jl_signed_type;
+jl_datatype_t *jl_unsigned_type;
 
 JL_DLLEXPORT jl_value_t *jl_emptytuple=NULL;
 jl_svec_t *jl_emptysvec;
@@ -125,6 +126,7 @@ JL_DLLEXPORT jl_value_t *jl_inexact_exception;
 JL_DLLEXPORT jl_value_t *jl_undefref_exception;
 jl_value_t *jl_interrupt_exception;
 jl_datatype_t *jl_boundserror_type;
+jl_datatype_t *jl_invalidvalueerror_type;
 jl_value_t *jl_memory_exception;
 jl_value_t *jl_readonlymemory_exception;
 union jl_typemap_t jl_cfunction_list;

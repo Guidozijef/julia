@@ -314,7 +314,7 @@ null_safe_op(::typeof(!), ::Type{Bool}) = true
 
 # Note this list does not include ^, ÷ and %
 # Operations between signed and unsigned types are not safe: promotion to unsigned
-# gives an InexactError for negative numbers
+# gives an InvalidValueError for negative numbers
 for op in (+, -, *, /, &, |, <<, >>, >>>,
            scalarmin, scalarmax)
     # to fix ambiguities

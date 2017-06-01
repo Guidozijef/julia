@@ -13,8 +13,8 @@
 @test UInt(IPv4(0x01020304)) == 0x01020304
 @test Int(IPv4("1.2.3.4")) == Int(0x01020304) == Int32(0x01020304)
 @test Int128(IPv6("2001:1::2")) == 42540488241204005274814694018844196866
-@test_throws InexactError Int16(IPv4("1.2.3.4"))
-@test_throws InexactError Int64(IPv6("2001:1::2"))
+@test_throws InvalidValueError Int16(IPv4("1.2.3.4"))
+@test_throws InvalidValueError Int64(IPv6("2001:1::2"))
 
 let ipv = parse(IPAddr, "127.0.0.1")
     @test isa(ipv, IPv4)
@@ -49,8 +49,8 @@ let inet = Base.InetAddr(IPv4(127,0,0,1), 1024)
     @test inet.port == 1024
 end
 # test InetAddr invalid port
-@test_throws InexactError Base.InetAddr(IPv4(127,0,0,1), -1)
-@test_throws InexactError Base.InetAddr(IPv4(127,0,0,1), typemax(UInt16)+1)
+@test_throws InvalidValueError Base.InetAddr(IPv4(127,0,0,1), -1)
+@test_throws InvalidValueError Base.InetAddr(IPv4(127,0,0,1), typemax(UInt16)+1)
 
 # isless and comparisons
 @test ip"1.2.3.4" < ip"1.2.3.7" < ip"2.3.4.5"

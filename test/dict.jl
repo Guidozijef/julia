@@ -25,7 +25,7 @@ p = Pair(10,20)
 @test p[true] == 10
 @test p[2.0] == 20
 @test p[0x01] == 10
-@test_throws InexactError p[2.3]
+@test_throws InvalidValueError p[2.3]
 @test first(p) == 10
 @test last(p) == 20
 @test eltype(p) == Int
@@ -439,8 +439,8 @@ d = Dict(:a=>"a")
 
 # test Dict constructor's argument checking (for an iterable of pairs or tuples)
 # make sure other errors can propagate when the nature of the iterator is not the problem
-@test_throws InexactError Dict(convert(Int,1.5) for i=1:1)
-@test_throws InexactError WeakKeyDict(convert(Int,1.5) for i=1:1)
+@test_throws InvalidValueError Dict(convert(Int,1.5) for i=1:1)
+@test_throws InvalidValueError WeakKeyDict(convert(Int,1.5) for i=1:1)
 
 # ImmutableDict
 import Base.ImmutableDict

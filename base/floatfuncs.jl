@@ -63,7 +63,7 @@ The optional [`RoundingMode`](@ref) argument will change how the number gets
 rounded.
 
 `round(T, x, [r::RoundingMode])` converts the result to type `T`, throwing an
-[`InexactError`](@ref) if the value is not representable.
+[`InvalidValueError`](@ref) if the value is not representable.
 
 `round(x, digits)` rounds to the specified number of digits after the decimal place (or
 before if negative). `round(x, digits, base)` rounds using a base other than 10.

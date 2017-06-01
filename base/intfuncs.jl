@@ -42,7 +42,7 @@ function gcd(a::T, b::T) where T<:Union{Int64,UInt64,Int128,UInt128}
         v >>= trailing_zeros(v)
     end
     r = u << k
-    # T(r) would throw InexactError; we want OverflowError instead
+    # T(r) would throw InvalidValueError; we want OverflowError instead
     r > typemax(T) && throw(OverflowError())
     r % T
 end

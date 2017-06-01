@@ -154,7 +154,7 @@ y = BigFloat(1)
 @test convert(Float16, BigFloat(0.5)) == Float16(0.5)
 @test convert(Bool, BigFloat(0.0)) == false
 @test convert(Bool, BigFloat(1.0)) == true
-@test_throws InexactError convert(Bool, BigFloat(0.1))
+@test_throws InvalidValueError convert(Bool, BigFloat(0.1))
 
 # exponent
 x = BigFloat(0)
@@ -349,11 +349,11 @@ end
 # convert to integer types
 x = BigFloat(12.1)
 y = BigFloat(42)
-@test_throws InexactError convert(Int32, x)
-@test_throws InexactError convert(Int64, x)
-@test_throws InexactError convert(BigInt, x)
-@test_throws InexactError convert(UInt32, x)
-@test_throws InexactError convert(UInt32, x)
+@test_throws InvalidValueError convert(Int32, x)
+@test_throws InvalidValueError convert(Int64, x)
+@test_throws InvalidValueError convert(BigInt, x)
+@test_throws InvalidValueError convert(UInt32, x)
+@test_throws InvalidValueError convert(UInt32, x)
 @test convert(Int32, y) == 42
 @test convert(Int64, y) == 42
 @test convert(BigInt, y) == 42

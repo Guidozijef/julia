@@ -24,7 +24,7 @@ end
     lufact!(A, pivot=Val{true}) -> LU
 
 `lufact!` is the same as [`lufact`](@ref), but saves space by overwriting the
-input `A`, instead of creating a copy. An [`InexactError`](@ref)
+input `A`, instead of creating a copy. An [`InvalidValueError`](@ref)
 exception is thrown if the factorization produces a number not representable by the
 element type of `A`, e.g. for integer types.
 """

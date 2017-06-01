@@ -359,7 +359,7 @@ ReadOnlyMemoryError
 `ceil(x)` returns the nearest integral value of the same type as `x` that is greater than or
 equal to `x`.
 
-`ceil(T, x)` converts the result to type `T`, throwing an `InexactError` if the value is not
+`ceil(T, x)` converts the result to type `T`, throwing an `InvalidValueError` if the value is not
 representable.
 
 `digits` and `base` work as for [`round`](@ref).
@@ -646,7 +646,7 @@ Mmap.Anonymous
 `floor(x)` returns the nearest integral value of the same type as `x` that is less than or
 equal to `x`.
 
-`floor(T, x)` converts the result to type `T`, throwing an `InexactError` if the value is
+`floor(T, x)` converts the result to type `T`, throwing an `InvalidValueError` if the value is
 not representable.
 
 `digits` and `base` work as for [`round`](@ref).
@@ -878,7 +878,7 @@ typeof
 `trunc(x)` returns the nearest integral value of the same type as `x` whose absolute value
 is less than or equal to `x`.
 
-`trunc(T, x)` converts the result to type `T`, throwing an `InexactError` if the value is
+`trunc(T, x)` converts the result to type `T`, throwing an `InvalidValueError` if the value is
 not representable.
 
 `digits` and `base` work as for [`round`](@ref).
@@ -1373,6 +1373,13 @@ hex2num
 Type conversion cannot be done exactly.
 """
 InexactError
+
+"""
+    InvalidValueError(name::Symbol, T, val)
+
+Cannot convert `val` to type `T` in a method of function `name`.
+"""
+InvalidValueError
 
 """
     typemax(T)
@@ -1934,7 +1941,7 @@ done
 
 Convert `x` to a value of type `T`.
 
-If `T` is an [`Integer`](@ref) type, an [`InexactError`](@ref) will be raised if `x`
+If `T` is an [`Integer`](@ref) type, an [`InvalidValueError`](@ref) will be raised if `x`
 is not representable by `T`, for example if `x` is not integer-valued, or is outside the
 range supported by `T`.
 
@@ -1943,7 +1950,7 @@ julia> convert(Int, 3.0)
 3
 
 julia> convert(Int, 3.5)
-ERROR: InexactError()
+ERROR: InvalidValueError: convert(Int64, 3.5::Float64)
 Stacktrace:
  [1] convert(::Type{Int64}, ::Float64) at ./float.jl:680
 ```

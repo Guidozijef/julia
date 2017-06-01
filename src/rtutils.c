@@ -182,6 +182,12 @@ JL_DLLEXPORT void JL_NORETURN jl_bounds_error_ints(jl_value_t *v, size_t *idxs, 
     jl_throw(jl_new_struct((jl_datatype_t*)jl_boundserror_type, v, t));
 }
 
+JL_DLLEXPORT void JL_NORETURN jl_invalid_value_error(jl_sym_t *f, jl_value_t *ty, jl_value_t *x)
+{
+    JL_GC_PUSH3(&f, &ty, &x); // root arguments so the caller doesn't need to
+    jl_throw(jl_new_struct(jl_invalidvalueerror_type, f, ty, x));
+}
+
 JL_DLLEXPORT void JL_NORETURN jl_eof_error(void)
 {
     jl_datatype_t *eof_error =

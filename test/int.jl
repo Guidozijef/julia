@@ -39,7 +39,7 @@ end
 @test signed(UInt(3)) == 3
 @test isa(signed(UInt(3)), Int)
 @test signed(UInt(0) - 1) == -1
-@test_throws InexactError signed(UInt(-3))
+@test_throws InvalidValueError signed(UInt(-3))
 
 @test bswap(Int8(3)) == 3
 @test bswap(UInt8(3)) == 3
@@ -109,18 +109,18 @@ end
 for T in (Int8, Int16, Int32, Int64)
     max_val = Int128(typemax(T))
     @test convert(T, max_val) == max_val
-    @test_throws InexactError convert(T, max_val+1)
+    @test_throws InvalidValueError convert(T, max_val+1)
 
     m = Int128(typemin(T))
     @test convert(T, m) == m
-    @test_throws InexactError convert(T, m-1)
+    @test_throws InvalidValueError convert(T, m-1)
 end
 
 for T in (UInt8, UInt16, UInt32, UInt64)
     max_val = Int128(typemax(T))
     @test convert(T, max_val) == max_val
-    @test_throws InexactError convert(T, max_val+1)
-    @test_throws InexactError convert(T, -1)
+    @test_throws InvalidValueError convert(T, max_val+1)
+    @test_throws InvalidValueError convert(T, -1)
 end
 
 # Test bit shifts

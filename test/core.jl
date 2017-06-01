@@ -1033,7 +1033,7 @@ let
     aaa = unsafe_wrap(Array, pointer(a), (1, 1))
     @test size(aaa) == (1, 1)
     @test aaa[1] == a[1]
-    @test_throws InexactError unsafe_wrap(Array, pointer(a), -3)
+    @test_throws InvalidValueError unsafe_wrap(Array, pointer(a), -3)
     # Misaligned pointer
     res = @test_throws ArgumentError unsafe_wrap(Array, pointer(a) + 1, length(a))
     @test contains(res.value.msg, "is not properly aligned to $(sizeof(Int)) bytes")

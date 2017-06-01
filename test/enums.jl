@@ -38,7 +38,7 @@ using Base.Test
 @test convert(BigInt,apple) == 0
 @test convert(Bool,apple) == false
 @test convert(Bool,orange) == true
-@test_throws InexactError convert(Bool,kiwi)
+@test_throws InvalidValueError convert(Bool,kiwi)
 @test instances(Fruit) == (apple, orange, kiwi)
 
 f(x::Fruit) = "hey, I'm a Fruit"
@@ -66,7 +66,7 @@ end
 @enum Negative _neg1=-1 _neg2=-2
 @test Int(_neg1) === -1
 @test Int(_neg2) === -2
-@test_throws InexactError convert(UInt8, _neg1)
+@test_throws InvalidValueError convert(UInt8, _neg1)
 @enum Negative2 _neg5=-5 _neg4 _neg3
 @test Int(_neg5) === -5
 @test Int(_neg4) === -4

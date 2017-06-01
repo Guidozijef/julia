@@ -527,6 +527,7 @@ extern JL_DLLEXPORT jl_value_t *jl_inexact_exception;
 extern JL_DLLEXPORT jl_value_t *jl_undefref_exception;
 extern JL_DLLEXPORT jl_value_t *jl_interrupt_exception;
 extern JL_DLLEXPORT jl_datatype_t *jl_boundserror_type;
+extern JL_DLLEXPORT jl_datatype_t *jl_invalidvalueerror_type;
 extern JL_DLLEXPORT jl_value_t *jl_an_empty_vec_any;
 
 extern JL_DLLEXPORT jl_datatype_t *jl_bool_type;
@@ -547,6 +548,7 @@ extern JL_DLLEXPORT jl_datatype_t *jl_number_type;
 extern JL_DLLEXPORT jl_datatype_t *jl_void_type;
 extern JL_DLLEXPORT jl_unionall_t *jl_complex_type;
 extern JL_DLLEXPORT jl_datatype_t *jl_signed_type;
+extern JL_DLLEXPORT jl_datatype_t *jl_unsigned_type;
 extern JL_DLLEXPORT jl_datatype_t *jl_voidpointer_type;
 extern JL_DLLEXPORT jl_unionall_t *jl_pointer_type;
 extern JL_DLLEXPORT jl_unionall_t *jl_ref_type;
@@ -1289,6 +1291,7 @@ JL_DLLEXPORT void JL_NORETURN jl_bounds_error_tuple_int(jl_value_t **v,
                                                         size_t nv, size_t i);
 JL_DLLEXPORT void JL_NORETURN jl_bounds_error_unboxed_int(void *v, jl_value_t *vt, size_t i);
 JL_DLLEXPORT void JL_NORETURN jl_bounds_error_ints(jl_value_t *v, size_t *idxs, size_t nidxs);
+JL_DLLEXPORT void JL_NORETURN jl_invalid_value_error(jl_sym_t *f, jl_value_t *ty, jl_value_t *x);
 JL_DLLEXPORT void JL_NORETURN jl_eof_error(void);
 JL_DLLEXPORT jl_value_t *jl_exception_occurred(void);
 JL_DLLEXPORT void jl_exception_clear(void);

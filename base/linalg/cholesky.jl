@@ -223,7 +223,7 @@ end
     cholfact!(A, [uplo::Symbol,] Val{false}) -> Cholesky
 
 The same as [`cholfact`](@ref), but saves space by overwriting the input `A`,
-instead of creating a copy. An [`InexactError`](@ref) exception is thrown if
+instead of creating a copy. An [`InvalidValueError`](@ref) exception is thrown if
 the factorization produces a number not representable by the element type of
 `A`, e.g. for integer types.
 
@@ -236,7 +236,7 @@ julia> A = [1 2; 2 50]
  2  50
 
 julia> cholfact!(A)
-ERROR: InexactError()
+ERROR: InvalidValueError: convert(Int64, 6.782329983125268::Float64)
 ```
 """
 function cholfact!(A::StridedMatrix, uplo::Symbol, ::Type{Val{false}})
@@ -273,7 +273,7 @@ cholfact!(A::RealHermSymComplexHerm{<:Real}, ::Type{Val{true}};
     cholfact!(A, [uplo::Symbol,] Val{true}; tol = 0.0) -> CholeskyPivoted
 
 The same as [`cholfact`](@ref), but saves space by overwriting the input `A`,
-instead of creating a copy. An [`InexactError`](@ref) exception is thrown if the
+instead of creating a copy. An [`InvalidValueError`](@ref) exception is thrown if the
 factorization produces a number not representable by the element type of `A`,
 e.g. for integer types.
 """

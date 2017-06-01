@@ -195,7 +195,7 @@ let aa = reshape([1.:6;], (2,3))
 end
 
 # scale real matrix by complex type
-@test_throws InexactError scale!([1.0], 2.0im)
+@test_throws InvalidValueError scale!([1.0], 2.0im)
 @test isequal([1.0] * 2.0im,             Complex{Float64}[2.0im])
 @test isequal(2.0im * [1.0],             Complex{Float64}[2.0im])
 @test isequal(Float32[1.0] * 2.0f0im,    Complex{Float32}[2.0im])

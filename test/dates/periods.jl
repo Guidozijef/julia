@@ -109,17 +109,17 @@ y2 = Dates.Year(2)
 @test Dates.Year(Float32(1)) == y
 @test Dates.Year(Rational(1)) == y
 @test Dates.Year(complex(1)) == y
-@test_throws InexactError Dates.Year(BigFloat(1.2)) == y
-@test_throws InexactError Dates.Year(1.2) == y
-@test_throws InexactError Dates.Year(Float32(1.2)) == y
-@test_throws InexactError Dates.Year(3//4) == y
-@test_throws InexactError Dates.Year(complex(1.2)) == y
-@test_throws InexactError Dates.Year(Float16(1.2)) == y
+@test_throws InvalidValueError Dates.Year(BigFloat(1.2)) == y
+@test_throws InvalidValueError Dates.Year(1.2) == y
+@test_throws InvalidValueError Dates.Year(Float32(1.2)) == y
+@test_throws InvalidValueError Dates.Year(3//4) == y
+@test_throws InvalidValueError Dates.Year(complex(1.2)) == y
+@test_throws InvalidValueError Dates.Year(Float16(1.2)) == y
 @test Dates.Year(true) == y
 @test Dates.Year(false) != y
 @test_throws MethodError Dates.Year(:hey) == y
 @test Dates.Year(real(1)) == y
-@test_throws InexactError Dates.Year(m) == y
+@test_throws InvalidValueError Dates.Year(m) == y
 @test_throws MethodError Dates.Year(w) == y
 @test_throws MethodError Dates.Year(d) == y
 @test_throws MethodError Dates.Year(h) == y
@@ -155,11 +155,11 @@ y2 = Dates.Year(2)
 #Period-Real arithmetic
 @test_throws MethodError y + 1 == Dates.Year(2)
 @test_throws MethodError y + true == Dates.Year(2)
-@test_throws InexactError y + Dates.Year(1.2)
+@test_throws InvalidValueError y + Dates.Year(1.2)
 @test y + Dates.Year(1f0) == Dates.Year(2)
 @test y * 4 == Dates.Year(4)
 @test y * 4f0 == Dates.Year(4)
-@test_throws InexactError y * 3//4 == Dates.Year(1)
+@test_throws InvalidValueError y * 3//4 == Dates.Year(1)
 @test div(y, 2) == Dates.Year(0)
 @test_throws MethodError div(2, y) == Dates.Year(2)
 @test div(y, y) == 1

@@ -291,8 +291,8 @@ end
 
 # conversion from float
 @test BigInt(2.0) == BigInt(2.0f0) == BigInt(big(2.0)) == 2
-@test_throws InexactError convert(BigInt, 2.1)
-@test_throws InexactError convert(BigInt, big(2.1))
+@test_throws InvalidValueError convert(BigInt, 2.1)
+@test_throws InvalidValueError convert(BigInt, big(2.1))
 
 # issue #13367
 @test trunc(BigInt,2.1) == 2
@@ -305,10 +305,10 @@ end
 @test floor(BigInt,2.1f0) == 2
 @test ceil(BigInt,2.1f0) == 3
 
-@test_throws InexactError trunc(BigInt,Inf)
-@test_throws InexactError round(BigInt,Inf)
-@test_throws InexactError floor(BigInt,Inf)
-@test_throws InexactError ceil(BigInt,Inf)
+@test_throws InvalidValueError trunc(BigInt,Inf)
+@test_throws InvalidValueError round(BigInt,Inf)
+@test_throws InvalidValueError floor(BigInt,Inf)
+@test_throws InvalidValueError ceil(BigInt,Inf)
 
 @test bin(big(3)) == "11"
 @test oct(big(9)) == "11"

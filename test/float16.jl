@@ -18,7 +18,7 @@ g = Float16(1.)
 
 @test convert(Bool,Float16(0.0)) == false
 @test convert(Bool,Float16(1.0)) == true
-@test_throws InexactError convert(Bool,Float16(0.1))
+@test_throws InvalidValueError convert(Bool,Float16(0.1))
 
 @test convert(Int128,Float16(-2.0)) == Int128(-2)
 @test convert(UInt128,Float16(2.0)) == UInt128(2)
@@ -26,12 +26,12 @@ g = Float16(1.)
 # convert(::Type{Int128},  x::Float16)
 @test convert(Int128, Float16(1.0)) === Int128(1.0)
 @test convert(Int128, Float16(-1.0)) === Int128(-1.0)
-@test_throws InexactError convert(Int128, Float16(3.5))
+@test_throws InvalidValueError convert(Int128, Float16(3.5))
 
 # convert(::Type{UInt128}, x::Float16)
 @test convert(UInt128, Float16(1.0)) === UInt128(1.0)
-@test_throws InexactError convert(UInt128, Float16(3.5))
-@test_throws InexactError convert(UInt128, Float16(-1))
+@test_throws InvalidValueError convert(UInt128, Float16(3.5))
+@test_throws InvalidValueError convert(UInt128, Float16(-1))
 
 @test Float16(0.5f0)^2 ≈ Float16(0.5f0^2)
 @test round(Int,Float16(0.5f0)) == round(Int,0.5f0)

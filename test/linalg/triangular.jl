@@ -280,7 +280,7 @@ for elty1 in (Float32, Float64, BigFloat, Complex64, Complex128, Complex{BigFloa
                 if elty1 <: Real && !(elty2 <: Integer)
                     @test convert(AbstractMatrix{elty2}, A1) == t1(convert(Matrix{elty2}, A1.data))
                 elseif elty2 <: Real && !(elty1 <: Integer)
-                    @test_throws InexactError convert(AbstractMatrix{elty2}, A1) == t1(convert(Matrix{elty2}, A1.data))
+                    @test_throws InvalidValueError convert(AbstractMatrix{elty2}, A1) == t1(convert(Matrix{elty2}, A1.data))
                 end
 
                 # Binary operations

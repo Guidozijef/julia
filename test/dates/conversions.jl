@@ -66,17 +66,17 @@ let t = Dates.Period[Dates.Week(2), Dates.Day(14), Dates.Hour(14 * 24), Dates.Mi
             Pj = typeof(t[j])
             tj1 = t[j] + Pj(1)
             @test t[i] < tj1
-            @test_throws InexactError Pi(tj1)
-            @test_throws InexactError Pj(Pi(typemax(Int64)))
-            @test_throws InexactError Pj(Pi(typemin(Int64)))
+            @test_throws InvalidValueError Pi(tj1)
+            @test_throws InvalidValueError Pj(Pi(typemax(Int64)))
+            @test_throws InvalidValueError Pj(Pi(typemin(Int64)))
         end
     end
 end
 @test Dates.Year(3) == Dates.Month(36)
 #@test_throws MethodError Int(Dates.Month(36)) # re-enable when deprecation removed
 @test Dates.Year(3) < Dates.Month(37)
-@test_throws InexactError convert(Dates.Year, Dates.Month(37))
-@test_throws InexactError Dates.Month(Dates.Year(typemax(Int64)))
+@test_throws InvalidValueError convert(Dates.Year, Dates.Month(37))
+@test_throws InvalidValueError Dates.Month(Dates.Year(typemax(Int64)))
 
 # Ensure that conversion of 32-bit integers work
 let dt = DateTime(1915, 1, 1, 12)

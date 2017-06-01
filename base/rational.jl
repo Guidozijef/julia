@@ -80,9 +80,12 @@ convert(::Type{Rational{T}}, x::Integer) where {T<:Integer} = Rational{T}(conver
 convert(::Type{Rational}, x::Rational) = x
 convert(::Type{Rational}, x::Integer) = convert(Rational{typeof(x)},x)
 
-convert(::Type{Bool}, x::Rational) = x==0 ? false : x==1 ? true : throw(InexactError()) # to resolve ambiguity
-convert(::Type{Integer}, x::Rational) = (isinteger(x) ? convert(Integer, x.num) : throw(InexactError()))
-convert(::Type{T}, x::Rational) where {T<:Integer} = (isinteger(x) ? convert(T, x.num) : throw(InexactError()))
+convert(::Type{Bool}, x::Rational) = x==0 ? false : x==1 ? true :
+    throw(InvalidValueError(:convert, Bool, x)) # to resolve ambiguity
+convert(::Type{Integer}, x::Rational) = (isinteger(x) ? convert(Integer, x.num) :
+    throw(InvalidValueError(:convert, Integer, x)))
+convert(::Type{T}, x::Rational) where {T<:Integer} = (isinteger(x) ? convert(T, x.num) :
+    throw(InvalidValueError(:convert, T, x)))
 
 convert(::Type{AbstractFloat}, x::Rational) = float(x.num)/float(x.den)
 function convert(::Type{T}, x::Rational{S}) where T<:AbstractFloat where S
@@ -92,7 +95,7 @@ end
 
 function convert(::Type{Rational{T}}, x::AbstractFloat) where T<:Integer
     r = rationalize(T, x, tol=0)
-    x == convert(typeof(x), r) || throw(InexactError())
+    x == convert(typeof(x), r) || throw(InvalidValueError(:convert, Rational{T}, x))
     r
 end
 convert(::Type{Rational}, x::Float64) = convert(Rational{Int64}, x)
@@ -154,7 +157,7 @@ function rationalize(::Type{T}, x::AbstractFloat, tol::Real) where T<:Integer
             p, pp = np, p
             q, qq = nq, q
         catch e
-            isa(e,InexactError) || isa(e,OverflowError) || rethrow(e)
+            isa(e,InvalidValueError) || isa(e,OverflowError) || rethrow(e)
             return p // q
         end
 
@@ -179,7 +182,7 @@ function rationalize(::Type{T}, x::AbstractFloat, tol::Real) where T<:Integer
         nq = checked_add(checked_mul(ia,q),qq)
         return np // nq
     catch e
-        isa(e,InexactError) || isa(e,OverflowError) || rethrow(e)
+        isa(e,InvalidValueError) || isa(e,OverflowError) || rethrow(e)
         return p // q
     end
 end

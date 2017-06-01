@@ -40,17 +40,17 @@ const ≣ = isequal # convenient for comparing NaNs
 @test Bool(true) == true
 @test Bool(0) == false
 @test Bool(1) == true
-@test_throws InexactError Bool(-1)
+@test_throws InvalidValueError Bool(-1)
 @test Bool(0.0) == false
 @test Bool(1.0) == true
-@test_throws InexactError Bool(0.1)
-@test_throws InexactError Bool(-1.0)
+@test_throws InvalidValueError Bool(0.1)
+@test_throws InvalidValueError Bool(-1.0)
 @test Bool(Complex(0,0)) == false
 @test Bool(Complex(1,0)) == true
-@test_throws InexactError Bool(Complex(0,1))
+@test_throws InvalidValueError Bool(Complex(0,1))
 @test Bool(0//1) == false
 @test Bool(1//1) == true
-@test_throws InexactError Bool(1//2)
+@test_throws InvalidValueError Bool(1//2)
 
 @test iszero(false) && !iszero(true)
 
@@ -1730,8 +1730,8 @@ let ≈(x,y) = x==y && typeof(x)==typeof(y)
     end
 end
 
-@test_throws InexactError round(Int,Inf)
-@test_throws InexactError round(Int,NaN)
+@test_throws InvalidValueError round(Int,Inf)
+@test_throws InvalidValueError round(Int,NaN)
 @test round(Int,2.5) == 2
 @test round(Int,1.5) == 2
 @test round(Int,-2.5) == -2
@@ -1745,17 +1745,17 @@ end
 @test round(Int,-2.5,RoundNearestTiesUp) == -2
 @test round(Int,-1.5,RoundNearestTiesUp) == -1
 @test round(Int,-1.9) == -2
-@test_throws InexactError round(Int64, 9.223372036854776e18)
+@test_throws InvalidValueError round(Int64, 9.223372036854776e18)
 @test       round(Int64, 9.223372036854775e18) == 9223372036854774784
-@test_throws InexactError round(Int64, -9.223372036854778e18)
+@test_throws InvalidValueError round(Int64, -9.223372036854778e18)
 @test       round(Int64, -9.223372036854776e18) == typemin(Int64)
-@test_throws InexactError round(UInt64, 1.8446744073709552e19)
+@test_throws InvalidValueError round(UInt64, 1.8446744073709552e19)
 @test       round(UInt64, 1.844674407370955e19) == 0xfffffffffffff800
-@test_throws InexactError round(Int32, 2.1474836f9)
+@test_throws InvalidValueError round(Int32, 2.1474836f9)
 @test       round(Int32, 2.1474835f9) == 2147483520
-@test_throws InexactError round(Int32, -2.147484f9)
+@test_throws InvalidValueError round(Int32, -2.147484f9)
 @test       round(Int32, -2.1474836f9) == typemin(Int32)
-@test_throws InexactError round(UInt32, 4.2949673f9)
+@test_throws InvalidValueError round(UInt32, 4.2949673f9)
 @test       round(UInt32, 4.294967f9) == 0xffffff00
 
 
@@ -1791,10 +1791,10 @@ for Ti in [Int,UInt]
             @test round(Ti, prevfloat(Tf(-0.5)), RoundNearestTiesAway) == -1
             @test round(Ti, prevfloat(Tf(-0.5)), RoundNearestTiesUp) == -1
         else
-            @test_throws InexactError round(Ti, Tf(-0.5), RoundNearestTiesAway)
-            @test_throws InexactError round(Ti, prevfloat(Tf(-0.5)))
-            @test_throws InexactError round(Ti, prevfloat(Tf(-0.5)), RoundNearestTiesAway)
-            @test_throws InexactError round(Ti, prevfloat(Tf(-0.5)), RoundNearestTiesUp)
+            @test_throws InvalidValueError round(Ti, Tf(-0.5), RoundNearestTiesAway)
+            @test_throws InvalidValueError round(Ti, prevfloat(Tf(-0.5)))
+            @test_throws InvalidValueError round(Ti, prevfloat(Tf(-0.5)), RoundNearestTiesAway)
+            @test_throws InvalidValueError round(Ti, prevfloat(Tf(-0.5)), RoundNearestTiesUp)
         end
     end
 end
@@ -2399,12 +2399,12 @@ end
 @test [1//3+2im,3+4im] .// [5,6] == [(1//3+2im)//5,(3+4im)//6]
 
 # issue #7441
-@test_throws InexactError Int32(2.0^50)
+@test_throws InvalidValueError Int32(2.0^50)
 
-@test_throws InexactError round(UInt8, 255.5)
+@test_throws InvalidValueError round(UInt8, 255.5)
 @test round(UInt8, 255.4) === 0xff
 
-@test_throws InexactError round(Int16, -32768.7)
+@test_throws InvalidValueError round(Int16, -32768.7)
 @test round(Int16, -32768.1) === Int16(-32768)
 
 # issue #7508
@@ -2450,21 +2450,21 @@ let a = zeros(Int,(2,4))
     @test a == [0 1 0 1;
                 0 0 1 1]
 end
-@test_throws InexactError convert(UInt8, 256)
-@test_throws InexactError convert(UInt, -1)
-@test_throws InexactError convert(Int, big(2)^100)
-@test_throws InexactError convert(Int16, big(2)^100)
-@test_throws InexactError convert(Int, typemax(UInt))
+@test_throws InvalidValueError convert(UInt8, 256)
+@test_throws InvalidValueError convert(UInt, -1)
+@test_throws InvalidValueError convert(Int, big(2)^100)
+@test_throws InvalidValueError convert(Int16, big(2)^100)
+@test_throws InvalidValueError convert(Int, typemax(UInt))
 
 # issue #9789
-@test_throws InexactError convert(Int8, typemax(UInt64))
-@test_throws InexactError convert(Int16, typemax(UInt64))
-@test_throws InexactError convert(Int, typemax(UInt64))
+@test_throws InvalidValueError convert(Int8, typemax(UInt64))
+@test_throws InvalidValueError convert(Int16, typemax(UInt64))
+@test_throws InvalidValueError convert(Int, typemax(UInt64))
 
 # issue #14549
 for T in (Int8, Int16, UInt8, UInt16)
     for F in (Float32,Float64)
-        @test_throws InexactError convert(T, F(200000.0))
+        @test_throws InvalidValueError convert(T, F(200000.0))
     end
 end
 
@@ -2592,7 +2592,7 @@ end
 @test map(copysign, 1.0, -2.0) == -1.0
 @test map(muladd, 2, 3, 4) == 10
 
-@test_throws InexactError convert(UInt8, big(300))
+@test_throws InvalidValueError convert(UInt8, big(300))
 
 # issue #10311
 let n = 1
@@ -2620,11 +2620,11 @@ for T in Any[Int16, Int32, UInt32, Int64, UInt64, BigInt]
     @test convert(T,  300) % UInt8 === 0x2c
 end
 
-@test_throws InexactError UInt128(-1)
+@test_throws InvalidValueError UInt128(-1)
 
 for T in (Int8,Int16,Int32,Int64,Int128,UInt8,UInt16,UInt32,UInt64,UInt128)
-    @test_throws InexactError T(big(typemax(T))+1)
-    @test_throws InexactError T(big(typemin(T))-1)
+    @test_throws InvalidValueError T(big(typemax(T))+1)
+    @test_throws InvalidValueError T(big(typemin(T))-1)
 end
 
 for (d,B) in ((4//2+1im,Rational{BigInt}),(3.0+1im,BigFloat),(2+1im,BigInt))

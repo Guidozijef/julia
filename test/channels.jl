@@ -24,7 +24,7 @@ tvals = Int[take!(c) for i in 1:10^6]
 # @test_throws MethodError Channel()
 
 @test_throws ArgumentError Channel(-1)
-@test_throws InexactError Channel(1.5)
+@test_throws InvalidValueError Channel(1.5)
 
 # Test multiple concurrent put!/take! on a channel for different sizes
 function testcpt(sz)
