@@ -2267,6 +2267,31 @@ static bool might_need_root(jl_value_t *ex)
             !jl_is_globalref(ex));
 }
 
+// Emit an "empty" structure (with uninitialized fields) of type
+// ty. Do not use for isbits types.
+static jl_cgval_t emit_uninitialized_struct(jl_value_t *ty, jl_codectx_t *ctx)
+{
+    assert(jl_is_datatype(ty));
+    assert(jl_is_leaf_type(ty));
+    jl_datatype_t *sty = (jl_datatype_t*)ty;
+    assert(!jl_isbits(sty));
+    size_t nf = jl_datatype_nfields(sty);
+    Value *strct = emit_allocobj(ctx, jl_datatype_size(sty),
+                                 literal_pointer_val((jl_value_t*)ty));
+    jl_cgval_t strctinfo = mark_julia_type(strct, true, ty, ctx);
+    for (size_t i = 0; i < nf; i++) {
+        if (jl_field_isptr(sty, i)) {
+            tbaa_decorate(strctinfo.tbaa, builder.CreateStore(
+                    V_null,
+                    builder.CreatePointerCast(
+                        builder.CreateGEP(emit_bitcast(strct, T_pint8),
+                            ConstantInt::get(T_size, jl_field_offset(sty, i))),
+                        T_ppjlvalue)));
+        }
+    }
+    return strctinfo;
+}
+
 static jl_cgval_t emit_new_struct(jl_value_t *ty, size_t nargs, jl_value_t **args, jl_codectx_t *ctx)
 {
     assert(jl_is_datatype(ty));
@@ -2325,19 +2350,7 @@ static jl_cgval_t emit_new_struct(jl_value_t *ty, size_t nargs, jl_value_t **arg
             else
                 return mark_julia_slot(strct, ty, NULL, tbaa_stack);
         }
-        Value *strct = emit_allocobj(ctx, jl_datatype_size(sty),
-                                     literal_pointer_val((jl_value_t*)ty));
-        jl_cgval_t strctinfo = mark_julia_type(strct, true, ty, ctx);
-        for (size_t i = 0; i < nf; i++) {
-            if (jl_field_isptr(sty, i)) {
-                tbaa_decorate(strctinfo.tbaa, builder.CreateStore(
-                        V_null,
-                        builder.CreatePointerCast(
-                            builder.CreateGEP(emit_bitcast(strct, T_pint8),
-                                ConstantInt::get(T_size, jl_field_offset(sty, i))),
-                            T_ppjlvalue)));
-            }
-        }
+        jl_cgval_t strctinfo = emit_uninitialized_struct(ty, ctx);
         bool need_wb = false;
         // TODO: verify that nargs <= nf (currently handled by front-end)
         for (size_t i = 1; i < nargs; i++) {

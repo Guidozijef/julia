@@ -492,7 +492,7 @@ static jl_cgval_t generic_cast(
     if (!to || !vt)
         return emit_runtime_call(f, argv, 2, ctx);
     Value *from = emit_unbox(vt, v, v.typ);
-    Value *jltov = boxed(emit_expr(jlto, ctx), ctx);
+    Value *jltov = boxed(emit_expr(jlto, ctx), ctx, false);
     Value *ans = generic(to, from, ctx, jltov);
     return mark_julia_type(ans, false, jlto, ctx);
 }
@@ -504,16 +504,24 @@ static Value *generic_trunc(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
 
 static Value *generic_trunc_exception(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
 {
-    Type *lt = julia_type_to_llvm((jl_value_t*)jl_invalidvalueerror_type);
-    Value *strct = UndefValue::get(lt);
-    strct = builder.CreateInsertElement(strct,
-                                        ConstantDataArray::getString(builder.getContext(),
-                                                                     StringRef("convert")),
-                                        uint64_t(0));
-    strct = builder.CreateInsertElement(strct, jlto, uint64_t(1));
-    strct = builder.CreateInsertElement(strct, x, uint64_t(2));
-    return strct;
-    //return mark_julia_type(strct, false, (jl_value_t*)jl_invalidvalueerror_type, ctx);
+    jl_datatype_t * const sty = jl_invalidvalueerror_type;
+    jl_cgval_t strct = emit_uninitialized_struct((jl_value_t*)sty, ctx);
+    Value *addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+                                    ConstantInt::get(T_size, jl_field_offset(sty, 0)));
+    Constant *funcsym = ConstantDataArray::getString(builder.getContext(),
+                                                     StringRef("convert"));
+    tbaa_decorate(strct.tbaa, builder.CreateStore(funcsym,
+                                                  emit_bitcast(addr, T_ppjlvalue)));
+    addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+                             ConstantInt::get(T_size, jl_field_offset(sty, 1)));
+    tbaa_decorate(strct.tbaa, builder.CreateStore(jlto,
+                                                  emit_bitcast(addr, T_ppjlvalue)));
+    addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+                             ConstantInt::get(T_size, jl_field_offset(sty, 2)));
+    tbaa_decorate(strct.tbaa, builder.CreateStore(x,
+                                                  emit_bitcast(addr, T_ppjlvalue)));
+    mark_gc_use(strct);
+    return strct.V;
 }
 
 static Value *generic_trunc_uchecked(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
