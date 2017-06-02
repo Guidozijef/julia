@@ -25,6 +25,16 @@
 @test string((name="", day=:today)) == "(name = \"\", day = :today)"
 @test string(NamedTuple()) == "NamedTuple()"
 
+@test hash((a = 1, b = "hello")) == hash(convert(NamedTuple{(:a,:b),Tuple{Int,String}}, (1, "hello")))
+@test hash((a = 1, b = "hello")) != hash(convert(NamedTuple{(:a,:c),Tuple{Int,String}}, (1, "hello")))
+@test hash((a = 1, b = "hello")) != hash(convert(NamedTuple{(:a,:b),Tuple{Int,String}}, (1, "helo")))
+
+@test (x=4, y=5, z=6)[[1,3]] == (x=4, z=6)
+@test (x=4, y=5, z=6)[[:z,:y]] == (z=6, y=5)
+
+@test convert(NamedTuple{(:a,:b),Tuple{Int8,Int16}}, (1,2)) === (a=Int8(1), b=Int16(2))
+@test convert(NamedTuple{(:a,:b),Tuple{Int8,Int16}}, (x=3,y=4)) === (a=Int8(3), b=Int16(4))
+
 @test eltype((a=[1,2], b=[3,4])) === Vector{Int}
 
 @test Tuple((a=[1,2], b=[3,4])) == ([1,2], [3,4])

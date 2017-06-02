@@ -19,6 +19,17 @@ endof(t::NamedTuple) = length(t)
 getindex(t::NamedTuple, i::Int) = getfield(t, i)
 getindex(t::NamedTuple, i::Symbol) = getfield(t, i)
 
+function getindex(t::NamedTuple, I::AbstractVector)
+    names = unique( Symbol[ isa(i,Symbol) ? i : fieldname(typeof(t),i) for i in I ] )
+    namedtuple(NamedTuple{(names...)}, [ getfield( t, i ) for i in names ]...)
+end
+
+convert(::Type{NamedTuple{names,T}}, itr::NamedTuple{names,T}) where {names,T} = itr
+
+function convert(::Type{NamedTuple{names,T}}, itr) where {names,T}
+    namedtuple(NamedTuple{names}, T(itr)...)
+end
+
 function show(io::IO, t::NamedTuple)
     n = length(t)
     if n == 0
