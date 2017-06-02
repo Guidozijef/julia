@@ -89,3 +89,44 @@ end
         namedtuple($NT, $(args...))
     end
 end
+
+# a version of `in` for the older world these generated functions run in
+function sym_in(x, itr)
+    for y in itr
+        y === x && return true
+    end
+    return false
+end
+
+@generated function merge(a::NamedTuple{an}, b::NamedTuple{bn}) where {an, bn}
+    names = Symbol[an...]
+    for n in bn
+        if !sym_in(n, an)
+            push!(names, n)
+        end
+    end
+    vals = map(names) do n
+        if sym_in(n, bn)
+            :(getfield(b, $(Expr(:quote, n))))
+        else
+            :(getfield(a, $(Expr(:quote, n))))
+        end
+    end
+    names = (names...,)
+    :(namedtuple(NamedTuple{$names}, $(vals...)))
+end
+
+@generated function structdiff(a::NamedTuple{an},
+                               b::Union{NamedTuple{bn},Type{NamedTuple{bn}}}) where {an,bn}
+    names = Symbol[]
+    for n in an
+        if !sym_in(n, bn)
+            push!(names, n)
+        end
+    end
+    vals = map(names) do n
+        :(getfield(a, $(Expr(:quote, n))))
+    end
+    names = (names...,)
+    :(namedtuple(NamedTuple{$names}, $(vals...)))
+end

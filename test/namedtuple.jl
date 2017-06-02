@@ -51,3 +51,13 @@
 @test map(+, (x=1, y=2), (x=10, y=20)) == (x=11, y=22)
 @test map(string, (x=1, y=2)) == (x="1", y="2")
 @test map(round, (x=1//3, y=Int), (x=3, y=2//3)) == (x=0.333, y=1)
+
+@test merge((a=1, b=2), (a=10,)) == (a=10, b=2)
+@test merge((a=1, b=2), (a=10, z=20)) == (a=10, b=2, z=20)
+@test merge((a=1, b=2), (z=20,)) == (a=1, b=2, z=20)
+
+@test Base.structdiff((a=1, b=2), (b=3,)) == (a=1,)
+@test Base.structdiff((a=1, b=2, z=20), (b=3,)) == (a=1, z=20)
+@test Base.structdiff((a=1, b=2, z=20), (b=3, q=20, z=1)) == (a=1,)
+@test Base.structdiff((a=1, b=2, z=20), (b=3, q=20, z=1, a=0)) == NamedTuple()
+@test Base.structdiff((a=1, b=2, z=20), NamedTuple{(:b,)}) == (a=1, z=20)
