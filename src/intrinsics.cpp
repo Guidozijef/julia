@@ -471,7 +471,8 @@ static jl_cgval_t generic_bitcast(const jl_cgval_t *argv, jl_codectx_t *ctx)
 }
 
 static jl_cgval_t generic_cast(
-        intrinsic f, Value *(*generic)(Type*, Value*, jl_codectx_t*, Value*, Value*),
+        intrinsic f, Value *(*generic)(Type*, Value*, jl_codectx_t*, BasicBlock*),
+        BasicBlock *exc,
         const jl_cgval_t *argv, jl_codectx_t *ctx, bool toint, bool fromint)
 {
     const jl_cgval_t &targ = argv[0];
@@ -492,92 +493,90 @@ static jl_cgval_t generic_cast(
     if (!to || !vt)
         return emit_runtime_call(f, argv, 2, ctx);
     Value *from = emit_unbox(vt, v, v.typ);
-    Value *jltoboxed = boxed(emit_expr(jlto, ctx), ctx, false);
-    Value *vboxed = boxed(v, ctx, false);
-    Value *ans = generic(to, from, ctx, jltoboxed, vboxed);
+    Value *ans = generic(to, from, ctx, exc);
     return mark_julia_type(ans, false, jlto, ctx);
 }
 
-static Value *generic_trunc(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static void trunc_exception(const jl_cgval_t *argv, jl_codectx_t *ctx)
+{
+    jl_datatype_t * const jl_exc = jl_invalidvalueerror_type;
+    const jl_cgval_t &type = argv[0];
+    const jl_cgval_t &val  = argv[1];
+    jl_cgval_t strct = emit_uninitialized_struct((jl_value_t*)jl_exc, ctx);
+    Value *addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+                                    ConstantInt::get(T_size, jl_field_offset(jl_exc, 0)));
+    Value *funcsym = boxed(emit_expr((jl_value_t*)jl_symbol("convert"), ctx), ctx, false);
+    tbaa_decorate(strct.tbaa, builder.CreateStore(funcsym,
+                                                  emit_bitcast(addr, T_ppjlvalue)));
+    addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+                             ConstantInt::get(T_size, jl_field_offset(jl_exc, 1)));
+    tbaa_decorate(strct.tbaa, builder.CreateStore(boxed(type, ctx, false),
+                                                  emit_bitcast(addr, T_ppjlvalue)));
+    addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+                             ConstantInt::get(T_size, jl_field_offset(jl_exc, 2)));
+    tbaa_decorate(strct.tbaa, builder.CreateStore(boxed(val, ctx, false),
+                                                  emit_bitcast(addr, T_ppjlvalue)));
+    mark_gc_use(strct);
+    builder.CreateCall(prepare_call(jlthrow_func), { strct.V });
+}
+
+static Value *generic_trunc(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     return builder.CreateTrunc(x, to);
 }
 
-static Value *generic_trunc_exception(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto)
-{
-    jl_datatype_t * const sty = jl_invalidvalueerror_type;
-    jl_cgval_t strct = emit_uninitialized_struct((jl_value_t*)sty, ctx);
-    Value *addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
-                                    ConstantInt::get(T_size, jl_field_offset(sty, 0)));
-    Value *funcsym = boxed(emit_expr((jl_value_t*)jl_symbol("convert"), ctx), ctx, true);
-    tbaa_decorate(strct.tbaa, builder.CreateStore(funcsym,
-                                                  emit_bitcast(addr, T_ppjlvalue)));
-    addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
-                             ConstantInt::get(T_size, jl_field_offset(sty, 1)));
-    tbaa_decorate(strct.tbaa, builder.CreateStore(jlto,
-                                                  emit_bitcast(addr, T_ppjlvalue)));
-    addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
-                             ConstantInt::get(T_size, jl_field_offset(sty, 2)));
-    tbaa_decorate(strct.tbaa, builder.CreateStore(x,
-                                                  emit_bitcast(addr, T_ppjlvalue)));
-    mark_gc_use(strct);
-    return strct.V;
-}
-
-static Value *generic_trunc_uchecked(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_trunc_uchecked(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     Value *ans = builder.CreateTrunc(x, to);
     Value *back = builder.CreateZExt(ans, x->getType());
-    raise_exception_unless(builder.CreateICmpEQ(back, x),
-                           generic_trunc_exception(to, xboxed, ctx, jlto), ctx);
+    raise_exception_unless(builder.CreateICmpEQ(back, x), exc, ctx);
     return ans;
 }
 
-static Value *generic_trunc_schecked(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_trunc_schecked(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     Value *ans = builder.CreateTrunc(x, to);
     Value *back = builder.CreateSExt(ans, x->getType());
-    raise_exception_unless(builder.CreateICmpEQ(back, x),
-                           generic_trunc_exception(to, xboxed, ctx, jlto), ctx);
+    raise_exception_unless(builder.CreateICmpEQ(back, x), exc, ctx);
     return ans;
 }
 
-static Value *generic_sext(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_sext(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     return builder.CreateSExt(x, to);
 }
 
-static Value *generic_zext(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_zext(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     return builder.CreateZExt(x, to);
 }
 
-static Value *generic_uitofp(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_uitofp(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     return builder.CreateUIToFP(x, to);
 }
 
-static Value *generic_sitofp(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_sitofp(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     return builder.CreateSIToFP(x, to);
 }
 
-static Value *generic_fptoui(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_fptoui(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     return builder.CreateFPToUI(x, to);
 }
 
-static Value *generic_fptosi(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_fptosi(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     return builder.CreateFPToSI(x, to);
 }
 
-static Value *generic_fptrunc(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_fptrunc(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
     return builder.CreateFPTrunc(x, to);
 }
 
-static Value *generic_fpext(Type *to, Value *x, jl_codectx_t *ctx, Value *jlto, Value *xboxed)
+static Value *generic_fpext(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *exc)
 {
 #ifdef JL_NEED_FLOATTEMP_VAR
     // Target platform might carry extra precision.
@@ -789,6 +788,7 @@ static jl_cgval_t emit_intrinsic(intrinsic f, jl_value_t **args, size_t nargs,
     // this forces everything to use runtime-intrinsics (e.g. for testing)
     // return emit_runtime_call(f, argv, nargs, ctx);
 
+    BasicBlock *noexception = (BasicBlock*)NULL;
     switch (f) {
     case arraylen:
         return mark_julia_type(emit_arraylen(argv[0], args[1], ctx), false, jl_long_type, ctx);
@@ -799,27 +799,31 @@ static jl_cgval_t emit_intrinsic(intrinsic f, jl_value_t **args, size_t nargs,
     case bitcast:
         return generic_bitcast(argv, ctx);
     case trunc_int:
-        return generic_cast(f, generic_trunc, argv, ctx, true, true);
+        return generic_cast(f, generic_trunc, noexception, argv, ctx, true, true);
     case checked_trunc_uint:
-        return generic_cast(f, generic_trunc_uchecked, argv, ctx, true, true);
+        return generic_cast(f, generic_trunc_uchecked,
+                            emit_failBB(trunc_exception, argv, ctx, "trunc_exception"),
+                            argv, ctx, true, true);
     case checked_trunc_sint:
-        return generic_cast(f, generic_trunc_schecked, argv, ctx, true, true);
+        return generic_cast(f, generic_trunc_schecked,
+                            emit_failBB(trunc_exception, argv, ctx, "trunc_exception"),
+                            argv, ctx, true, true);
     case sext_int:
-        return generic_cast(f, generic_sext, argv, ctx, true, true);
+        return generic_cast(f, generic_sext, noexception, argv, ctx, true, true);
     case zext_int:
-        return generic_cast(f, generic_zext, argv, ctx, true, true);
+        return generic_cast(f, generic_zext, noexception, argv, ctx, true, true);
     case uitofp:
-        return generic_cast(f, generic_uitofp, argv, ctx, false, true);
+        return generic_cast(f, generic_uitofp, noexception, argv, ctx, false, true);
     case sitofp:
-        return generic_cast(f, generic_sitofp, argv, ctx, false, true);
+        return generic_cast(f, generic_sitofp, noexception, argv, ctx, false, true);
     case fptoui:
-        return generic_cast(f, generic_fptoui, argv, ctx, true, false);
+        return generic_cast(f, generic_fptoui, noexception, argv, ctx, true, false);
     case fptosi:
-        return generic_cast(f, generic_fptosi, argv, ctx, true, false);
+        return generic_cast(f, generic_fptosi, noexception, argv, ctx, true, false);
     case fptrunc:
-        return generic_cast(f, generic_fptrunc, argv, ctx, false, false);
+        return generic_cast(f, generic_fptrunc, noexception, argv, ctx, false, false);
     case fpext:
-        return generic_cast(f, generic_fpext, argv, ctx, false, false);
+        return generic_cast(f, generic_fpext, noexception, argv, ctx, false, false);
 
     case select_value: {
         Value *isfalse = emit_condition(argv[0], "select_value", ctx); // emit the first argument
