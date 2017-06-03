@@ -2149,3 +2149,23 @@ Base.:(==)(a::T11053, b::T11053) = a.a == b.a
 
 #15907
 @test typeof(Array{Int,0}()) == Array{Int,0}
+
+struct T22208 <: DenseMatrix{Float64}
+    A::Matrix{Float64}
+end
+Base.size(A::T22208) = size(A.A)
+Base.map(f, A::T22208)            = T22208(map(f, A.A))
+Base.map(f, A::T22208, B::T22208) = T22208(map(f, A.A, B.A))
+@testset "test binary ops for custom arrays use map" for f in (+, -, *, /, \)
+    A = T22208(randn(3,3))
+    x = randn()
+    if f != /
+        @test ((f)(x, A)).A == (f)(x, A.A)
+    end
+    if f != \
+        @test ((f)(A, x)).A == (f)(A.A, x)
+    end
+    if f in (+, -)
+        @test ((f)(A, A)).A == (f)(A.A, A.A)
+    end
+end

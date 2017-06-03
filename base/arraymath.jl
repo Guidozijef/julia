@@ -23,10 +23,10 @@ julia> A
  2-2im  3-1im
 ```
 """
-conj!(A::AbstractArray{<:Number}) = (@inbounds broadcast!(conj, A, A); A)
+conj!(A::AbstractArray{<:Number}) = (@inbounds map!(conj, A, A); A)
 
 for f in (:-, :conj, :real, :imag)
-    @eval ($f)(A::AbstractArray) = broadcast($f, A)
+    @eval ($f)(A::AbstractArray) = map($f, A)
 end
 
 
@@ -35,16 +35,16 @@ end
 for f in (:+, :-)
     @eval function ($f)(A::AbstractArray, B::AbstractArray)
         promote_shape(A, B) # check size compatibility
-        broadcast($f, A, B)
+        map($f, A, B)
     end
 end
 
 for f in (:/, :\, :*, :+, :-)
     if f != :/
-        @eval ($f)(A::Number, B::AbstractArray) = broadcast($f, A, B)
+        @eval ($f)(x::Number, A::AbstractArray) = map(t -> ($f)(x, t), A)
     end
     if f != :\
-        @eval ($f)(A::AbstractArray, B::Number) = broadcast($f, A, B)
+        @eval ($f)(A::AbstractArray, x::Number) = map(t -> ($f)(t, x), A)
     end
 end
 
