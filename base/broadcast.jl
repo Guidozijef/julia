@@ -137,7 +137,7 @@ Base.@propagate_inbounds _broadcast_getindex(::Any, A, I) = A[I]
 @generated function _broadcast!(f, B::AbstractArray, keeps::K, Idefaults::ID, A::AT, Bs::BT, ::Type{Val{N}}, iter) where {K,ID,AT,BT,N}
     nargs = N + 1
     quote
-        $(Expr(:meta, :inline))
+#        $(Expr(:meta, :inline))
         # destructure the keeps and As tuples
         A_1 = A
         @nexprs $N i->(A_{i+1} = Bs[i])
@@ -160,7 +160,7 @@ end
 @generated function _broadcast!(f, B::BitArray, keeps::K, Idefaults::ID, A::AT, Bs::BT, ::Type{Val{N}}, iter) where {K,ID,AT,BT,N}
     nargs = N + 1
     quote
-        $(Expr(:meta, :inline))
+#        $(Expr(:meta, :inline))
         # destructure the keeps and As tuples
         A_1 = A
         @nexprs $N i->(A_{i+1} = Bs[i])

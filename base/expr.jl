@@ -128,7 +128,8 @@ end
 ```
 """
 macro inline(ex)
-    esc(isa(ex, Expr) ? pushmeta!(ex, :inline) : ex)
+#    esc(isa(ex, Expr) ? pushmeta!(ex, :inline) : ex)
+    esc(ex)
 end
 
 """
@@ -163,7 +164,7 @@ Tells the compiler to inline a function while retaining the caller's inbounds co
 """
 macro propagate_inbounds(ex)
     if isa(ex, Expr)
-        pushmeta!(ex, :inline)
+#        pushmeta!(ex, :inline)
         pushmeta!(ex, :propagate_inbounds)
         esc(ex)
     else

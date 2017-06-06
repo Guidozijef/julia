@@ -224,7 +224,7 @@ importall .Broadcast
     Core.typeassert(N, Int)
     (N >= 0) || return :(throw($(ArgumentError(string("tuple length should be ≥0, got ", N)))))
     return quote
-        $(Expr(:meta, :inline))
+#        $(Expr(:meta, :inline))
         @nexprs $N i -> t_i = f(i)
         @ncall $N tuple t
     end
@@ -233,7 +233,7 @@ end
     M = length(t.parameters)
     M > N  && return :(throw($(ArgumentError("input tuple of length $M, requested $N"))))
     return quote
-        $(Expr(:meta, :inline))
+#        $(Expr(:meta, :inline))
         (t..., $(Any[ :val for i = (M + 1):N ]...))
     end
 end

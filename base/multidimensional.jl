@@ -466,7 +466,7 @@ end
 @generated function _unsafe_getindex!(dest::AbstractArray, src::AbstractArray, I::Union{Real, AbstractArray}...)
     N = length(I)
     quote
-        $(Expr(:meta, :inline))
+#        $(Expr(:meta, :inline))
         @nexprs $N d->(J_d = I[d])
         D = eachindex(dest)
         Ds = start(D)
@@ -977,7 +977,7 @@ end
         I0::Union{Slice,UnitRange{Int}}, I::Union{Int,UnitRange{Int},Slice}...)
     N = length(I)
     quote
-        $(Expr(:meta, :inline))
+#        $(Expr(:meta, :inline))
         @nexprs $N d->(I_d = I[d])
 
         idxlens = @ncall $N index_lengths I0 I
@@ -1015,7 +1015,7 @@ end
 @generated function _unsafe_getindex!(X::BitArray, B::BitArray, I::Union{Int,AbstractArray{Int}}...)
     N = length(I)
     quote
-        $(Expr(:meta, :inline))
+#        $(Expr(:meta, :inline))
         stride_1 = 1
         @nexprs $N d->(stride_{d+1} = stride_d*size(B, d))
         $(Symbol(:offset_, N)) = 1

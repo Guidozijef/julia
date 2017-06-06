@@ -12,7 +12,8 @@ abstract type Associative{K,V} end
 # The real @inline macro is not available until after array.jl, so this
 # internal macro splices the meta Expr directly into the function body.
 macro _inline_meta()
-    Expr(:meta, :inline)
+#    Expr(:meta, :inline)
+    nothing
 end
 macro _noinline_meta()
     Expr(:meta, :noinline)
@@ -22,7 +23,8 @@ macro _pure_meta()
 end
 # another version of inlining that propagates an inbounds context
 macro _propagate_inbounds_meta()
-    Expr(:meta, :inline, :propagate_inbounds)
+#    Expr(:meta, :inline, :propagate_inbounds)
+    Expr(:meta, :propagate_inbounds)
 end
 
 convert(::Type{Any}, x::ANY) = x
