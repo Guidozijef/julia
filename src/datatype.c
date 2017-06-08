@@ -225,7 +225,7 @@ void jl_compute_field_offsets(jl_datatype_t *st)
     uint64_t max_offset = (((uint64_t)1) << 32) - 1;
     uint64_t max_size = max_offset >> 1;
 
-    if (st->name->wrapper && !jl_is_namedtuple_type(st)) {
+    if (st->name->wrapper) {
         // If layout doesn't depend on type parameters, it's stored in st->name->wrapper
         // and reused by all subtypes.
         jl_datatype_t *w = (jl_datatype_t*)jl_unwrap_unionall(st->name->wrapper);
@@ -236,7 +236,7 @@ void jl_compute_field_offsets(jl_datatype_t *st)
             return;
         }
     }
-    if (st->types == NULL)
+    if (st->types == NULL || (jl_is_namedtuple_type(st) && !jl_is_leaf_type((jl_value_t*)st)))
         return;
     uint32_t nfields = jl_svec_len(st->types);
     if (nfields == 0 && st != jl_sym_type && st != jl_simplevector_type) {

@@ -1140,16 +1140,18 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
         jl_value_t *values_tt = jl_svecref(p, 1);
         if (!jl_has_free_typevars(names_tup) && !jl_has_free_typevars(values_tt)) {
             if (!jl_is_tuple(names_tup))
-                jl_type_error_rt("NamedTuple", "names", jl_anytuple_type, names_tup);
+                jl_type_error_rt("NamedTuple", "names", (jl_value_t*)jl_anytuple_type, names_tup);
             size_t nf = jl_nfields(names_tup);
             jl_svec_t *names = jl_alloc_svec_uninit(nf);
             for(size_t i = 0; i < nf; i++) {
                 jl_value_t *ni = jl_fieldref(names_tup, i);
                 if (!jl_is_symbol(ni))
-                    jl_type_error_rt("NamedTuple", "name", jl_symbol_type, ni);
+                    jl_type_error_rt("NamedTuple", "name", (jl_value_t*)jl_symbol_type, ni);
                 jl_svecset(names, i, ni);
             }
-            if (jl_is_va_tuple(values_tt) || jl_nparams(values_tt) != nf)
+            if (!jl_is_datatype(values_tt))
+                jl_error("NamedTuple field type must be a tuple type");
+            if (jl_is_va_tuple((jl_datatype_t*)values_tt) || jl_nparams(values_tt) != nf)
                 jl_error("NamedTuple names and field types must have matching lengths");
             ndt->names = names;
             jl_gc_wb(ndt, ndt->names);
@@ -2065,9 +2067,10 @@ void jl_init_types(void)
     jl_tvar_t *ntval_var = jl_new_typevar(jl_symbol("T"), (jl_value_t*)jl_bottom_type,
                                           (jl_value_t*)jl_anytuple_type);
     tv = jl_svec2(tvar("names"), ntval_var);
-    jl_datatype_t *ntt = jl_new_datatype(jl_symbol("NamedTuple"), jl_any_type, tv,
+    jl_datatype_t *ntt = jl_new_datatype(jl_symbol("NamedTuple"), core, jl_any_type, tv,
                                          jl_emptysvec, jl_emptysvec, 0, 0, 0);
     jl_namedtuple_type = (jl_unionall_t*)ntt->name->wrapper;
+    ((jl_datatype_t*)jl_unwrap_unionall((jl_value_t*)jl_namedtuple_type))->layout = NULL;
     jl_namedtuple_typename = ntt->name;
 
     // complete builtin type metadata
