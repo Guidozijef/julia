@@ -1849,6 +1849,75 @@
               (extract (cdr params) (cons p newparams) whereparams)))))
   (extract (cddr e) '() '()))
 
+(define (named-tuple-expr names values)
+  `(call (top namedtuple)
+         (curly (core NamedTuple) (tuple ,@names))
+         ,@values))
+
+(define (lower-named-tuple lst)
+  (let* ((names (apply append
+                       (map (lambda (x)
+                              (cond ((symbol? x) (list x))
+                                    ((and (or (assignment? x) (kwarg? x)) (symbol? (cadr x)))
+                                     (list (cadr x)))
+                                    ((and (length= x 3) (eq? (car x) '|.|))
+                                     (list (cadr (caddr x))))
+                                    (else '())))
+                            lst)))
+         (dups (has-dups names)))
+    (if dups
+        (error (string "field name \"" (car dups) "\" repeated in named tuple"))))
+  (define (to-nt n v)
+    (if (null? n)
+        #f
+        (named-tuple-expr (reverse! (map quotify n)) (reverse v))))
+  (define (merge old new)
+    (if old
+        (if new
+            `(call (top merge) ,old ,new)
+            old)
+        new))
+  (let loop ((L             lst)
+             (current-names '())
+             (current-vals  '())
+             (expr          #f))
+    (if (null? L)
+        (merge expr (to-nt current-names current-vals))
+        (let ((el (car L)))
+          (cond ((or (assignment? el) (kwarg? el))
+                 (if (not (symbol? (cadr el)))
+                     (error (string "invalid named tuple field name \"" (deparse (cadr el)) "\"")))
+                 (loop (cdr L)
+                       (cons (cadr el) current-names)
+                       (cons (caddr el) current-vals)
+                       expr))
+                ((symbol? el)  ;; x  =>  x = x
+                 (loop (cdr L)
+                       (cons el current-names)
+                       (cons el current-vals)
+                       expr))
+                ((and (length= el 3) (eq? (car el) '|.|))  ;; a.x  =>  x = a.x
+                 (loop (cdr L)
+                       (cons (cadr (caddr el)) current-names)
+                       (cons el current-vals)
+                       expr))
+                ((and (length= el 4) (eq? (car el) 'call) (eq? (cadr el) '=>))
+                 (loop (cdr L)
+                       '()
+                       '()
+                       (merge (merge expr (to-nt current-names current-vals))
+                              (named-tuple-expr (list (caddr el)) (list (cadddr el))))))
+                ((vararg? el)
+                 (loop (cdr L)
+                       '()
+                       '()
+                       (let ((current (merge expr (to-nt current-names current-vals))))
+                         (if current
+                             (merge current (cadr el))
+                             `(call (top merge) (call (top NamedTuple)) ,(cadr el))))))
+                (else
+                 (error (string "invalid named tuple element \"" (deparse el) "\""))))))))
+
 ;; table mapping expression head to a function expanding that form
 (define expand-table
   (table
@@ -2158,21 +2227,14 @@
 
    'tuple
    (lambda (e)
-     (if (and (length> e 1) (pair? (cadr e)) (eq? (caadr e) 'parameters))
-         (error "unexpected semicolon in tuple"))
-     (if (any assignment? (cdr e))
-         (if (not (every (lambda (x) (and (assignment? x) (symbol? (cadr x))))
-                         (cdr e)))
-             (error (string "invalid named tuple syntax \"" (deparse e) "\""))
-             (let* ((names (map cadr (cdr e)))
-                    (dups (has-dups names)))
-               (if dups
-                   (error (string "field name \"" (car dups) "\" repeated in named tuple"))
-                   (expand-forms `(call (top namedtuple)
-                                        (curly (core NamedTuple)
-                                               (tuple ,@(map quotify names)))
-                                        ,@(map caddr (cdr e)))))))
-         (expand-forms `(call (core tuple) ,@(cdr e)))))
+     (cond ((and (length> e 1) (pair? (cadr e)) (eq? (caadr e) 'parameters))
+            (if (length= e 2)
+                (expand-forms (lower-named-tuple (cdr (cadr e))))
+                (error "unexpected semicolon in tuple")))
+           ((any assignment? (cdr e))
+            (expand-forms (lower-named-tuple (cdr e))))
+           (else
+            (expand-forms `(call (core tuple) ,@(cdr e))))))
 
    '=>
    (lambda (e)

@@ -11,6 +11,14 @@ end
 
 NamedTuple() = namedtuple(NamedTuple{()})
 
+"""
+    namedtuple(names::Tuple{Vararg{Symbol,N}}, args::Vararg{Any,N}) where {N}
+
+Create a named tuple with the specified names (as a tuple) and field values.
+This should only be used for constructing named tuples with computed field names.
+"""
+namedtuple(names::Tuple{Vararg{Symbol,N}}, args::Vararg{Any,N}) where {N} = namedtuple(NamedTuple{names}, args...)
+
 length(t::NamedTuple) = nfields(t)
 start(t::NamedTuple) = 1
 done(t::NamedTuple, iter) = iter > nfields(t)
@@ -98,6 +106,18 @@ function sym_in(x, itr)
     return false
 end
 
+"""
+    merge(a::NamedTuple, b::NamedTuple)
+
+Construct a new named tuple by merging two existing ones.
+The order of fields in `a` is preserved, but values are taken from matching
+fields in `b`. Fields present only in `b` are appended at the end.
+
+```jldoctest
+julia> merge((a=1, b=2, c=3), (b=4, d=5))
+(a = 1, b = 4, c = 3, d = 5)
+```
+"""
 @generated function merge(a::NamedTuple{an}, b::NamedTuple{bn}) where {an, bn}
     names = Symbol[an...]
     for n in bn
@@ -116,6 +136,34 @@ end
     :(namedtuple(NamedTuple{$names}, $(vals...)))
 end
 
+merge(a::NamedTuple{()}, b::NamedTuple) = b
+
+"""
+    merge(a::NamedTuple, iterable)
+
+Interpret an iterable of key-value pairs as a named tuple, and perform a merge.
+
+```jldoctest
+julia> merge((a=1, b=2, c=3), [:b=>4, :d=>5])
+(a = 1, b = 4, c = 3, d = 5)
+```
+"""
+function merge(a::NamedTuple, itr)
+    names = Symbol[]
+    vals = Any[]
+    for (k,v) in itr
+        push!(names, k)
+        push!(vals, v)
+    end
+    merge(a, namedtuple((names...), vals...))
+end
+
+"""
+    structdiff(a::NamedTuple{an}, b::Union{NamedTuple{bn},Type{NamedTuple{bn}}}) where {an,bn}
+
+Construct a copy of named tuple `a`, except with fields that exist in `b` removed.
+`b` can be a named tuple, or a type of the form `NamedTuple{field_names}`.
+"""
 @generated function structdiff(a::NamedTuple{an},
                                b::Union{NamedTuple{bn},Type{NamedTuple{bn}}}) where {an,bn}
     names = Symbol[]
