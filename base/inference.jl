@@ -368,6 +368,8 @@ tupletype_tail(t::ANY, n) = Tuple{t.parameters[n:end]...}
 const _Type_name = Type.body.name
 isType(t::ANY) = isa(t, DataType) && (t::DataType).name === _Type_name
 
+const _NamedTuple_name = NamedTuple.body.body.name
+
 # true if Type is inlineable as constant (is a singleton)
 isconstType(t::ANY) = isType(t) && (isleaftype(t.parameters[1]) || t.parameters[1] === Union{})
 
@@ -607,7 +609,9 @@ add_tfunc(nfields, 1, 1,
         if isType(x)
             isleaftype(x.parameters[1]) && return Const(nfields(x.parameters[1]))
         elseif isa(x,DataType) && !x.abstract && !(x.name === Tuple.name && isvatuple(x)) && x !== DataType
-            return Const(length(x.types))
+            if !(x.name === _NamedTuple_name && !isleaftype(x))
+                return Const(length(x.types))
+            end
         end
         return Int
     end)
@@ -1124,6 +1128,10 @@ function getfield_tfunc(s00::ANY, name)
         end
         return Any
     end
+    if s.name === _NamedTuple_name && !isleaftype(s)
+        # TODO: better approximate inference
+        return Any
+    end
     if isempty(s.types)
         return Bottom
     end
@@ -1203,6 +1211,9 @@ function fieldtype_tfunc(s0::ANY, name::ANY)
     end
 
     if !isa(u,DataType) || u.abstract
+        return Type
+    end
+    if u.name === _NamedTuple_name && !isleaftype(u)
         return Type
     end
     ftypes = u.types
