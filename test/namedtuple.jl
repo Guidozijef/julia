@@ -5,6 +5,7 @@
 @test_throws TypeError NamedTuple{(:a,1),Tuple{Int}}
 @test_throws ErrorException NamedTuple{(:a,:b),Tuple{Int}}
 @test_throws ErrorException NamedTuple{(:a,:b),Tuple{Int,Vararg{Int}}}
+@test_throws ErrorException NamedTuple{(:a,),Union{Tuple{Int},Tuple{String}}}
 
 @test (a=1,).a == 1
 @test (a=2,)[1] == 2
@@ -88,19 +89,19 @@ end
 
 # syntax errors
 
-@test expand(parse("(a=1, 0)")) == Expr(:error, "invalid named tuple element \"0\"")
-@test expand(parse("(a=1, f(x))")) == Expr(:error, "invalid named tuple element \"f(x)\"")
-@test expand(parse("(; f(x))")) == Expr(:error, "invalid named tuple element \"f(x)\"")
-@test expand(parse("(;1=0)")) == Expr(:error, "invalid named tuple field name \"1\"")
-@test expand(parse("(a=1,a=2)")) == Expr(:error, "field name \"a\" repeated in named tuple")
-@test expand(parse("(a=1,b=0,a=2)")) == Expr(:error, "field name \"a\" repeated in named tuple")
-@test expand(parse("(c=1,a=1,b=0,a=2)")) == Expr(:error, "field name \"a\" repeated in named tuple")
-@test expand(parse("(c=1,a=1,b=0,d.a)")) == Expr(:error, "field name \"a\" repeated in named tuple")
-@test expand(parse("(c=1,a=1,b=0,c)")) == Expr(:error, "field name \"c\" repeated in named tuple")
-@test expand(parse("(;d.c,c)")) == Expr(:error, "field name \"c\" repeated in named tuple")
+@test expand(Main, parse("(a=1, 0)")) == Expr(:error, "invalid named tuple element \"0\"")
+@test expand(Main, parse("(a=1, f(x))")) == Expr(:error, "invalid named tuple element \"f(x)\"")
+@test expand(Main, parse("(; f(x))")) == Expr(:error, "invalid named tuple element \"f(x)\"")
+@test expand(Main, parse("(;1=0)")) == Expr(:error, "invalid named tuple field name \"1\"")
+@test expand(Main, parse("(a=1,a=2)")) == Expr(:error, "field name \"a\" repeated in named tuple")
+@test expand(Main, parse("(a=1,b=0,a=2)")) == Expr(:error, "field name \"a\" repeated in named tuple")
+@test expand(Main, parse("(c=1,a=1,b=0,a=2)")) == Expr(:error, "field name \"a\" repeated in named tuple")
+@test expand(Main, parse("(c=1,a=1,b=0,d.a)")) == Expr(:error, "field name \"a\" repeated in named tuple")
+@test expand(Main, parse("(c=1,a=1,b=0,c)")) == Expr(:error, "field name \"c\" repeated in named tuple")
+@test expand(Main, parse("(;d.c,c)")) == Expr(:error, "field name \"c\" repeated in named tuple")
 
 @test parse("(;)") == quote end
-@test expand(parse("(1,;2)")) == Expr(:error, "unexpected semicolon in tuple")
+@test expand(Main, parse("(1,;2)")) == Expr(:error, "unexpected semicolon in tuple")
 
 # inference tests
 
