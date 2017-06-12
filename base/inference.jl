@@ -577,6 +577,10 @@ function isdefined_tfunc(args...)
             end
             if 1 <= idx <= a1.ninitialized
                 return Const(true)
+            elseif a1.name === _NamedTuple_name
+                if isleaftype(a1)
+                    return Const(false)
+                end
             elseif idx <= 0 || (idx > nfields(a1) && !isvatuple(a1))
                 return Const(false)
             end
