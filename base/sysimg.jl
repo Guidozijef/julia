@@ -362,10 +362,10 @@ using .I18n
 
 # frontend
 include("initdefs.jl")
-include("Terminals.jl")
-include("LineEdit.jl")
-include("REPLCompletions.jl")
-include("REPL.jl")
+include("repl/Terminals.jl")
+include("repl/LineEdit.jl")
+include("repl/REPLCompletions.jl")
+include("repl/REPL.jl")
 include("client.jl")
 
 # Stack frames and traces
@@ -383,12 +383,6 @@ const × = cross
 
 # statistics
 include("statistics.jl")
-
-# signal processing
-include("dft.jl")
-importall .DFT
-include("dsp.jl")
-importall .DSP
 
 # libgit2 support
 include("libgit2/libgit2.jl")
@@ -449,6 +443,5 @@ include(Base, "precompile.jl")
 end # baremodule Base
 
 using Base
-importall Base.Operators
 
 Base.isfile("userimg.jl") && Base.include(Main, "userimg.jl")

@@ -35,7 +35,6 @@ USE_SYSTEM_OPENSPECFUN:=0
 USE_SYSTEM_DSFMT:=0
 USE_SYSTEM_BLAS:=0
 USE_SYSTEM_LAPACK:=0
-USE_SYSTEM_FFTW:=0
 USE_SYSTEM_GMP:=0
 USE_SYSTEM_MPFR:=0
 USE_SYSTEM_ARPACK:=0
@@ -54,8 +53,6 @@ USE_LLVM_SHLIB := 1
 ## Settings for various Intel tools
 # Set to 1 to use MKL
 USE_INTEL_MKL ?= 0
-# Set to 1 to use MKL FFT
-USE_INTEL_MKL_FFT ?= 0
 # Set to 1 to use Intel LIBM
 USE_INTEL_LIBM ?= 0
 # Set to 1 to enable profiling with Intel VTune Amplifier
@@ -232,7 +229,6 @@ INSTALL_M := $(JULIAHOME)/contrib/install.sh 755
 LLVMROOT := $(build_prefix)
 LLVM_ASSERTIONS := 0
 LLVM_DEBUG := 0
-#LLVM_USE_CMAKE: defined in deps/llvm-ver.mk as it depends on LLVM_VER_SHORT
 # set to 1 to get clang and compiler-rt
 BUILD_LLVM_CLANG := 0
 # set to 1 to get lldb (often does not work, no chance with llvm3.2 and earlier)
@@ -243,7 +239,6 @@ BUILD_LLDB := 0
 USE_POLLY := 0
 USE_POLLY_OPENMP := 0  # Enable OpenMP code-generation
 USE_POLLY_ACC := 0     # Enable GPU code-generation
-CUDALIB_INCLUDE_DIR := # Path to CUDA header files
 
 # Cross-compile
 #XC_HOST := i686-w64-mingw32
@@ -865,14 +860,6 @@ LIBLAPACKNAME := liblapack
 endif
 endif
 
-ifeq ($(OS), WINNT)
-LIBFFTWNAME := libfftw3
-LIBFFTWFNAME := libfftw3f
-else
-LIBFFTWNAME := libfftw3_threads
-LIBFFTWFNAME := libfftw3f_threads
-endif
-
 ifeq ($(USE_SYSTEM_LIBM), 1)
 LIBM := -lm
 LIBMNAME := libm
@@ -1058,12 +1045,6 @@ ifneq ($(strip $(MKLLIB)),)
 endif
 LIBBLAS   := $(MKL_LDFLAGS)
 LIBLAPACK := $(MKL_LDFLAGS)
-endif
-
-ifeq ($(USE_INTEL_MKL_FFT), 1)
-USE_SYSTEM_FFTW := 1
-LIBFFTWNAME := libmkl_rt
-LIBFFTWFNAME := libmkl_rt
 endif
 
 ifeq ($(HAVE_SSP),1)

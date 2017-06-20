@@ -42,13 +42,17 @@
 #if defined(__GNUC__)
 #  define JL_NORETURN __attribute__ ((noreturn))
 #  define JL_CONST_FUNC __attribute__((const))
+#  define JL_USED_FUNC __attribute__((used))
 #elif defined(_COMPILER_MICROSOFT_)
 #  define JL_NORETURN __declspec(noreturn)
 // This is the closest I can find for __attribute__((const))
 #  define JL_CONST_FUNC __declspec(noalias)
+// Does MSVC have this?
+#  define JL_USED_FUNC
 #else
 #  define JL_NORETURN
 #  define JL_CONST_FUNC
+#  define JL_USED_FUNC
 #endif
 
 #define container_of(ptr, type, member) \
@@ -1225,6 +1229,7 @@ JL_DLLEXPORT void jl_array_del_beg(jl_array_t *a, size_t dec);
 JL_DLLEXPORT void jl_array_sizehint(jl_array_t *a, size_t sz);
 JL_DLLEXPORT void jl_array_ptr_1d_push(jl_array_t *a, jl_value_t *item);
 JL_DLLEXPORT void jl_array_ptr_1d_push2(jl_array_t *a, jl_value_t *b, jl_value_t *c);
+JL_DLLEXPORT void jl_array_ptr_1d_append(jl_array_t *a, jl_array_t *a2);
 JL_DLLEXPORT jl_value_t *jl_apply_array_type(jl_value_t *type, size_t dim);
 // property access
 JL_DLLEXPORT void *jl_array_ptr(jl_array_t *a);
@@ -1745,6 +1750,7 @@ typedef struct {
     int8_t use_compilecache;
     const char *bindto;
     const char *outputbc;
+    const char *outputunoptbc;
     const char *outputo;
     const char *outputji;
     int8_t incremental;

@@ -40,6 +40,10 @@ This section lists changes that do not have deprecation warnings.
     of the socket. Previously the address of the remote endpoint was being
     returned ([#21825]).
 
+  * Using `ARGS` within the ~/.juliarc.jl or within a .jl file loaded with `--load` will no
+    longer contain the script name as the first argument. Instead the script name will be
+    assigned to `PROGRAM_FILE`. ([#22092])
+
 Library improvements
 --------------------
 
@@ -48,6 +52,9 @@ Library improvements
 
   * The function `randn` now accepts complex arguments (`Complex{T <: AbstractFloat}`)
     ([#21973]).
+
+  * The function `rand` can now pick up random elements from strings, associatives
+    and sets ([#22228], [#21960], [#18155], [#22224]).
 
   * Method lists are now printed as a numbered list. In addition, the source code of a
     method can be opened in an editor by entering the corresponding number in the REPL
@@ -59,11 +66,18 @@ Library improvements
   * `resize!` and `sizehint!` methods no longer over-reserve memory when the
     requested array size is more than double of its current size ([#22038]).
 
+  * The `crc32c` function for CRC-32c checksums is now exported ([#22274]).
+
   * The output of `versioninfo()` is now controlled with keyword arguments ([#21974]).
 
   * The function `LibGit2.set_remote_url` now always sets both the fetch and push URLs for a
     git repo. Additionally, the argument order was changed to be consistent with the git
     command line tool ([#22062]).
+
+  * `logspace` now accepts a `base` keyword argument to specify the base of the logarithmic
+    range. The base defaults to 10 ([#22310]).
+
+  * Added `unique!` which is an inplace version of `unique` ([#20549]).
 
 Compiler/Runtime improvements
 -----------------------------
@@ -80,10 +94,21 @@ Deprecated or removed
   * The `cholfact`/`cholfact!` methods that accepted an `uplo` symbol have been deprecated
     in favor of using `Hermitian` (or `Symmetric`) views ([#22187], [#22188]).
 
+  * `isposdef(A::AbstractMatrix, UL::Symbol)` and `isposdef!(A::AbstractMatrix, UL::Symbol)`
+    have been deprecated in favor of `isposdef(Hermitian(A, UL))` and `isposdef!(Hermitian(A, UL))`
+    respectively ([#22245]).
+
   * The function `current_module` is deprecated and replaced with `@__MODULE__` ([#22064]).
     This caused the deprecation of some reflection methods (such as `macroexpand` and `isconst`),
     which now require a module argument.
     And it caused the bugfix of other default arguments to use the Main module (including `whos`, `which`).
+
+  * The `Operators` module is deprecated. Instead, import required operators explicitly
+    from `Base`, e.g. `import Base: +, -, *, /` ([#22251]).
+
+  * Bindings to the FFTW library have been removed from Base. The DFT framework for building FFT
+    implementations is now in AbstractFFTs.jl, the bindings to the FFTW library are in FFTW.jl,
+    and the Base signal processing functions which used FFTs are now in DSP.jl ([#21956]).
 
 
 Julia v0.6.0 Release Notes
@@ -679,6 +704,23 @@ Deprecated or removed
     [StatsBase.jl package](https://github.com/JuliaStats/StatsBase.jl)'s
     `midpoints` function ([#20058]).
 
+  * Passing a type argument to `LibGit2.cat` has been deprecated in favor of a simpler,
+    two-argument method for `LibGit2.cat` ([#20435]).
+
+  * The `LibGit2.owner` function for finding the repository which owns a given Git object
+    has been deprecated in favor of `LibGit2.repository` ([#20135]).
+
+  * The `LibGit2.GitAnyObject` type has been renamed to `LibGit2.GitUnknownObject` to
+    clarify its intent ([#19935]).
+
+  * The `LibGit2.GitOid` type has been renamed to `LibGit2.GitHash` for clarity ([#19878]).
+
+  * Finalizing `LibGit2` objects with `finalize` has been deprecated in favor of using `close`
+    ([#19660]).
+
+  * Parsing string dates from a `Dates.DateFormat` object has been deprecated as part of a
+    larger effort toward faster, more extensible date parsing ([#20952]).
+
 Command-line option changes
 ---------------------------
 
@@ -719,6 +761,7 @@ Command-line option changes
 [#17785]: https://github.com/JuliaLang/julia/issues/17785
 [#18012]: https://github.com/JuliaLang/julia/issues/18012
 [#18050]: https://github.com/JuliaLang/julia/issues/18050
+[#18155]: https://github.com/JuliaLang/julia/issues/18155
 [#18159]: https://github.com/JuliaLang/julia/issues/18159
 [#18218]: https://github.com/JuliaLang/julia/issues/18218
 [#18251]: https://github.com/JuliaLang/julia/issues/18251
@@ -768,6 +811,7 @@ Command-line option changes
 [#19598]: https://github.com/JuliaLang/julia/issues/19598
 [#19635]: https://github.com/JuliaLang/julia/issues/19635
 [#19636]: https://github.com/JuliaLang/julia/issues/19636
+[#19660]: https://github.com/JuliaLang/julia/issues/19660
 [#19669]: https://github.com/JuliaLang/julia/issues/19669
 [#19670]: https://github.com/JuliaLang/julia/issues/19670
 [#19677]: https://github.com/JuliaLang/julia/issues/19677
@@ -780,6 +824,7 @@ Command-line option changes
 [#19721]: https://github.com/JuliaLang/julia/issues/19721
 [#19722]: https://github.com/JuliaLang/julia/issues/19722
 [#19724]: https://github.com/JuliaLang/julia/issues/19724
+[#19730]: https://github.com/JuliaLang/julia/issues/19730
 [#19737]: https://github.com/JuliaLang/julia/issues/19737
 [#19741]: https://github.com/JuliaLang/julia/issues/19741
 [#19766]: https://github.com/JuliaLang/julia/issues/19766
@@ -794,6 +839,7 @@ Command-line option changes
 [#19811]: https://github.com/JuliaLang/julia/issues/19811
 [#19814]: https://github.com/JuliaLang/julia/issues/19814
 [#19841]: https://github.com/JuliaLang/julia/issues/19841
+[#19878]: https://github.com/JuliaLang/julia/issues/19878
 [#19900]: https://github.com/JuliaLang/julia/issues/19900
 [#19901]: https://github.com/JuliaLang/julia/issues/19901
 [#19903]: https://github.com/JuliaLang/julia/issues/19903
@@ -803,6 +849,7 @@ Command-line option changes
 [#19926]: https://github.com/JuliaLang/julia/issues/19926
 [#19931]: https://github.com/JuliaLang/julia/issues/19931
 [#19934]: https://github.com/JuliaLang/julia/issues/19934
+[#19935]: https://github.com/JuliaLang/julia/issues/19935
 [#19937]: https://github.com/JuliaLang/julia/issues/19937
 [#19944]: https://github.com/JuliaLang/julia/issues/19944
 [#19949]: https://github.com/JuliaLang/julia/issues/19949
@@ -812,6 +859,7 @@ Command-line option changes
 [#20047]: https://github.com/JuliaLang/julia/issues/20047
 [#20058]: https://github.com/JuliaLang/julia/issues/20058
 [#20079]: https://github.com/JuliaLang/julia/issues/20079
+[#20135]: https://github.com/JuliaLang/julia/issues/20135
 [#20164]: https://github.com/JuliaLang/julia/issues/20164
 [#20213]: https://github.com/JuliaLang/julia/issues/20213
 [#20228]: https://github.com/JuliaLang/julia/issues/20228
@@ -831,14 +879,33 @@ Command-line option changes
 [#20414]: https://github.com/JuliaLang/julia/issues/20414
 [#20418]: https://github.com/JuliaLang/julia/issues/20418
 [#20427]: https://github.com/JuliaLang/julia/issues/20427
+[#20435]: https://github.com/JuliaLang/julia/issues/20435
 [#20500]: https://github.com/JuliaLang/julia/issues/20500
 [#20530]: https://github.com/JuliaLang/julia/issues/20530
 [#20543]: https://github.com/JuliaLang/julia/issues/20543
 [#20575]: https://github.com/JuliaLang/julia/issues/20575
 [#20609]: https://github.com/JuliaLang/julia/issues/20609
 [#20889]: https://github.com/JuliaLang/julia/issues/20889
+[#20952]: https://github.com/JuliaLang/julia/issues/20952
 [#21183]: https://github.com/JuliaLang/julia/issues/21183
 [#21359]: https://github.com/JuliaLang/julia/issues/21359
 [#21692]: https://github.com/JuliaLang/julia/issues/21692
 [#21697]: https://github.com/JuliaLang/julia/issues/21697
+[#21746]: https://github.com/JuliaLang/julia/issues/21746
 [#21759]: https://github.com/JuliaLang/julia/issues/21759
+[#21818]: https://github.com/JuliaLang/julia/issues/21818
+[#21825]: https://github.com/JuliaLang/julia/issues/21825
+[#21956]: https://github.com/JuliaLang/julia/issues/21956
+[#21960]: https://github.com/JuliaLang/julia/issues/21960
+[#21973]: https://github.com/JuliaLang/julia/issues/21973
+[#21974]: https://github.com/JuliaLang/julia/issues/21974
+[#22007]: https://github.com/JuliaLang/julia/issues/22007
+[#22038]: https://github.com/JuliaLang/julia/issues/22038
+[#22062]: https://github.com/JuliaLang/julia/issues/22062
+[#22064]: https://github.com/JuliaLang/julia/issues/22064
+[#22187]: https://github.com/JuliaLang/julia/issues/22187
+[#22188]: https://github.com/JuliaLang/julia/issues/22188
+[#22224]: https://github.com/JuliaLang/julia/issues/22224
+[#22228]: https://github.com/JuliaLang/julia/issues/22228
+[#22245]: https://github.com/JuliaLang/julia/issues/22245
+[#22310]: https://github.com/JuliaLang/julia/issues/22310

@@ -281,6 +281,8 @@ end
 ## Matvec
 A_mul_B!(y::StridedVector{T}, A::Symmetric{T,<:StridedMatrix}, x::StridedVector{T}) where {T<:BlasFloat} =
     BLAS.symv!(A.uplo, one(T), A.data, x, zero(T), y)
+A_mul_B!(y::StridedVector{T}, A::Hermitian{T,<:StridedMatrix}, x::StridedVector{T}) where {T<:BlasReal} =
+    BLAS.symv!(A.uplo, one(T), A.data, x, zero(T), y)
 A_mul_B!(y::StridedVector{T}, A::Hermitian{T,<:StridedMatrix}, x::StridedVector{T}) where {T<:BlasComplex} =
     BLAS.hemv!(A.uplo, one(T), A.data, x, zero(T), y)
 ## Matmat
@@ -288,13 +290,16 @@ A_mul_B!(C::StridedMatrix{T}, A::Symmetric{T,<:StridedMatrix}, B::StridedMatrix{
     BLAS.symm!('L', A.uplo, one(T), A.data, B, zero(T), C)
 A_mul_B!(C::StridedMatrix{T}, A::StridedMatrix{T}, B::Symmetric{T,<:StridedMatrix}) where {T<:BlasFloat} =
     BLAS.symm!('R', B.uplo, one(T), B.data, A, zero(T), C)
+A_mul_B!(C::StridedMatrix{T}, A::Hermitian{T,<:StridedMatrix}, B::StridedMatrix{T}) where {T<:BlasReal} =
+    BLAS.symm!('L', A.uplo, one(T), A.data, B, zero(T), C)
+A_mul_B!(C::StridedMatrix{T}, A::StridedMatrix{T}, B::Hermitian{T,<:StridedMatrix}) where {T<:BlasReal} =
+    BLAS.symm!('R', B.uplo, one(T), B.data, A, zero(T), C)
 A_mul_B!(C::StridedMatrix{T}, A::Hermitian{T,<:StridedMatrix}, B::StridedMatrix{T}) where {T<:BlasComplex} =
     BLAS.hemm!('L', A.uplo, one(T), A.data, B, zero(T), C)
 A_mul_B!(C::StridedMatrix{T}, A::StridedMatrix{T}, B::Hermitian{T,<:StridedMatrix}) where {T<:BlasComplex} =
     BLAS.hemm!('R', B.uplo, one(T), B.data, A, zero(T), C)
 
-*(A::HermOrSym, B::HermOrSym) = full(A)*full(B)
-*(A::StridedMatrix, B::HermOrSym) = A*full(B)
+*(A::HermOrSym, B::HermOrSym) = A*full(B)
 
 for T in (:Symmetric, :Hermitian), op in (:+, :-, :*, :/)
     # Deal with an ambiguous case
@@ -314,8 +319,6 @@ det(A::Symmetric) = det(bkfact(A))
 
 inv(A::Hermitian{T,S}) where {T<:BlasFloat,S<:StridedMatrix} = Hermitian{T,S}(inv(bkfact(A)), A.uplo)
 inv(A::Symmetric{T,S}) where {T<:BlasFloat,S<:StridedMatrix} = Symmetric{T,S}(inv(bkfact(A)), A.uplo)
-
-isposdef!(A::HermOrSym{<:BlasFloat,<:StridedMatrix}) = ishermitian(A) && LAPACK.potrf!(A.uplo, A.data)[2] == 0
 
 eigfact!(A::RealHermSymComplexHerm{<:BlasReal,<:StridedMatrix}) = Eigen(LAPACK.syevr!('V', 'A', A.uplo, A.data, 0.0, 0.0, 0, 0, -1.0)...)
 

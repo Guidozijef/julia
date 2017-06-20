@@ -256,13 +256,16 @@ globalRNG() = GLOBAL_RNG
 
 Pick a random element or array of random elements from the set of values specified by `S`; `S` can be
 
-* an indexable collection (for example `1:n` or `['x','y','z']`), or
-* a `Dict`, a `Set` or an `IntSet`, or
+* an indexable collection (for example `1:n` or `['x','y','z']`),
+* an `Associative` or `AbstractSet` object,
+* a string (considered as a collection of characters), or
 * a type: the set of values to pick from is then equivalent to `typemin(S):typemax(S)` for
   integers (this is not applicable to [`BigInt`](@ref)), and to ``[0, 1)`` for floating
   point numbers;
 
 `S` defaults to [`Float64`](@ref).
+
+# Examples
 
 ```julia-repl
 julia> rand(Int, 2)
@@ -273,6 +276,14 @@ julia> rand(Int, 2)
 julia> rand(MersenneTwister(0), Dict(1=>2, 3=>4))
 1=>2
 ```
+
+!!! note
+    The complexity of `rand(rng, s::Union{Associative,AbstractSet})`
+    is linear in the length of `s`, unless an optimized method with
+    constant complexity is available, which is the case for `Dict`,
+    `Set` and `IntSet`. For more than a few calls, use `rand(rng,
+    collect(s))` instead, or either `rand(rng, Dict(s))` or `rand(rng,
+    Set(s))` as appropriate.
 """
 @inline rand() = rand(GLOBAL_RNG, CloseOpen)
 @inline rand(T::Type) = rand(GLOBAL_RNG, T)
@@ -362,9 +373,8 @@ function rand(r::AbstractRNG, t::Dict)
         Base.isslotfilled(t, i) && @inbounds return (t.keys[i] => t.vals[i])
     end
 end
-rand(t::Dict) = rand(GLOBAL_RNG, t)
+
 rand(r::AbstractRNG, s::Set) = rand(r, s.dict).first
-rand(s::Set) = rand(GLOBAL_RNG, s)
 
 function rand(r::AbstractRNG, s::IntSet)
     isempty(s) && throw(ArgumentError("collection must be non-empty"))
@@ -378,7 +388,16 @@ function rand(r::AbstractRNG, s::IntSet)
     end
 end
 
-rand(s::IntSet) = rand(GLOBAL_RNG, s)
+function nth(iter, n::Integer)::eltype(iter)
+    for (i, x) in enumerate(iter)
+        i == n && return x
+    end
+end
+nth(iter::AbstractArray, n::Integer) = iter[n]
+
+rand(r::AbstractRNG, s::Union{Associative,AbstractSet}) = nth(s, rand(r, 1:length(s)))
+
+rand(s::Union{Associative,AbstractSet}) = rand(GLOBAL_RNG, s)
 
 ## Arrays of random numbers
 
@@ -407,14 +426,16 @@ function rand!(r::AbstractRNG, A::AbstractArray, s::Union{Dict,Set,IntSet})
     A
 end
 
-rand!(A::AbstractArray, s::Union{Dict,Set,IntSet}) = rand!(GLOBAL_RNG, A, s)
+# avoid linear complexity for repeated calls with generic containers
+rand!(r::AbstractRNG, A::AbstractArray, s::Union{Associative,AbstractSet}) = rand!(r, A, collect(s))
 
-rand(r::AbstractRNG, s::Dict{K,V}, dims::Dims) where {K,V} = rand!(r, Array{Pair{K,V}}(dims), s)
-rand(r::AbstractRNG, s::Set{T}, dims::Dims) where {T} = rand!(r, Array{T}(dims), s)
-rand(r::AbstractRNG, s::IntSet, dims::Dims) = rand!(r, Array{Int}(dims), s)
-rand(r::AbstractRNG, s::Union{Dict,Set,IntSet}, dims::Integer...) = rand(r, s, convert(Dims, dims))
-rand(s::Union{Dict,Set,IntSet}, dims::Integer...) = rand(GLOBAL_RNG, s, convert(Dims, dims))
-rand(s::Union{Dict,Set,IntSet}, dims::Dims) = rand(GLOBAL_RNG, s, dims)
+rand!(A::AbstractArray, s::Union{Associative,AbstractSet}) = rand!(GLOBAL_RNG, A, s)
+
+rand(r::AbstractRNG, s::Associative{K,V}, dims::Dims) where {K,V} = rand!(r, Array{Pair{K,V}}(dims), s)
+rand(r::AbstractRNG, s::AbstractSet{T}, dims::Dims) where {T} = rand!(r, Array{T}(dims), s)
+rand(r::AbstractRNG, s::Union{Associative,AbstractSet}, dims::Integer...) = rand(r, s, convert(Dims, dims))
+rand(s::Union{Associative,AbstractSet}, dims::Integer...) = rand(GLOBAL_RNG, s, convert(Dims, dims))
+rand(s::Union{Associative,AbstractSet}, dims::Dims) = rand(GLOBAL_RNG, s, dims)
 
 # MersenneTwister
 
@@ -688,6 +709,33 @@ end
 
 rand(rng::AbstractRNG, r::AbstractArray{T}, dims::Dims) where {T} = rand!(rng, Array{T}(dims), r)
 rand(rng::AbstractRNG, r::AbstractArray, dims::Integer...) = rand(rng, r, convert(Dims, dims))
+
+# rand from a string
+
+isvalid_unsafe(s::String, i) = !Base.is_valid_continuation(unsafe_load(pointer(s), i))
+isvalid_unsafe(s::AbstractString, i) = isvalid(s, i)
+_endof(s::String) = s.len
+_endof(s::AbstractString) = endof(s)
+
+function rand(rng::AbstractRNG, s::AbstractString)::Char
+    g = RangeGenerator(1:_endof(s))
+    while true
+        pos = rand(rng, g)
+        isvalid_unsafe(s, pos) && return s[pos]
+    end
+end
+
+rand(s::AbstractString) = rand(GLOBAL_RNG, s)
+
+## rand from a string for arrays
+# we use collect(str), which is most of the time more efficient than specialized methods
+# (except maybe for very small arrays)
+rand!(rng::AbstractRNG, A::AbstractArray, str::AbstractString) = rand!(rng, A, collect(str))
+rand!(A::AbstractArray, str::AbstractString) = rand!(GLOBAL_RNG, A, str)
+rand(rng::AbstractRNG, str::AbstractString, dims::Dims) = rand!(rng, Array{eltype(str)}(dims), str)
+rand(rng::AbstractRNG, str::AbstractString, d1::Integer, dims::Integer...) = rand(rng, str, convert(Dims, tuple(d1, dims...)))
+rand(str::AbstractString, dims::Dims) = rand(GLOBAL_RNG, str, dims)
+rand(str::AbstractString, d1::Integer, dims::Integer...) = rand(GLOBAL_RNG, str, d1, dims...)
 
 ## random BitArrays (AbstractRNG)
 
