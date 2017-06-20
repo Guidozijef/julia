@@ -6,7 +6,7 @@ module IteratorsMD
                  setindex!, IndexStyle, min, max, zero, one, isless, eachindex,
                  ndims, iteratorsize, convert
 
-    importall ..Base.Operators
+    import Base: +, -, *
     import Base: simd_outer_range, simd_inner_length, simd_index
     using Base: IndexLinear, IndexCartesian, AbstractCartesianIndex, fill_to_length, tail
 
@@ -1294,14 +1294,11 @@ end
 hash(x::Prehashed) = x.hash
 
 """
-    unique(A::AbstractArray[, dim::Int])
+    unique(A::AbstractArray, dim::Int)
 
-Return an array containing only the unique elements of `A`, as determined by
-[`isequal`](@ref), in the order that the first of each set of equivalent elements
-originally appears.
+Return unique regions of `A` along dimension `dim`.
 
-If `dim` is specified, return unique regions of `A` along dimension `dim`.
-
+# Examples
 
 ```jldoctest
 julia> A = map(isodd, reshape(collect(1:8), (2,2,2)))

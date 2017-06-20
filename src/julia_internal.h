@@ -82,6 +82,22 @@ static inline void jl_assume_(int cond)
 #define jl_assume(cond) (cond)
 #endif
 
+#if defined(__GLIBC__) && defined(JULIA_HAS_IFUNC_SUPPORT)
+// Make sure both the compiler and the glibc supports it.
+// Only enable this on known working glibc versions.
+#  if (defined(_CPU_X86_) || defined(_CPU_X86_64_)) && __GLIBC_PREREQ(2, 12)
+#    define JL_USE_IFUNC 1
+#  elif (defined(_CPU_ARM_) || defined(_CPU_AARCH64_)) && __GLIBC_PREREQ(2, 18)
+// This is the oldest tested version that supports ifunc.
+#    define JL_USE_IFUNC 1
+#  endif
+// TODO: PPC probably supports ifunc on some glibc versions too
+#endif
+// Make sure JL_USE_IFUNC is always defined to catch include errors.
+#ifndef JL_USE_IFUNC
+#  define JL_USE_IFUNC 0
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -487,6 +503,8 @@ jl_method_instance_t *jl_method_lookup_by_type(jl_methtable_t *mt, jl_tupletype_
 jl_method_instance_t *jl_method_lookup(jl_methtable_t *mt, jl_value_t **args, size_t nargs, int cache, size_t world);
 jl_value_t *jl_gf_invoke(jl_tupletype_t *types, jl_value_t **args, size_t nargs);
 jl_method_instance_t *jl_lookup_generic(jl_value_t **args, uint32_t nargs, uint32_t callsite, size_t world);
+JL_DLLEXPORT jl_value_t *jl_matching_methods(jl_tupletype_t *types, int lim, int include_ambiguous,
+                                             size_t world, size_t *min_valid, size_t *max_valid);
 
 JL_DLLEXPORT jl_datatype_t *jl_first_argument_datatype(jl_value_t *argtypes);
 jl_datatype_t *jl_argument_datatype(jl_value_t *argt);

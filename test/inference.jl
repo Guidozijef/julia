@@ -911,6 +911,17 @@ end
 @test isdefined_tfunc(Tuple{Any,Vararg{Any}}, Const(2)) === Bool
 @test isdefined_tfunc(Tuple{Any,Vararg{Any}}, Const(3)) === Bool
 
+@noinline map3_22347(f, t::Tuple{}) = ()
+@noinline map3_22347(f, t::Tuple) = (f(t[1]), map3_22347(f, Base.tail(t))...)
+# issue #22347
+let niter = 0
+    map3_22347((1, 2, 3, 4)) do y
+        niter += 1
+        nothing
+    end
+    @test niter == 4
+end
+
 # demonstrate that inference must converge
 # while doing constant propagation
 Base.@pure plus1(x) = x + 1
@@ -954,3 +965,10 @@ copy_dims_pair(out, dim::Colon, tail...) = copy_dims_out(out => dim, tail...)
 @test Const(true) ⊑ isdefined_tfunc(NamedTuple{(:x,:y)}, Const(1))
 @test Const(false) ⊑ isdefined_tfunc(NamedTuple{(:x,:y)}, Const(3))
 @test Const(true) ⊑ isdefined_tfunc(NamedTuple{(:x,:y)}, Const(:y))
+
+# splatting an ::Any should still allow inference to use types of parameters preceding it
+f22364(::Int, ::Any...) = 0
+f22364(::String, ::Any...) = 0.0
+g22364(x) = f22364(x, Any[[]][1]...)
+@test @inferred(g22364(1)) === 0
+@test @inferred(g22364("1")) === 0.0

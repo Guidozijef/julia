@@ -1894,30 +1894,19 @@ function abstract_apply(aft::ANY, fargs::Vector{Any}, aargtypes::Vector{Any}, vt
     splitunions = 1 < countunionsplit(aargtypes) <= sv.params.MAX_APPLY_UNION_ENUM
     ctypes = Any[Any[aft]]
     for i = 1:nargs
-        if aargtypes[i] === Any
-            # bail out completely and infer as f(::Any...)
-            # instead could infer the precise types for the types up to this point and just append a Vararg{Any}
-            # (by just using the normal logic from below), but that makes the time of the subarray test explode
-            push!(ctypes[1], Vararg{Any})
-            break
-        end
-    end
-    if length(ctypes[1]) == 1
-        for i = 1:nargs
-            ctypes´ = []
-            for ti in (splitunions ? uniontypes(aargtypes[i]) : Any[aargtypes[i]])
-                cti = precise_container_type(fargs[i], ti, vtypes, sv)
-                for ct in ctypes
-                    if !isempty(ct) && isvarargtype(ct[end])
-                        tail = tuple_tail_elem(unwrapva(ct[end]), cti)
-                        push!(ctypes´, push!(ct[1:(end - 1)], tail))
-                    else
-                        push!(ctypes´, append_any(ct, cti))
-                    end
+        ctypes´ = []
+        for ti in (splitunions ? uniontypes(aargtypes[i]) : Any[aargtypes[i]])
+            cti = precise_container_type(fargs[i], ti, vtypes, sv)
+            for ct in ctypes
+                if !isempty(ct) && isvarargtype(ct[end])
+                    tail = tuple_tail_elem(unwrapva(ct[end]), cti)
+                    push!(ctypes´, push!(ct[1:(end - 1)], tail))
+                else
+                    push!(ctypes´, append_any(ct, cti))
                 end
             end
-            ctypes = ctypes´
         end
+        ctypes = ctypes´
     end
     for ct in ctypes
         if length(ct) > sv.params.MAX_TUPLETYPE_LEN
@@ -4872,7 +4861,8 @@ function inlining_pass(e::Expr, sv::InferenceState, stmts, ins)
                 if isa(aarg,Expr) && (is_known_call(aarg, tuple, sv.src, sv.mod) || is_known_call(aarg, svec, sv.src, sv.mod))
                     # apply(f,tuple(x,y,...)) => f(x,y,...)
                     newargs[i-2] = aarg.args[2:end]
-                elseif isa(argt,Const) && (isa(argt.val, Tuple) || isa(argt.val, SimpleVector))
+                elseif isa(argt,Const) && (isa(argt.val, Tuple) || isa(argt.val, SimpleVector)) &&
+                        effect_free(aarg, sv.src, sv.mod, true)
                     newargs[i-2] = Any[ QuoteNode(x) for x in argt.val ]
                 elseif isa(aarg, Tuple) || (isa(aarg, QuoteNode) && (isa(aarg.value, Tuple) || isa(aarg.value, SimpleVector)))
                     if isa(aarg, QuoteNode)

@@ -77,6 +77,8 @@ Library improvements
   * `logspace` now accepts a `base` keyword argument to specify the base of the logarithmic
     range. The base defaults to 10 ([#22310]).
 
+  * Added `unique!` which is an inplace version of `unique` ([#20549]).
+
 Compiler/Runtime improvements
 -----------------------------
 
@@ -100,6 +102,13 @@ Deprecated or removed
     This caused the deprecation of some reflection methods (such as `macroexpand` and `isconst`),
     which now require a module argument.
     And it caused the bugfix of other default arguments to use the Main module (including `whos`, `which`).
+
+  * The `Operators` module is deprecated. Instead, import required operators explicitly
+    from `Base`, e.g. `import Base: +, -, *, /` ([#22251]).
+
+  * Bindings to the FFTW library have been removed from Base. The DFT framework for building FFT
+    implementations is now in AbstractFFTs.jl, the bindings to the FFTW library are in FFTW.jl,
+    and the Base signal processing functions which used FFTs are now in DSP.jl ([#21956]).
 
 
 Julia v0.6.0 Release Notes
@@ -886,6 +895,7 @@ Command-line option changes
 [#21759]: https://github.com/JuliaLang/julia/issues/21759
 [#21818]: https://github.com/JuliaLang/julia/issues/21818
 [#21825]: https://github.com/JuliaLang/julia/issues/21825
+[#21956]: https://github.com/JuliaLang/julia/issues/21956
 [#21960]: https://github.com/JuliaLang/julia/issues/21960
 [#21973]: https://github.com/JuliaLang/julia/issues/21973
 [#21974]: https://github.com/JuliaLang/julia/issues/21974
