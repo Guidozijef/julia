@@ -46,6 +46,7 @@
 @test Tuple((a=[1,2], b=[3,4])) == ([1,2], [3,4])
 @test Tuple(NamedTuple()) === ()
 @test Tuple((x=4, y=5, z=6)) == (4,5,6)
+@test convert(Tuple, (x=4, y=5, z=6)) == (4,5,6)
 @test collect((x=4, y=5, z=6)) == [4,5,6]
 
 @test isless((a=1,b=2), (a=1,b=3))
@@ -115,3 +116,19 @@ namedtuple_fieldtype_a(x) = fieldtype(typeof(x), :a)
 
 namedtuple_nfields(x) = nfields(x) === 0 ? 1 : ""
 @test Union{Int,String} <: Base.return_types(namedtuple_nfields, (NamedTuple,))[1]
+
+struct NamedTupleFieldType
+    a::NamedTuple
+end
+namedtuple_field(x) = getfield(x.a, 1)
+@test namedtuple_field((a=1, b=2, c=3)) == 1
+
+# Associative tests
+@test keys((a=1, b=2, c=3)) == (:a, :b, :c)
+@test values((a=1, b=2, c=3)) == (1, 2, 3)
+@test haskey((a=1, b=2, c=3), :a)
+@test haskey((a=1, b=2, c=3), 1)
+@test get((a=1, b=2, c=3), :a, 0) == 1
+@test get((a=1, b=2, c=3), 1, 0) == 1
+@test get(()->0, (a=1, b=2, c=3), :a) == 1
+@test get(()->0, (a=1, b=2, c=3), :d) == 0

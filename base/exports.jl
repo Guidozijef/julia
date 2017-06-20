@@ -1013,6 +1013,7 @@ export
     crc32c,
     exit,
     ntuple,
+    namedtuple,
     quit,
 
 # IP address stuff

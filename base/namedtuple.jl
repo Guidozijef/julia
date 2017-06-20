@@ -59,7 +59,7 @@ end
 eltype(::Type{NamedTuple{names,T}}) where {names,T} = eltype(T)
 
 @generated function convert(::Type{Tuple}, n::NamedTuple)
-    Expr(:tuple, Any[ Expr(:getfield, :n, f) for f = 1:nfields(n) ]...)
+    Expr(:tuple, Any[ :(getfield(n, $f)) for f = 1:nfields(n) ]...)
 end
 
 ==(a::NamedTuple{n}, b::NamedTuple{n}) where {n} = Tuple(a) == Tuple(b)
@@ -178,3 +178,10 @@ Construct a copy of named tuple `a`, except with fields that exist in `b` remove
     names = (names...,)
     :(namedtuple(NamedTuple{$names}, $(vals...)))
 end
+
+# Associative interface
+keys(nt::NamedTuple{names}) where {names} = names
+values(nt::NamedTuple) = convert(Tuple, nt)
+haskey(nt::NamedTuple, key::Union{Integer, Symbol}) = isdefined(nt, key)
+get(nt::NamedTuple, key::Union{Integer, Symbol}, default) = haskey(nt, key) ? getfield(nt, key) : default
+get(f::Callable, nt::NamedTuple, key::Union{Integer, Symbol}) = haskey(nt, key) ? getfield(nt, key) : f()
