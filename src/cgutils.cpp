@@ -1441,8 +1441,8 @@ static jl_cgval_t emit_getfield_knownidx(const jl_cgval_t &strct, unsigned idx, 
         if (jl_field_isptr(jt, idx)) {
             bool maybe_null = idx >= (unsigned)jt->ninitialized;
             Instruction *Load = maybe_mark_load_dereferenceable(
-                builder.CreateLoad(emit_bitcast(addr, T_ppjlvalue)),
-                maybe_null, jfty
+                builder.CreateLoad(emit_bitcast(addr, T_pprjlvalue)),
+                maybe_null, jl_field_type(jt, idx)
             );
             Value *fldv = tbaa_decorate(strct.tbaa, Load);
             if (maybe_null)
