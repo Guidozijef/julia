@@ -234,7 +234,6 @@ static MDNode *tbaa_arrayptr;       // The pointer inside a jl_array_t
 static MDNode *tbaa_arraysize;      // A size in a jl_array_t
 static MDNode *tbaa_arraylen;       // The len in a jl_array_t
 static MDNode *tbaa_arrayflags;     // The flags in a jl_array_t
-static MDNode *tbaa_arrayoffset;    // The offset in a jl_array_t
 static MDNode *tbaa_const;      // Memory that is immutable by the time LLVM can see it
 
 // Basic DITypes
@@ -3607,33 +3606,6 @@ static Value *try_emit_union_alloca(jl_uniontype_t *ut, bool &allunbox, size_t &
     return NULL;
 }
 
-static Value *compute_box_tindex(Value *datatype, jl_value_t *supertype, jl_value_t *ut, jl_codectx_t *ctx)
-{
-    Value *tindex = ConstantInt::get(T_int8, 0);
-    unsigned counter = 0;
-    for_each_uniontype_small(
-            [&](unsigned idx, jl_datatype_t *jt) {
-                if (jl_subtype((jl_value_t*)jt, supertype)) {
-                    Value *cmp = builder.CreateICmpEQ(maybe_decay_untracked(literal_pointer_val((jl_value_t*)jt)), datatype);
-                    tindex = builder.CreateSelect(cmp, ConstantInt::get(T_int8, idx), tindex);
-                }
-            },
-            ut,
-            counter);
-    return tindex;
-}
-
-// get the runtime tindex value
-static Value *compute_tindex_unboxed(const jl_cgval_t &val, jl_value_t *typ, jl_codectx_t *ctx)
-{
-    if (val.constant)
-        return ConstantInt::get(T_int8, get_box_tindex((jl_datatype_t*)jl_typeof(val.constant), typ));
-    if (val.isboxed)
-        return compute_box_tindex(emit_typeof_boxed(val, ctx), val.typ, typ, ctx);
-    assert(val.TIndex);
-    return builder.CreateAnd(val.TIndex, ConstantInt::get(T_int8, 0x7f));
-}
-
 static void emit_assignment(jl_value_t *l, jl_value_t *r, jl_codectx_t *ctx)
 {
     if (jl_is_ssavalue(l)) {
@@ -6176,7 +6148,6 @@ static void init_julia_llvm_meta(void)
     tbaa_arraysize = tbaa_make_child("jtbaa_arraysize", tbaa_array_scalar).first;
     tbaa_arraylen = tbaa_make_child("jtbaa_arraylen", tbaa_array_scalar).first;
     tbaa_arrayflags = tbaa_make_child("jtbaa_arrayflags", tbaa_array_scalar).first;
-    tbaa_arrayoffset = tbaa_make_child("jtbaa_arrayoffset", tbaa_array_scalar).first;
     tbaa_const = tbaa_make_child("jtbaa_const", nullptr, true).first;
 }
 
