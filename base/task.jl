@@ -195,6 +195,7 @@ end
 
 _wait(not_a_task) = wait(not_a_task)
 
+if !JULIA_PARTR
 """
     fetch(t::Task)
 
@@ -205,6 +206,7 @@ function fetch(t::Task)
     _wait(t)
     task_result(t)
 end
+end # !JULIA_PARTR
 
 
 ## lexically-scoped waiting for multiple items
