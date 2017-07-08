@@ -835,7 +835,7 @@ static inline jl_cgval_t update_julia_type(const jl_cgval_t &v, jl_value_t *typ,
     return jl_cgval_t(v, typ, NULL);
 }
 
-static jl_cgval_t convert_julia_type(const jl_cgval_t &v, jl_value_t *typ, jl_codectx_t *ctx, bool needsroot = true);
+static jl_cgval_t convert_julia_type(jl_codectx_t &ctx, const jl_cgval_t &v, jl_value_t *typ, bool needsroot = true);
 
 // --- allocating local variables ---
 

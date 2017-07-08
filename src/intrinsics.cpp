@@ -305,8 +305,8 @@ static Value *emit_unbox(Type *to, const jl_cgval_t &x, jl_value_t *jt, Value *d
             return unboxed;
         Type *dest_ty = unboxed->getType()->getPointerTo();
         if (dest->getType() != dest_ty)
-            dest = emit_bitcast(dest, dest_ty);
-        builder.CreateStore(unboxed, dest, volatile_store);
+            dest = emit_bitcast(ctx, dest, dest_ty);
+        ctx.builder.CreateStore(unboxed, dest, volatile_store);
         return NULL;
     }
 
