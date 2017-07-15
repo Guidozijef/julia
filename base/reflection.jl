@@ -108,6 +108,13 @@ function resolve(g::GlobalRef; force::Bool=false)
     return g
 end
 
+function rename_binding(mod::Module, oldname::Symbol, newname::Symbol)
+    T = getfield(mod, oldname)
+    ccall(:jl_rename_binding, Void, (Any, Any, Any), mod, oldname, newname)
+    T.name.name = newname
+    T
+end
+
 """
     fieldname(x::DataType, i::Integer)
 
