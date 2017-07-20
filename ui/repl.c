@@ -169,22 +169,23 @@ int main(int argc, char *argv[])
     uv_setup_args(argc, argv); // no-op on Windows
 #else
 
-#if defined(_P64) && defined(JL_DEBUG_BUILD)
-static int is_running_under_wine()
-{
-    static const char * (CDECL *pwine_get_version)(void);
-    HMODULE hntdll = GetModuleHandle("ntdll.dll");
-    assert(hntdll);
-    pwine_get_version = (void *)GetProcAddress(hntdll, "wine_get_version");
-    return pwine_get_version != 0;
-}
-#endif
+//#if defined(_P64) && defined(JL_DEBUG_BUILD)
+//static int is_running_under_wine()
+//{
+//    static void *pwine_get_version;
+//    HMODULE hntdll = GetModuleHandle("ntdll.dll");
+//    assert(hntdll);
+//    pwine_get_version = GetProcAddress(hntdll, "wine_get_version");
+//    return pwine_get_version != 0;
+//}
+//#endif
 
 static void lock_low32() {
 #if defined(_P64) && defined(JL_DEBUG_BUILD)
     // Wine currently has a that causes it to answer VirtualQuery incorrectly.
     // See https://www.winehq.org/pipermail/wine-devel/2016-March/112188.html for details
-    int under_wine = is_running_under_wine();
+    // Now, Windows 10 does too
+    //int under_wine = is_running_under_wine();
     // block usage of the 32-bit address space on win64, to catch pointer cast errors
     char *const max32addr = (char*)0xffffffffL;
     SYSTEM_INFO info;
@@ -198,7 +199,7 @@ static void lock_low32() {
         if (meminfo.State == MEM_FREE) { // reserve all free pages in the first 4GB of memory
             char *first = (char*)meminfo.BaseAddress;
             char *last = first + meminfo.RegionSize;
-            char *p;
+            void *p;
             if (last > max32addr)
                 last = max32addr;
             // adjust first up to the first allocation granularity boundary
@@ -207,7 +208,8 @@ static void lock_low32() {
             last = (char*)((long long)last & ~(info.dwAllocationGranularity - 1));
             if (last != first) {
                 p = VirtualAlloc(first, last - first, MEM_RESERVE, PAGE_NOACCESS); // reserve all memory in between
-                assert(under_wine || p == first);
+                (void)p;
+                //assert(under_wine || p == (void*)first);
             }
         }
         meminfo.BaseAddress += meminfo.RegionSize;
