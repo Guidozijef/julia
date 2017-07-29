@@ -8,10 +8,10 @@ end
 """
     Symmetric(A, uplo=:U)
 
-Construct a `Symmetric` matrix from the upper (if `uplo = :U`) or lower (if `uplo = :L`) triangle of `A`.
+Construct a `Symmetric` view of the upper (if `uplo = :U`) or lower (if `uplo = :L`)
+triangle of the matrix `A`.
 
-# Example
-
+# Examples
 ```jldoctest
 julia> A = [1 0 2 0 3; 0 4 0 5 0; 6 0 7 0 8; 0 9 0 1 0; 2 0 3 0 4]
 5×5 Array{Int64,2}:
@@ -49,10 +49,10 @@ end
 """
     Hermitian(A, uplo=:U)
 
-Construct a `Hermitian` matrix from the upper (if `uplo = :U`) or lower (if `uplo = :L`) triangle of `A`.
+Construct a `Hermitian` view of the upper (if `uplo = :U`) or lower (if `uplo = :L`)
+triangle of the matrix `A`.
 
-# Example
-
+# Examples
 ```jldoctest
 julia> A = [1 0 2+2im 0 3-3im; 0 4 0 5 0; 6-6im 0 7 0 8+8im; 0 9 0 1 0; 2+2im 0 3-3im 0 4];
 
@@ -107,6 +107,7 @@ end
 
 const HermOrSym{T,S} = Union{Hermitian{T,S}, Symmetric{T,S}}
 const RealHermSymComplexHerm{T<:Real,S} = Union{Hermitian{T,S}, Symmetric{T,S}, Hermitian{Complex{T},S}}
+const RealHermSymComplexSym{T<:Real,S} = Union{Hermitian{T,S}, Symmetric{T,S}, Symmetric{Complex{T},S}}
 
 size(A::HermOrSym, d) = size(A.data, d)
 size(A::HermOrSym) = size(A.data)
@@ -301,6 +302,25 @@ A_mul_B!(C::StridedMatrix{T}, A::StridedMatrix{T}, B::Hermitian{T,<:StridedMatri
 
 *(A::HermOrSym, B::HermOrSym) = A*full(B)
 
+# Fallbacks to avoid generic_matvecmul!/generic_matmatmul!
+## Symmetric{<:Number} and Hermitian{<:Real} are invariant to transpose; peel off the t
+At_mul_B(A::RealHermSymComplexSym, B::AbstractVector) = A*B
+At_mul_B(A::RealHermSymComplexSym, B::AbstractMatrix) = A*B
+A_mul_Bt(A::AbstractMatrix, B::RealHermSymComplexSym) = A*B
+## Hermitian{<:Number} and Symmetric{<:Real} are invariant to ctranspose; peel off the c
+Ac_mul_B(A::RealHermSymComplexHerm, B::AbstractVector) = A*B
+Ac_mul_B(A::RealHermSymComplexHerm, B::AbstractMatrix) = A*B
+A_mul_Bc(A::AbstractMatrix, B::RealHermSymComplexHerm) = A*B
+
+# ambiguities with RowVector
+A_mul_Bt(A::RowVector, B::RealHermSymComplexSym) = A*B
+A_mul_Bc(A::RowVector, B::RealHermSymComplexHerm) = A*B
+# ambiguities with AbstractTriangular
+At_mul_B(A::RealHermSymComplexSym, B::AbstractTriangular) = A*B
+A_mul_Bt(A::AbstractTriangular, B::RealHermSymComplexSym) = A*B
+Ac_mul_B(A::RealHermSymComplexHerm, B::AbstractTriangular) = A*B
+A_mul_Bc(A::AbstractTriangular, B::RealHermSymComplexHerm) = A*B
+
 for T in (:Symmetric, :Hermitian), op in (:+, :-, :*, :/)
     # Deal with an ambiguous case
     @eval ($op)(A::$T, x::Bool) = ($T)(($op)(A.data, x), Symbol(A.uplo))
@@ -308,17 +328,44 @@ for T in (:Symmetric, :Hermitian), op in (:+, :-, :*, :/)
     @eval ($op)(A::$T, x::$S) = ($T)(($op)(A.data, x), Symbol(A.uplo))
 end
 
-bkfact(A::HermOrSym) = bkfact(A.data, Symbol(A.uplo), issymmetric(A))
-factorize(A::HermOrSym) = bkfact(A)
+function factorize(A::HermOrSym{T}) where T
+    TT = typeof(sqrt(one(T)))
+    if TT <: BlasFloat
+        return bkfact(A)
+    else # fallback
+        return lufact(A)
+    end
+end
 
-det(A::RealHermSymComplexHerm) = real(det(bkfact(A)))
-det(A::Symmetric{<:Real}) = det(bkfact(A))
-det(A::Symmetric) = det(bkfact(A))
+det(A::RealHermSymComplexHerm) = real(det(factorize(A)))
+det(A::Symmetric{<:Real}) = det(factorize(A))
+det(A::Symmetric) = det(factorize(A))
 
-\(A::HermOrSym{<:Any,<:StridedMatrix}, B::StridedVecOrMat) = \(bkfact(A.data, Symbol(A.uplo), issymmetric(A)), B)
+\(A::HermOrSym{<:Any,<:StridedMatrix}, B::AbstractVector) = \(factorize(A), B)
+# Bunch-Kaufman solves can not utilize BLAS-3 for multiple right hand sides
+# so using LU is faster for AbstractMatrix right hand side
+\(A::HermOrSym{<:Any,<:StridedMatrix}, B::AbstractMatrix) = \(lufact(A), B)
+# ambiguity with RowVector
+\(A::HermOrSym{<:Any,<:StridedMatrix}, B::RowVector) = invoke(\, Tuple{AbstractMatrix, RowVector}, A, B)
 
-inv(A::Hermitian{T,S}) where {T<:BlasFloat,S<:StridedMatrix} = Hermitian{T,S}(inv(bkfact(A)), A.uplo)
-inv(A::Symmetric{T,S}) where {T<:BlasFloat,S<:StridedMatrix} = Symmetric{T,S}(inv(bkfact(A)), A.uplo)
+function _inv(A::HermOrSym)
+    n = checksquare(A)
+    B = inv!(lufact(A))
+    conjugate = isa(A, Hermitian)
+    # symmetrize
+    if A.uplo == 'U' # add to upper triangle
+        @inbounds for i = 1:n, j = i:n
+            B[i,j] = conjugate ? (B[i,j] + conj(B[j,i])) / 2 : (B[i,j] + B[j,i]) / 2
+        end
+    else # A.uplo == 'L', add to lower triangle
+        @inbounds for i = 1:n, j = i:n
+            B[j,i] = conjugate ? (B[j,i] + conj(B[i,j])) / 2 : (B[j,i] + B[i,j]) / 2
+        end
+    end
+    B
+end
+inv(A::Hermitian{T,S}) where {T<:BlasFloat,S<:StridedMatrix} = Hermitian{T,S}(_inv(A), A.uplo)
+inv(A::Symmetric{T,S}) where {T<:BlasFloat,S<:StridedMatrix} = Symmetric{T,S}(_inv(A), A.uplo)
 
 eigfact!(A::RealHermSymComplexHerm{<:BlasReal,<:StridedMatrix}) = Eigen(LAPACK.syevr!('V', 'A', A.uplo, A.data, 0.0, 0.0, 0, 0, -1.0)...)
 
@@ -479,6 +526,8 @@ eigvals!(A::HermOrSym{T,S}, B::HermOrSym{T,S}) where {T<:BlasReal,S<:StridedMatr
     LAPACK.sygvd!(1, 'N', A.uplo, A.data, B.uplo == A.uplo ? B.data : B.data')[1]
 eigvals!(A::Hermitian{T,S}, B::Hermitian{T,S}) where {T<:BlasComplex,S<:StridedMatrix} =
     LAPACK.sygvd!(1, 'N', A.uplo, A.data, B.uplo == A.uplo ? B.data : B.data')[1]
+
+eigvecs(A::HermOrSym) = eigvecs(eigfact(A))
 
 function svdvals!(A::RealHermSymComplexHerm)
     vals = eigvals!(A)
