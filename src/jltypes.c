@@ -1168,6 +1168,9 @@ static jl_value_t *inst_datatype_inner(jl_datatype_t *dt, jl_svec_t *p, jl_value
             ndt->types = ((jl_datatype_t*)values_tt)->parameters;
             jl_gc_wb(ndt, ndt->types);
         }
+        else {
+            ndt->types = jl_emptysvec;
+        }
     }
     ndt->mutabl = dt->mutabl;
     ndt->abstract = dt->abstract;
