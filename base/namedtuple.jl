@@ -59,7 +59,7 @@ end
 eltype(::Type{NamedTuple{names,T}}) where {names,T} = eltype(T)
 
 @generated function convert(::Type{Tuple}, n::NamedTuple)
-    Expr(:tuple, Any[ Expr(:getfield, :n, f) for f = 1:nfields(n) ]...)
+    Expr(:tuple, Any[ Expr(:getfield, :n, f) for f = 1:fieldcount(n) ]...)
 end
 
 ==(a::NamedTuple{n}, b::NamedTuple{n}) where {n} = Tuple(a) == Tuple(b)
@@ -88,7 +88,7 @@ end
             throw(ArgumentError("All NamedTuple arguments to map must have the same fields in the same order"))
         end
     end
-    N = nfields(nts[1])
+    N = fieldcount(nts[1])
     M = length(nts)
 
     NT = NamedTuple{fields}
