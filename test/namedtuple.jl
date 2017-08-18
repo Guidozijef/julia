@@ -47,6 +47,7 @@
 @test Tuple(NamedTuple()) === ()
 @test Tuple((x=4, y=5, z=6)) == (4,5,6)
 @test collect((x=4, y=5, z=6)) == [4,5,6]
+@test convert(Tuple, (a=1, b=2, c=3)) == (1, 2, 3)
 
 @test isless((a=1,b=2), (a=1,b=3))
 @test_broken isless((a=1,), (a=1,b=2))
@@ -68,6 +69,22 @@
 @test Base.structdiff((a=1, b=2, z=20), (b=3, q=20, z=1)) == (a=1,)
 @test Base.structdiff((a=1, b=2, z=20), (b=3, q=20, z=1, a=0)) == NamedTuple()
 @test Base.structdiff((a=1, b=2, z=20), NamedTuple{(:b,)}) == (a=1, z=20)
+
+@test keys((a=1, b=2, c=3)) == (:a, :b, :c)
+@test keys(NamedTuple()) == ()
+@test keys((a=1,)) == (:a,)
+@test values((a=1, b=2, c=3)) == (1, 2, 3)
+@test values(NamedTuple()) == ()
+@test values((a=1,)) == (1,)
+@test haskey((a=1, b=2, c=3), :a)
+@test !haskey(NamedTuple(), :a)
+@test !haskey((a=1,), :b)
+@test get((a=1, b=2, c=3), :a, 0) == 1
+@test get(NamedTuple(), :a, 0) == 0
+@test get((a=1,), :b, 0) == 0
+@test get(()->0, (a=1, b=2, c=3), :a) == 1
+@test get(()->0, NamedTuple(), :a) == 0
+@test get(()->0, (a=1,), :b) == 0
 
 # splatting and implicit naming syntax
 
