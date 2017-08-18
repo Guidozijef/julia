@@ -65,7 +65,6 @@ jl_datatype_t *jl_float32_type;
 jl_datatype_t *jl_float64_type;
 jl_datatype_t *jl_floatingpoint_type;
 jl_datatype_t *jl_number_type;
-jl_unionall_t *jl_complex_type;
 jl_datatype_t *jl_signed_type;
 
 JL_DLLEXPORT jl_value_t *jl_emptytuple=NULL;
@@ -371,6 +370,22 @@ jl_value_t *jl_nth_union_component(jl_value_t *v, int i)
     return nth_union_component(v, &i);
 }
 
+// inverse of jl_nth_union_component
+int jl_find_union_component(jl_value_t *haystack, jl_value_t *needle, unsigned *nth)
+{
+    if (jl_is_uniontype(haystack)) {
+        if (jl_find_union_component(((jl_uniontype_t*)haystack)->a, needle, nth))
+            return 1;
+        if (jl_find_union_component(((jl_uniontype_t*)haystack)->b, needle, nth))
+            return 1;
+        return 0;
+    }
+    if (needle == haystack)
+        return 1;
+    (*nth)++;
+    return 0;
+}
+
 static void flatten_type_union(jl_value_t **types, size_t n, jl_value_t **out, size_t *idx)
 {
     size_t i;
@@ -385,6 +400,102 @@ static void flatten_type_union(jl_value_t **types, size_t n, jl_value_t **out, s
             out[*idx] = e;
             (*idx)++;
         }
+    }
+}
+
+STATIC_INLINE const char *datatype_module_name(jl_value_t *t)
+{
+    return jl_symbol_name(((jl_datatype_t*)t)->name->module->name);
+}
+
+STATIC_INLINE const char *str_(const char *s)
+{
+    return s == NULL ? "" : s;
+}
+
+STATIC_INLINE int cmp_(int a, int b)
+{
+    return a < b ? -1 : a > b;
+}
+
+// a/b are jl_datatype_t* & not NULL
+int datatype_name_cmp(jl_value_t *a, jl_value_t *b)
+{
+    if (!jl_is_datatype(a))
+        return jl_is_datatype(b) ? 1 : 0;
+    if (!jl_is_datatype(b))
+        return -1;
+    int cmp = strcmp(str_(datatype_module_name(a)), str_(datatype_module_name(b)));
+    if (cmp != 0)
+        return cmp;
+    cmp = strcmp(str_(jl_typename_str(a)), str_(jl_typename_str(b)));
+    if (cmp != 0)
+        return cmp;
+    cmp = cmp_(jl_nparams(a), jl_nparams(b));
+    if (cmp != 0)
+        return cmp;
+    // compare up to 3 type parameters
+    for (int i = 0; i < 3 && i < jl_nparams(a); i++) {
+        jl_value_t *ap = jl_tparam(a, i);
+        jl_value_t *bp = jl_tparam(b, i);
+        if (ap == bp) {
+            continue;
+        }
+        else if (jl_is_datatype(ap) && jl_is_datatype(bp)) {
+            cmp = datatype_name_cmp(ap, bp);
+            if (cmp != 0)
+                return cmp;
+        }
+        else if (jl_is_unionall(ap) && jl_is_unionall(bp)) {
+            cmp = datatype_name_cmp(jl_unwrap_unionall(ap), jl_unwrap_unionall(bp));
+            if (cmp != 0)
+                return cmp;
+        }
+        else {
+            // give up
+            cmp = 0;
+        }
+    }
+    return cmp;
+}
+
+// sort singletons first, then DataTypes, then UnionAlls,
+// ties broken alphabetically including module name & type parameters
+int union_sort_cmp(const void *ap, const void *bp)
+{
+    jl_value_t *a = *(jl_value_t**)ap;
+    jl_value_t *b = *(jl_value_t**)bp;
+    if (a == NULL)
+        return b == NULL ? 0 : 1;
+    if (b == NULL)
+        return -1;
+    if (jl_is_datatype(a)) {
+        if (!jl_is_datatype(b))
+            return -1;
+        if (jl_is_datatype_singleton((jl_datatype_t*)a)) {
+            if (jl_is_datatype_singleton((jl_datatype_t*)b))
+                return datatype_name_cmp(a, b);
+            return -1;
+        }
+        else if (jl_is_datatype_singleton((jl_datatype_t*)b)) {
+            return 1;
+        }
+        else if (jl_isbits(a)) {
+            if (jl_isbits(b))
+                return datatype_name_cmp(a, b);
+            return -1;
+        }
+        else if (jl_isbits(b)) {
+            return 1;
+        }
+        else {
+            return datatype_name_cmp(a, b);
+        }
+    }
+    else {
+        if (jl_is_datatype(b))
+            return 1;
+        return datatype_name_cmp(jl_unwrap_unionall(a), jl_unwrap_unionall(b));
     }
 }
 
@@ -419,6 +530,7 @@ JL_DLLEXPORT jl_value_t *jl_type_union(jl_value_t **ts, size_t n)
             }
         }
     }
+    qsort(temp, nt, sizeof(jl_value_t*), union_sort_cmp);
     jl_value_t **ptu = &temp[nt];
     *ptu = jl_bottom_type;
     int k;
@@ -1771,14 +1883,10 @@ void jl_init_types(void)
     jl_emptytuple_type->instance = jl_emptytuple;
 
     // non-primitive definitions follow
-    jl_int32_type = NULL;
     jl_int32_type = jl_new_primitivetype((jl_value_t*)jl_symbol("Int32"), core,
                                          jl_any_type, jl_emptysvec, 32);
-    jl_int64_type = NULL;
     jl_int64_type = jl_new_primitivetype((jl_value_t*)jl_symbol("Int64"), core,
                                          jl_any_type, jl_emptysvec, 64);
-
-    jl_uint8_type = NULL;
     jl_uint8_type = jl_new_primitivetype((jl_value_t*)jl_symbol("UInt8"), core,
                                          jl_any_type, jl_emptysvec, 8);
 

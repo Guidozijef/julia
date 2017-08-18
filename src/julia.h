@@ -530,7 +530,6 @@ extern JL_DLLEXPORT jl_value_t *jl_stackovf_exception;
 extern JL_DLLEXPORT jl_value_t *jl_memory_exception;
 extern JL_DLLEXPORT jl_value_t *jl_readonlymemory_exception;
 extern JL_DLLEXPORT jl_value_t *jl_diverror_exception;
-extern JL_DLLEXPORT jl_value_t *jl_overflow_exception;
 extern JL_DLLEXPORT jl_value_t *jl_undefref_exception;
 extern JL_DLLEXPORT jl_value_t *jl_interrupt_exception;
 extern JL_DLLEXPORT jl_datatype_t *jl_boundserror_type;
@@ -552,7 +551,6 @@ extern JL_DLLEXPORT jl_datatype_t *jl_float64_type;
 extern JL_DLLEXPORT jl_datatype_t *jl_floatingpoint_type;
 extern JL_DLLEXPORT jl_datatype_t *jl_number_type;
 extern JL_DLLEXPORT jl_datatype_t *jl_void_type;
-extern JL_DLLEXPORT jl_unionall_t *jl_complex_type;
 extern JL_DLLEXPORT jl_datatype_t *jl_signed_type;
 extern JL_DLLEXPORT jl_datatype_t *jl_voidpointer_type;
 extern JL_DLLEXPORT jl_unionall_t *jl_pointer_type;
@@ -1194,6 +1192,7 @@ JL_DLLEXPORT void        jl_set_nth_field(jl_value_t *v, size_t i,
 JL_DLLEXPORT int         jl_field_isdefined(jl_value_t *v, size_t i);
 JL_DLLEXPORT jl_value_t *jl_get_field(jl_value_t *o, const char *fld);
 JL_DLLEXPORT jl_value_t *jl_value_ptr(jl_value_t *a);
+JL_DLLEXPORT int jl_islayout_inline(jl_value_t *eltype, size_t *fsz, size_t *al);
 
 // arrays
 JL_DLLEXPORT jl_array_t *jl_new_array(jl_value_t *atype, jl_value_t *dims);
@@ -1248,7 +1247,7 @@ JL_DLLEXPORT jl_binding_t *jl_get_binding(jl_module_t *m, jl_sym_t *var);
 JL_DLLEXPORT jl_binding_t *jl_get_binding_or_error(jl_module_t *m, jl_sym_t *var);
 JL_DLLEXPORT jl_value_t *jl_module_globalref(jl_module_t *m, jl_sym_t *var);
 // get binding for assignment
-JL_DLLEXPORT jl_binding_t *jl_get_binding_wr(jl_module_t *m, jl_sym_t *var);
+JL_DLLEXPORT jl_binding_t *jl_get_binding_wr(jl_module_t *m, jl_sym_t *var, int error);
 JL_DLLEXPORT jl_binding_t *jl_get_binding_for_method_def(jl_module_t *m,
                                                          jl_sym_t *var);
 JL_DLLEXPORT int jl_boundp(jl_module_t *m, jl_sym_t *var);
@@ -1705,6 +1704,7 @@ typedef struct {
     int8_t debug_level;
     int8_t check_bounds;
     int8_t depwarn;
+    int8_t warn_overwrite;
     int8_t can_inline;
     int8_t polly;
     int8_t fast_math;
@@ -1764,6 +1764,9 @@ JL_DLLEXPORT int jl_generating_output(void);
 #define JL_OPTIONS_DEPWARN_OFF 0
 #define JL_OPTIONS_DEPWARN_ON 1
 #define JL_OPTIONS_DEPWARN_ERROR 2
+
+#define JL_OPTIONS_WARN_OVERWRITE_OFF 0
+#define JL_OPTIONS_WARN_OVERWRITE_ON 1
 
 #define JL_OPTIONS_POLLY_ON 1
 #define JL_OPTIONS_POLLY_OFF 0

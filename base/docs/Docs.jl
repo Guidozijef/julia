@@ -234,8 +234,9 @@ function doc!(__module__::Module, b::Binding, str::DocStr, @nospecialize sig = U
     m = get!(meta(__module__), b, MultiDoc())
     if haskey(m.docs, sig)
         # We allow for docstrings to be updated, but print a warning since it is possible
-        # that over-writing a docstring *may* have been accidental.
-        warn("replacing docs for '$b :: $sig' in module '$(__module__)'.")
+        # that over-writing a docstring *may* have been accidental.  The warning
+        # is suppressed for symbols in Main, for interactive use (#23011).
+        __module__ == Main || warn("replacing docs for '$b :: $sig' in module '$(__module__)'.")
     else
         # The ordering of docstrings for each Binding is defined by the order in which they
         # are initially added. Replacing a specific docstring does not change it's ordering.
@@ -462,7 +463,7 @@ function nameof(x::Expr, ismacro)
     if isexpr(x, :.)
         ismacro ? macroname(x) : x
     else
-        n = isexpr(x, (:module, :type, :bitstype)) ? 2 : 1
+        n = isexpr(x, (:module, :struct)) ? 2 : 1
         nameof(x.args[n], ismacro)
     end
 end
@@ -504,7 +505,7 @@ function metadata(__source__, __module__, expr, ismodule)
     else
         push!(args, Pair(:module, __module__))
     end
-    if isexpr(expr, :type)
+    if isexpr(expr, :struct)
         # Field docs for concrete types.
         fields = []
         tmp = nothing
@@ -684,11 +685,11 @@ function docm(source::LineNumberNode, mod::Module, meta, ex, define = true)
 
     # Type definitions.
     #
-    #   type T ... end
-    #   abstract T
-    #   bitstype N T
+    #   struct T ... end
+    #   abstract type T end
+    #   primitive type T N end
     #
-    isexpr(x, [:type, :abstract, :bitstype]) ? objectdoc(source, mod, meta, def, x) :
+    isexpr(x, [:struct, :abstract, :primitive]) ? objectdoc(source, mod, meta, def, x) :
 
     # "Bindings". Names that resolve to objects with different names, ie.
     #

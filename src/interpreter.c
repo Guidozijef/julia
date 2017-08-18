@@ -15,10 +15,11 @@ extern "C" {
 #endif
 
 typedef struct {
-    jl_code_info_t *src;
-    jl_module_t *module;
-    jl_value_t **locals;
-    jl_svec_t *sparam_vals;
+    jl_code_info_t *src; // contains the names and number of slots
+    jl_module_t *module; // context for globals
+    jl_value_t **locals; // slots for holding local slots and ssavalues
+    jl_svec_t *sparam_vals; // method static parameters, if eval-ing a method body
+    int preevaluation; // use special rules for pre-evaluating expressions
 } interpreter_state;
 
 static jl_value_t *eval(jl_value_t *e, interpreter_state *s);
@@ -27,6 +28,9 @@ static jl_value_t *eval_body(jl_array_t *stmts, interpreter_state *s, int start,
 jl_value_t *jl_eval_module_expr(jl_module_t *m, jl_expr_t *ex);
 int jl_is_toplevel_only_expr(jl_value_t *e);
 
+// deprecated: do not use this method in new code
+// it uses special scoping / evaluation / error rules
+// which should instead be handled in lowering
 jl_value_t *jl_interpret_toplevel_expr_in(jl_module_t *m, jl_value_t *e,
                                           jl_code_info_t *src,
                                           jl_svec_t *sparam_vals)
@@ -35,11 +39,11 @@ jl_value_t *jl_interpret_toplevel_expr_in(jl_module_t *m, jl_value_t *e,
     jl_value_t *v=NULL;
     jl_module_t *last_m = ptls->current_module;
     jl_module_t *task_last_m = ptls->current_task->current_module;
-    interpreter_state s;
+    interpreter_state s = {};
     s.src = src;
     s.module = m;
-    s.locals = NULL;
     s.sparam_vals = sparam_vals;
+    s.preevaluation = (sparam_vals != NULL);
 
     JL_TRY {
         ptls->current_task->current_module = ptls->current_module = m;
@@ -237,6 +241,18 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
         else if (jl_is_symbol(sym)) {
             defined = jl_boundp(modu, (jl_sym_t*)sym);
         }
+        else if (jl_is_expr(sym) && ((jl_expr_t*)sym)->head == static_parameter_sym) {
+            ssize_t n = jl_unbox_long(args[0]);
+            assert(n > 0);
+            if (s->sparam_vals && n <= jl_svec_len(s->sparam_vals)) {
+                jl_value_t *sp = jl_svecref(s->sparam_vals, n - 1);
+                defined = !jl_is_typevar(sp);
+            }
+            else {
+                // static parameter val unknown needs to be an error for ccall
+                jl_error("could not determine static parameter value");
+            }
+        }
         else {
             assert(0 && "malformed isdefined expression");
         }
@@ -264,7 +280,10 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
         ssize_t n = jl_unbox_long(args[0]);
         assert(n > 0);
         if (s->sparam_vals && n <= jl_svec_len(s->sparam_vals)) {
-            return jl_svecref(s->sparam_vals, n - 1);
+            jl_value_t *sp = jl_svecref(s->sparam_vals, n - 1);
+            if (jl_is_typevar(sp) && !s->preevaluation)
+                jl_undefined_var_error(((jl_tvar_t*)sp)->name);
+            return sp;
         }
         // static parameter val unknown needs to be an error for ccall
         jl_error("could not determine static parameter value");
@@ -287,20 +306,15 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
         assert(jl_expr_nargs(ex) != 1 || jl_is_symbol(fname));
 
         if (jl_is_symbol(fname)) {
-            jl_value_t **bp=NULL;
-            jl_value_t *bp_owner=NULL;
-            jl_binding_t *b=NULL;
-            if (bp == NULL) {
-                b = jl_get_binding_for_method_def(modu, fname);
-                bp = &b->value;
-                bp_owner = (jl_value_t*)modu;
-            }
-            jl_value_t *gf = jl_generic_function_def(fname, modu, bp, bp_owner, b);
+            jl_value_t *bp_owner = (jl_value_t*)modu;
+            jl_binding_t *b = jl_get_binding_for_method_def(modu, fname);
+            jl_value_t **bp = &b->value;
+            jl_value_t *gf = jl_generic_function_def(b->name, b->owner, bp, bp_owner, b);
             if (jl_expr_nargs(ex) == 1)
                 return gf;
         }
 
-        jl_value_t *atypes=NULL, *meth=NULL;
+        jl_value_t *atypes = NULL, *meth = NULL;
         JL_GC_PUSH2(&atypes, &meth);
         atypes = eval(args[1], s);
         meth = eval(args[2], s);
@@ -315,24 +329,8 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
             sym = jl_globalref_name(sym);
         }
         assert(jl_is_symbol(sym));
-        jl_binding_t *b = jl_get_binding_wr(modu, sym);
+        jl_binding_t *b = jl_get_binding_wr(modu, sym, 1);
         jl_declare_constant(b);
-        return (jl_value_t*)jl_nothing;
-    }
-    else if (ex->head == global_sym) {
-        // create uninitialized mutable binding for "global x" decl
-        // TODO: handle type decls
-        size_t i, l = jl_array_len(ex->args);
-        for (i = 0; i < l; i++) {
-            jl_sym_t *gsym = (jl_sym_t*)args[i];
-            jl_module_t *gmodu = modu;
-            if (jl_is_globalref(gsym)) {
-                gmodu = jl_globalref_mod(gsym);
-                gsym = jl_globalref_name(gsym);
-            }
-            assert(jl_is_symbol(gsym));
-            jl_get_binding_wr(gmodu, gsym);
-        }
         return (jl_value_t*)jl_nothing;
     }
     else if (ex->head == abstracttype_sym) {
@@ -353,7 +351,7 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
         assert(jl_is_symbol(name));
         dt = jl_new_abstracttype(name, modu, NULL, (jl_svec_t*)para);
         w = dt->name->wrapper;
-        jl_binding_t *b = jl_get_binding_wr(modu, (jl_sym_t*)name);
+        jl_binding_t *b = jl_get_binding_wr(modu, (jl_sym_t*)name, 1);
         temp = b->value;
         check_can_assign_type(b, w);
         b->value = w;
@@ -376,7 +374,7 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
         JL_GC_POP();
         return (jl_value_t*)jl_nothing;
     }
-    else if (ex->head == bitstype_sym) {
+    else if (ex->head == primtype_sym) {
         if (inside_typedef)
             jl_error("cannot eval a new bits type definition while defining another type");
         jl_value_t *name = args[0];
@@ -401,7 +399,7 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
                       jl_symbol_name((jl_sym_t*)name));
         dt = jl_new_primitivetype(name, modu, NULL, (jl_svec_t*)para, nb);
         w = dt->name->wrapper;
-        jl_binding_t *b = jl_get_binding_wr(modu, (jl_sym_t*)name);
+        jl_binding_t *b = jl_get_binding_wr(modu, (jl_sym_t*)name, 1);
         temp = b->value;
         check_can_assign_type(b, w);
         b->value = w;
@@ -424,7 +422,7 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
         JL_GC_POP();
         return (jl_value_t*)jl_nothing;
     }
-    else if (ex->head == compositetype_sym) {
+    else if (ex->head == structtype_sym) {
         if (inside_typedef)
             jl_error("cannot eval a new data type definition while defining another type");
         jl_value_t *name = args[0];
@@ -446,7 +444,7 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
                              0, args[5]==jl_true ? 1 : 0, jl_unbox_long(args[6]));
         w = dt->name->wrapper;
 
-        jl_binding_t *b = jl_get_binding_wr(modu, (jl_sym_t*)name);
+        jl_binding_t *b = jl_get_binding_wr(modu, (jl_sym_t*)name, 1);
         temp = b->value;  // save old value
         // temporarily assign so binding is available for field types
         check_can_assign_type(b, w);
@@ -508,11 +506,8 @@ static jl_value_t *eval(jl_value_t *e, interpreter_state *s)
 jl_value_t *jl_toplevel_eval_body(jl_module_t *m, jl_array_t *stmts)
 {
     size_t last_age = jl_get_ptls_states()->world_age;
-    interpreter_state s;
-    s.src = NULL;
+    interpreter_state s = {};
     s.module = m;
-    s.locals = NULL;
-    s.sparam_vals = NULL;
     jl_value_t *ret = eval_body(stmts, &s, 0, 1);
     jl_get_ptls_states()->world_age = last_age;
     return ret;
@@ -558,17 +553,14 @@ static jl_value_t *eval_body(jl_array_t *stmts, interpreter_state *s, int start,
                     s->locals[n-1] = rhs;
                 }
                 else {
-                    jl_module_t *m;
+                    jl_module_t *modu = s->module;
                     if (jl_is_globalref(sym)) {
-                        m = jl_globalref_mod(sym);
+                        modu = jl_globalref_mod(sym);
                         sym = (jl_value_t*)jl_globalref_name(sym);
-                    }
-                    else {
-                        m = s->module;
                     }
                     assert(jl_is_symbol(sym));
                     JL_GC_PUSH1(&rhs);
-                    jl_binding_t *b = jl_get_binding_wr(m, (jl_sym_t*)sym);
+                    jl_binding_t *b = jl_get_binding_wr(modu, (jl_sym_t*)sym, 1);
                     jl_checked_assignment(b, rhs);
                     JL_GC_POP();
                 }
@@ -665,7 +657,7 @@ jl_value_t *jl_interpret_call(jl_method_instance_t *lam, jl_value_t **args, uint
     JL_GC_PUSHARGS(locals, jl_source_nslots(src) + jl_source_nssavalues(src) + 2);
     locals[0] = (jl_value_t*)src;
     locals[1] = (jl_value_t*)stmts;
-    interpreter_state s;
+    interpreter_state s = {};
     s.src = src;
     s.module = lam->def.method->module;
     s.locals = locals + 2;
@@ -688,7 +680,7 @@ jl_value_t *jl_interpret_toplevel_thunk(jl_module_t *m, jl_code_info_t *src)
     assert(jl_typeis(stmts, jl_array_any_type));
     jl_value_t **locals;
     JL_GC_PUSHARGS(locals, jl_source_nslots(src) + jl_source_nssavalues(src));
-    interpreter_state s;
+    interpreter_state s = {};
     s.src = src;
     s.locals = locals;
     s.module = m;

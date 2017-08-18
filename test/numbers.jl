@@ -387,20 +387,6 @@ end
 @test base(12,typemin(Int128)) == "-2a695925806818735399a37a20a31b3534a8"
 @test base(12,typemax(Int128)) == "2a695925806818735399a37a20a31b3534a7"
 
-@test hex2num("3ff0000000000000") == 1.
-@test hex2num("bff0000000000000") == -1.
-@test hex2num("4000000000000000") == 2.
-@test hex2num("7ff0000000000000") == Inf
-@test hex2num("fff0000000000000") == -Inf
-@test isnan(hex2num("7ff8000000000000"))
-@test isnan(hex2num("fff8000000000000"))
-@test hex2num("3f800000") == 1.0f0
-@test hex2num("bf800000") == -1.0f0
-@test hex2num("7f800000") == Inf32
-@test hex2num("ff800000") == -Inf32
-@test isnan(hex2num("7fc00000"))
-@test isnan(hex2num("ffc00000"))
-
 # floating-point printing
 @test repr(1.0) == "1.0"
 @test repr(-1.0) == "-1.0"
@@ -2989,3 +2975,51 @@ f20065(B, i) = UInt8(B[i])
 end
 
 @test inv(3//4) === 4//3 === 1 / (3//4) === 1 // (3//4)
+
+# issues #23244 & #23250
+@testset "convert preserves NaN payloads" begin
+    @testset "smallest NaNs" begin
+        @test convert(Float32,  NaN16) ===  NaN32
+        @test convert(Float32, -NaN16) === -NaN32
+        @test convert(Float64,  NaN16) ===  NaN64
+        @test convert(Float64, -NaN16) === -NaN64
+        @test convert(Float16,  NaN32) ===  NaN16
+        @test convert(Float16, -NaN32) === -NaN16
+        @test convert(Float64,  NaN32) ===  NaN64
+        @test convert(Float64, -NaN32) === -NaN64
+        @test convert(Float32,  NaN64) ===  NaN32
+        @test convert(Float32, -NaN64) === -NaN32
+        @test convert(Float16,  NaN64) ===  NaN16
+        @test convert(Float16, -NaN64) === -NaN16
+    end
+
+    @testset "largest NaNs" begin
+        @test convert(Float32, reinterpret(Float16, typemax(UInt16))) ===
+              reinterpret(Float32, typemax(UInt32) >> 13 << 13)
+        @test convert(Float64, reinterpret(Float16, typemax(UInt16))) ===
+              reinterpret(Float64, typemax(UInt64) >> 42 << 42)
+        @test convert(Float16, reinterpret(Float32, typemax(UInt32))) ===
+              reinterpret(Float16, typemax(UInt16) >> 00 << 00)
+        @test convert(Float64, reinterpret(Float32, typemax(UInt32))) ===
+              reinterpret(Float64, typemax(UInt64) >> 29 << 29)
+        @test convert(Float32, reinterpret(Float64, typemax(UInt64))) ===
+              reinterpret(Float32, typemax(UInt32) >> 00 << 00)
+        @test convert(Float16, reinterpret(Float64, typemax(UInt64))) ===
+              reinterpret(Float16, typemax(UInt16) >> 00 << 00)
+    end
+
+    @testset "random NaNs" begin
+        nans = AbstractFloat[NaN16, NaN32, NaN64]
+        F = [Float16, Float32, Float64]
+        U = [UInt16, UInt32, UInt64]
+        sig = [11, 24, 53]
+        for i = 1:length(F), j = 1:length(F)
+            for _ = 1:100
+                nan = reinterpret(F[i], rand(U[i]) | reinterpret(U[i], nans[i]))
+                z = sig[i] - sig[j]
+                nan′ = i <= j ? nan : reinterpret(F[i], reinterpret(U[i], nan) >> z << z)
+                @test convert(F[i], convert(F[j], nan)) === nan′
+            end
+        end
+    end
+end

@@ -5,7 +5,7 @@ New language features
 ---------------------
 
   * Local variables can be tested for being defined
-    using the new `@isdefined variable` macro ([#TBD]).
+    using the new `@isdefined variable` macro ([#22281]).
 
 Language changes
 ----------------
@@ -32,6 +32,41 @@ Language changes
   * `{ }` expressions now use `braces` and `bracescat` as expression heads instead
     of `cell1d` and `cell2d`, and parse similarly to `vect` and `vcat` ([#8470]).
 
+  * Nested `if` expressions that arise from the keyword `elseif` now use `elseif`
+    as their expression head instead of `if` ([#21774]).
+
+  * Parsed and lowered forms of type definitions have been synchronized with their
+    new keywords ([#23157]). Expression heads are renamed as follows:
+
+    + `type`           => `struct`
+
+    + `bitstype`       => `primitive` (order of arguments is also reversed, to match syntax)
+
+    + `composite_type` => `struct_type`
+
+    + `bits_type`      => `primitive_type`
+
+  * The `global` keyword now only introduces a new binding if one doesn't already exist
+    in the module.
+    This means that assignment to a global (`global sin = 3`) may now throw the error:
+    "cannot assign variable Base.sin from module Main", rather than emitting a warning.
+    Additionally, the new bindings are now created before the statement is executed.
+    For example, `f() = (global sin = "gluttony"; nothing)` will now resolve which module
+    contains `sin` eagerly, rather than delaying that decision until `f` is run. ([#22984]).
+
+  * Dispatch rules have been simplified:
+    method matching is now determined exclusively by subtyping;
+    the rule that method type parameters must also be captured has been removed.
+    Instead, attempting to access the unconstrained parameters will throw an `UndefVarError`.
+    Linting in package tests is recommended to confirm that the set of methods
+    which might throw `UndefVarError` when accessing the static parameters
+    (`need_to_handle_undef_sparam = Set{Any}(m.sig for m in Test.detect_unbound_args(Base, recursive=true))`)
+    is equal (`==`) to some known set (`expected = Set()`). ([#23117])
+
+  * `const` declarations on local variables were previously ignored. They now give a
+    warning, so that this syntax can be disallowed or given a new meaning in a
+    future version ([#5148]).
+
 Breaking changes
 ----------------
 
@@ -41,6 +76,16 @@ This section lists changes that do not have deprecation warnings.
     Previously an empty tuple was returned ([#21697]).
 
   * Juxtaposing string literals (e.g. `"x"y`) is now a syntax error ([#20575]).
+
+  * Macro calls with `for` expressions are now parsed as generators inside
+    function argument lists ([#18650]). Examples:
+
+    + `sum(@inbounds a[i] for i = 1:n)` used to give a syntax error, but is now
+      parsed as `sum(@inbounds(a[i]) for i = 1:n)`.
+
+    + `sum(@m x for i = 1:n end)` used to parse the argument to `sum` as a 2-argument
+      call to macro `@m`, but now parses it as a generator plus a syntax error
+      for the dangling `end`.
 
   * `@__DIR__` returns the current working directory rather than `nothing` when not run
     from a file ([#21759]).
@@ -73,8 +118,14 @@ This section lists changes that do not have deprecation warnings.
     longer present. Use `first(R)` and `last(R)` to obtain
     start/stop. ([#20974])
 
-  * The `Diagonal` type definition has changed from `Diagonal{T}` to
-    `Diagonal{T,V<:AbstractVector{T}}` ([#22718]).
+  * The `Diagonal`, `Bidiagonal` and `SymTridiagonal` type definitions have changed from
+    `Diagonal{T}`, `Bidiagonal{T}` and `SymTridiagonal{T}` to `Diagonal{T,V<:AbstractVector{T}}`,
+    `Bidiagonal{T,V<:AbstractVector{T}}` and `SymTridiagonal{T,V<:AbstractVector{T}}`
+    respectively ([#22718], [#22925], [#23035]).
+
+  * `isapprox(x,y)` now tests `norm(x-y) <= max(atol, rtol*max(norm(x), norm(y)))`
+    rather than `norm(x-y) <= atol + ...`, and `rtol` defaults to zero
+    if an `atol > 0` is specified ([#22742]).
 
   * Spaces are no longer allowed between `@` and the name of a macro in a macro call ([#22868]).
 
@@ -142,8 +193,9 @@ Library improvements
 
   * `Char`s can now be concatenated with `String`s and/or other `Char`s using `*` ([#22532]).
 
-  * `Diagonal` is now parameterized on the type of the wrapped vector. This allows
-    for `Diagonal` matrices with arbitrary `AbstractVector`s ([#22718]).
+  * `Diagonal`, `Bidiagonal` and `SymTridiagonal` are now parameterized on the type of the
+    wrapped vectors, allowing `Diagonal`, `Bidiagonal` and `SymTridiagonal` matrices with
+    arbitrary `AbstractVector`s ([#22718], [#22925], [#23035]).
 
   * Mutating versions of `randperm` and `randcycle` have been added:
     `randperm!` and `randcycle!` ([#22723]).
@@ -206,17 +258,21 @@ Deprecated or removed
   * `Bidiagonal` constructors now use a `Symbol` (`:U` or `:L`) for the upper/lower
     argument, instead of a `Bool` or a `Char` ([#22703]).
 
+  * `Bidiagonal` and `SymTridiagonal` constructors that automatically converted the input
+    vectors to the same type are deprecated in favor of explicit conversion ([#22925], [#23035]).
+
   * Calling `nfields` on a type to find out how many fields its instances have is deprecated.
     Use `fieldcount` instead. Use `nfields` only to get the number of fields in a specific object ([#22350]).
 
   * `fieldnames` now operates only on types. To get the names of fields in an object, use
     `fieldnames(typeof(x))` ([#22350]).
 
-  * `InexactError` and `DomainError` now take
+  * `InexactError`, `DomainError`, and `OverflowError` now take
     arguments. `InexactError(func::Symbol, type, -3)` now prints as
-    `ERROR: InexactError: func(type, -3)`, and `DomainError(val,
-    [msg])` prints as `ERROR: DomainError with val:\nmsg`. ([#20005],
-    [#22751])
+    "ERROR: InexactError: func(type, -3)", `DomainError(val,
+    [msg])` prints as "ERROR: DomainError with val:\nmsg",
+    and `OverflowError(msg)` prints as "ERROR: OverflowError: msg".
+    ([#20005], [#22751], [#22761])
 
   * The operating system identification functions: `is_linux`, `is_bsd`, `is_apple`, `is_unix`,
     and `is_windows`, have been deprecated in favor of `Sys.islinux`, `Sys.isbsd`, `Sys.isapple`,
@@ -226,6 +282,10 @@ Deprecated or removed
     input stream are deprecated. Use e.g. `read(pipeline(stdin, cmd))` instead ([#22762]).
 
   * The unexported type `AbstractIOBuffer` has been renamed to `GenericIOBuffer` ([#17360] [#22796]).
+
+  * Remaining vectorized methods over `SparseVector`s, particularly `floor`, `ceil`,
+    `trunc`, `round`, and most common transcendental functions such as `exp`, `log`, and
+    `sin` variants, have been deprecated in favor of dot-syntax ([#22961]).
 
   * The method `String(io::IOBuffer)` is deprecated to `String(take!(copy(io)))` ([#21438]).
 
@@ -239,6 +299,24 @@ Deprecated or removed
   * Calling `write` on non-isbits arrays is deprecated in favor of explicit loops or
     `serialize` ([#6466]).
 
+  * The default `juliarc.jl` file on Windows has been removed. Now must explicitly include the
+    full path if you need access to executables or libraries in the `JULIA_HOME` directory, e.g.
+    `joinpath(JULIA_HOME, "7z.exe")` for `7z.exe` ([#21540]).
+
+  * Calling `union` with no arguments is deprecated; construct an empty set with an appropriate
+    element type using `Set{T}()` instead ([#23144]).
+
+  * Vectorized `DateTime`, `Date`, and `format` methods have been deprecated in favor of
+    dot-syntax ([#23207]).
+
+  * `Base.cpad` has been removed; use an appropriate combination of `rpad` and `lpad`
+    instead ([#23187]).
+
+Command-line option changes
+---------------------------
+
+  * New option `--warn-overwrite={yes|no}` to control the warning for overwriting method
+    definitions. The default is `no` ([#23002]).
 
 Julia v0.6.0 Release Notes
 ==========================
@@ -863,7 +941,9 @@ Command-line option changes
 <!--- generated by NEWS-update.jl: -->
 [#265]: https://github.com/JuliaLang/julia/issues/265
 [#4615]: https://github.com/JuliaLang/julia/issues/4615
+[#6466]: https://github.com/JuliaLang/julia/issues/6466
 [#7669]: https://github.com/JuliaLang/julia/issues/7669
+[#8470]: https://github.com/JuliaLang/julia/issues/8470
 [#8974]: https://github.com/JuliaLang/julia/issues/8974
 [#9343]: https://github.com/JuliaLang/julia/issues/9343
 [#10946]: https://github.com/JuliaLang/julia/issues/10946
@@ -871,6 +951,7 @@ Command-line option changes
 [#11310]: https://github.com/JuliaLang/julia/issues/11310
 [#12274]: https://github.com/JuliaLang/julia/issues/12274
 [#12563]: https://github.com/JuliaLang/julia/issues/12563
+[#13079]: https://github.com/JuliaLang/julia/issues/13079
 [#15850]: https://github.com/JuliaLang/julia/issues/15850
 [#16213]: https://github.com/JuliaLang/julia/issues/16213
 [#16378]: https://github.com/JuliaLang/julia/issues/16378
@@ -880,9 +961,11 @@ Command-line option changes
 [#16986]: https://github.com/JuliaLang/julia/issues/16986
 [#17057]: https://github.com/JuliaLang/julia/issues/17057
 [#17155]: https://github.com/JuliaLang/julia/issues/17155
+[#17240]: https://github.com/JuliaLang/julia/issues/17240
 [#17261]: https://github.com/JuliaLang/julia/issues/17261
 [#17265]: https://github.com/JuliaLang/julia/issues/17265
 [#17302]: https://github.com/JuliaLang/julia/issues/17302
+[#17360]: https://github.com/JuliaLang/julia/issues/17360
 [#17599]: https://github.com/JuliaLang/julia/issues/17599
 [#17607]: https://github.com/JuliaLang/julia/issues/17607
 [#17623]: https://github.com/JuliaLang/julia/issues/17623
@@ -910,6 +993,7 @@ Command-line option changes
 [#18628]: https://github.com/JuliaLang/julia/issues/18628
 [#18642]: https://github.com/JuliaLang/julia/issues/18642
 [#18644]: https://github.com/JuliaLang/julia/issues/18644
+[#18650]: https://github.com/JuliaLang/julia/issues/18650
 [#18660]: https://github.com/JuliaLang/julia/issues/18660
 [#18690]: https://github.com/JuliaLang/julia/issues/18690
 [#18754]: https://github.com/JuliaLang/julia/issues/18754
@@ -922,6 +1006,7 @@ Command-line option changes
 [#18977]: https://github.com/JuliaLang/julia/issues/18977
 [#19018]: https://github.com/JuliaLang/julia/issues/19018
 [#19088]: https://github.com/JuliaLang/julia/issues/19088
+[#19089]: https://github.com/JuliaLang/julia/issues/19089
 [#19157]: https://github.com/JuliaLang/julia/issues/19157
 [#19233]: https://github.com/JuliaLang/julia/issues/19233
 [#19239]: https://github.com/JuliaLang/julia/issues/19239
@@ -1015,6 +1100,7 @@ Command-line option changes
 [#20500]: https://github.com/JuliaLang/julia/issues/20500
 [#20530]: https://github.com/JuliaLang/julia/issues/20530
 [#20543]: https://github.com/JuliaLang/julia/issues/20543
+[#20549]: https://github.com/JuliaLang/julia/issues/20549
 [#20575]: https://github.com/JuliaLang/julia/issues/20575
 [#20609]: https://github.com/JuliaLang/julia/issues/20609
 [#20889]: https://github.com/JuliaLang/julia/issues/20889
@@ -1022,10 +1108,17 @@ Command-line option changes
 [#20974]: https://github.com/JuliaLang/julia/issues/20974
 [#21183]: https://github.com/JuliaLang/julia/issues/21183
 [#21359]: https://github.com/JuliaLang/julia/issues/21359
+[#21438]: https://github.com/JuliaLang/julia/issues/21438
+[#21450]: https://github.com/JuliaLang/julia/issues/21450
+[#21540]: https://github.com/JuliaLang/julia/issues/21540
+[#21592]: https://github.com/JuliaLang/julia/issues/21592
+[#21662]: https://github.com/JuliaLang/julia/issues/21662
 [#21692]: https://github.com/JuliaLang/julia/issues/21692
 [#21697]: https://github.com/JuliaLang/julia/issues/21697
+[#21709]: https://github.com/JuliaLang/julia/issues/21709
 [#21746]: https://github.com/JuliaLang/julia/issues/21746
 [#21759]: https://github.com/JuliaLang/julia/issues/21759
+[#21774]: https://github.com/JuliaLang/julia/issues/21774
 [#21818]: https://github.com/JuliaLang/julia/issues/21818
 [#21825]: https://github.com/JuliaLang/julia/issues/21825
 [#21956]: https://github.com/JuliaLang/julia/issues/21956
@@ -1036,6 +1129,7 @@ Command-line option changes
 [#22038]: https://github.com/JuliaLang/julia/issues/22038
 [#22062]: https://github.com/JuliaLang/julia/issues/22062
 [#22064]: https://github.com/JuliaLang/julia/issues/22064
+[#22092]: https://github.com/JuliaLang/julia/issues/22092
 [#22182]: https://github.com/JuliaLang/julia/issues/22182
 [#22187]: https://github.com/JuliaLang/julia/issues/22187
 [#22188]: https://github.com/JuliaLang/julia/issues/22188
@@ -1043,9 +1137,40 @@ Command-line option changes
 [#22224]: https://github.com/JuliaLang/julia/issues/22224
 [#22228]: https://github.com/JuliaLang/julia/issues/22228
 [#22245]: https://github.com/JuliaLang/julia/issues/22245
+[#22251]: https://github.com/JuliaLang/julia/issues/22251
+[#22274]: https://github.com/JuliaLang/julia/issues/22274
+[#22281]: https://github.com/JuliaLang/julia/issues/22281
+[#22296]: https://github.com/JuliaLang/julia/issues/22296
 [#22310]: https://github.com/JuliaLang/julia/issues/22310
+[#22325]: https://github.com/JuliaLang/julia/issues/22325
+[#22350]: https://github.com/JuliaLang/julia/issues/22350
+[#22496]: https://github.com/JuliaLang/julia/issues/22496
 [#22523]: https://github.com/JuliaLang/julia/issues/22523
 [#22532]: https://github.com/JuliaLang/julia/issues/22532
-[#22709]: https://github.com/JuliaLang/julia/issues/22709
+[#22588]: https://github.com/JuliaLang/julia/issues/22588
+[#22605]: https://github.com/JuliaLang/julia/issues/22605
+[#22666]: https://github.com/JuliaLang/julia/issues/22666
+[#22703]: https://github.com/JuliaLang/julia/issues/22703
 [#22712]: https://github.com/JuliaLang/julia/issues/22712
+[#22718]: https://github.com/JuliaLang/julia/issues/22718
+[#22723]: https://github.com/JuliaLang/julia/issues/22723
 [#22732]: https://github.com/JuliaLang/julia/issues/22732
+[#22751]: https://github.com/JuliaLang/julia/issues/22751
+[#22761]: https://github.com/JuliaLang/julia/issues/22761
+[#22762]: https://github.com/JuliaLang/julia/issues/22762
+[#22793]: https://github.com/JuliaLang/julia/issues/22793
+[#22796]: https://github.com/JuliaLang/julia/issues/22796
+[#22800]: https://github.com/JuliaLang/julia/issues/22800
+[#22814]: https://github.com/JuliaLang/julia/issues/22814
+[#22829]: https://github.com/JuliaLang/julia/issues/22829
+[#22847]: https://github.com/JuliaLang/julia/issues/22847
+[#22868]: https://github.com/JuliaLang/julia/issues/22868
+[#22925]: https://github.com/JuliaLang/julia/issues/22925
+[#22961]: https://github.com/JuliaLang/julia/issues/22961
+[#22984]: https://github.com/JuliaLang/julia/issues/22984
+[#23035]: https://github.com/JuliaLang/julia/issues/23035
+[#23117]: https://github.com/JuliaLang/julia/issues/23117
+[#23144]: https://github.com/JuliaLang/julia/issues/23144
+[#23157]: https://github.com/JuliaLang/julia/issues/23157
+[#23187]: https://github.com/JuliaLang/julia/issues/23187
+[#23207]: https://github.com/JuliaLang/julia/issues/23207

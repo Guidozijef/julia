@@ -392,6 +392,14 @@ convert(::Type{Float16}, n::BigInt) = Float16(n,RoundNearest)
 
 promote_rule(::Type{BigInt}, ::Type{<:Integer}) = BigInt
 
+"""
+    big(x)
+
+Convert a number to a maximum precision representation (typically [`BigInt`](@ref) or
+`BigFloat`). See [`BigFloat`](@ref) for information about some pitfalls with floating-point numbers.
+"""
+function big end
+
 big(::Type{<:Integer})  = BigInt
 big(::Type{<:Rational}) = Rational{BigInt}
 
@@ -494,6 +502,8 @@ isqrt(x::BigInt) = MPZ.sqrt(x)
 
 function bigint_pow(x::BigInt, y::Integer)
     if y<0; throw(DomainError(y, "`y` cannot be negative.")); end
+    @noinline throw1(y) =
+        throw(OverflowError("exponent $y is too large and computation will overflow"))
     if x== 1; return x; end
     if x==-1; return isodd(y) ? x : -x; end
     if y>typemax(Culong)
@@ -507,7 +517,7 @@ function bigint_pow(x::BigInt, y::Integer)
        #
        #Assume that the answer will definitely overflow.
 
-       throw(OverflowError())
+       throw1(y)
     end
     return x^convert(Culong, y)
 end

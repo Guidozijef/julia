@@ -2,6 +2,11 @@
 
 ## type join (closest common ancestor, or least upper bound) ##
 
+"""
+    typejoin(T, S)
+
+Compute a type that contains both `T` and `S`.
+"""
 typejoin() = (@_pure_meta; Bottom)
 typejoin(@nospecialize(t)) = (@_pure_meta; t)
 typejoin(@nospecialize(t), ts...) = (@_pure_meta; typejoin(t, typejoin(ts...)))
@@ -122,15 +127,6 @@ end
 
 ## promotion mechanism ##
 
-promote_type()  = Bottom
-promote_type(T) = T
-promote_type(T, S, U, V...) = (@_inline_meta; promote_type(T, promote_type(S, U, V...)))
-
-promote_type(::Type{Bottom}, ::Type{Bottom}) = Bottom
-promote_type(::Type{T}, ::Type{T}) where {T} = T
-promote_type(::Type{T}, ::Type{Bottom}) where {T} = T
-promote_type(::Type{Bottom}, ::Type{T}) where {T} = T
-
 """
     promote_type(type1, type2)
 
@@ -151,6 +147,17 @@ julia> promote_type(Float32, BigInt)
 BigFloat
 ```
 """
+function promote_type end
+
+promote_type()  = Bottom
+promote_type(T) = T
+promote_type(T, S, U, V...) = (@_inline_meta; promote_type(T, promote_type(S, U, V...)))
+
+promote_type(::Type{Bottom}, ::Type{Bottom}) = Bottom
+promote_type(::Type{T}, ::Type{T}) where {T} = T
+promote_type(::Type{T}, ::Type{Bottom}) where {T} = T
+promote_type(::Type{Bottom}, ::Type{T}) where {T} = T
+
 function promote_type(::Type{T}, ::Type{S}) where {T,S}
     @_inline_meta
     # Try promote_rule in both orders. Typically only one is defined,
@@ -161,12 +168,34 @@ function promote_type(::Type{T}, ::Type{S}) where {T,S}
     promote_result(T, S, promote_rule(T,S), promote_rule(S,T))
 end
 
+"""
+    promote_rule(type1, type2)
+
+Specifies what type should be used by [`promote`](@ref) when given values of types `type1` and
+`type2`. This function should not be called directly, but should have definitions added to
+it for new types as appropriate.
+"""
+function promote_rule end
+
 promote_rule(::Type{<:Any}, ::Type{<:Any}) = Bottom
 
 promote_result(::Type{<:Any},::Type{<:Any},::Type{T},::Type{S}) where {T,S} = (@_inline_meta; promote_type(T,S))
 # If no promote_rule is defined, both directions give Bottom. In that
 # case use typejoin on the original types instead.
 promote_result(::Type{T},::Type{S},::Type{Bottom},::Type{Bottom}) where {T,S} = (@_inline_meta; typejoin(T, S))
+
+"""
+    promote(xs...)
+
+Convert all arguments to their common promotion type (if any), and return them all (as a tuple).
+
+# Examples
+```jldoctest
+julia> promote(Int8(1), Float16(4.5), Float32(4.1))
+(1.0f0, 4.5f0, 4.1f0)
+```
+"""
+function promote end
 
 promote() = ()
 promote(x) = (x,)

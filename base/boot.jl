@@ -135,7 +135,7 @@ export
     ErrorException, BoundsError, DivideError, DomainError, Exception,
     InterruptException, InexactError, OutOfMemoryError, ReadOnlyMemoryError,
     OverflowError, StackOverflowError, SegmentationFault, UndefRefError, UndefVarError,
-    TypeError,
+    TypeError, ArgumentError, MethodError, AssertionError, LoadError, InitError,
     # AST representation
     Expr, GotoNode, LabelNode, LineNumberNode, QuoteNode,
     GlobalRef, NewvarNode, SSAValue, Slot, SlotNumber, TypedSlot,
@@ -212,7 +212,6 @@ struct BoundsError        <: Exception
     BoundsError(@nospecialize(a), i) = (@_noinline_meta; new(a,i))
 end
 struct DivideError        <: Exception end
-struct OverflowError      <: Exception end
 struct OutOfMemoryError   <: Exception end
 struct ReadOnlyMemoryError<: Exception end
 struct SegmentationFault  <: Exception end
@@ -240,6 +239,43 @@ struct InexactError <: Exception
     val
 
     InexactError(f::Symbol, @nospecialize(T), @nospecialize(val)) = (@_noinline_meta; new(f, T, val))
+end
+struct OverflowError <: Exception
+    msg
+end
+
+mutable struct ArgumentError <: Exception
+    msg::AbstractString
+end
+
+mutable struct MethodError <: Exception
+    f
+    args
+    world::UInt
+    MethodError(@nospecialize(f), @nospecialize(args), world::UInt) = new(f, args, world)
+end
+const typemax_UInt = ccall(:jl_typemax_uint, Any, (Any,), UInt)
+MethodError(@nospecialize(f), @nospecialize(args)) = MethodError(f, args, typemax_UInt)
+
+mutable struct AssertionError <: Exception
+    msg::AbstractString
+    AssertionError() = new("")
+    AssertionError(msg) = new(msg)
+end
+
+#Generic wrapping of arbitrary exceptions
+#Subtypes should put the exception in an 'error' field
+abstract type WrappedException <: Exception end
+
+mutable struct LoadError <: WrappedException
+    file::AbstractString
+    line::Int
+    error
+end
+
+mutable struct InitError <: WrappedException
+    mod::Symbol
+    error
 end
 
 abstract type DirectIndexString <: AbstractString end

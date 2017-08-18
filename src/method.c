@@ -25,8 +25,14 @@ jl_value_t *jl_resolve_globals(jl_value_t *expr, jl_module_t *module, jl_svec_t 
     }
     else if (jl_is_expr(expr)) {
         jl_expr_t *e = (jl_expr_t*)expr;
+        if (e->head == global_sym) {
+            // execute the side-effects of "global x" decl immediately:
+            // creates uninitialized mutable binding in module for each global
+            jl_toplevel_eval_flex(module, expr, 0, 1);
+            expr = jl_nothing;
+        }
         if (jl_is_toplevel_only_expr(expr) || e->head == const_sym || e->head == copyast_sym ||
-            e->head == global_sym || e->head == quote_sym || e->head == inert_sym ||
+            e->head == quote_sym || e->head == inert_sym ||
             e->head == line_sym || e->head == meta_sym || e->head == inbounds_sym ||
             e->head == boundscheck_sym || e->head == simdloop_sym) {
             // ignore these
@@ -104,8 +110,8 @@ jl_value_t *jl_resolve_globals(jl_value_t *expr, jl_module_t *module, jl_svec_t 
                 JL_TYPECHK(ccall method definition, symbol, *(jl_value_t**)jl_exprarg(e, 3));
                 JL_TYPECHK(ccall method definition, long, jl_exprarg(e, 4));
             }
-            if (e->head == method_sym || e->head == abstracttype_sym || e->head == compositetype_sym ||
-                e->head == bitstype_sym || e->head == module_sym) {
+            if (e->head == method_sym || e->head == abstracttype_sym || e->head == structtype_sym ||
+                e->head == primtype_sym || e->head == module_sym) {
                 i++;
             }
             for (; i < nargs; i++) {
@@ -164,6 +170,8 @@ static void jl_code_info_set_ast(jl_code_info_t *li, jl_expr_t *ast)
     jl_gc_wb(li, li->slotflags);
     li->ssavaluetypes = jl_box_long(nssavalue);
     jl_gc_wb(li, li->ssavaluetypes);
+    // Flags that need to be copied to slotflags
+    const uint8_t vinfo_mask = 16 | 32 | 64;
     int i;
     for (i = 0; i < nslots; i++) {
         jl_value_t *vi = jl_array_ptr_ref(vis, i);
@@ -181,7 +189,7 @@ static void jl_code_info_set_ast(jl_code_info_t *li, jl_expr_t *ast)
             }
         }
         jl_array_ptr_set(li->slotnames, i, name);
-        jl_array_uint8_set(li->slotflags, i, jl_unbox_long(jl_array_ptr_ref(vi, 2)));
+        jl_array_uint8_set(li->slotflags, i, vinfo_mask & jl_unbox_long(jl_array_ptr_ref(vi, 2)));
     }
 }
 
@@ -316,37 +324,41 @@ JL_DLLEXPORT jl_code_info_t *jl_code_for_staged(jl_method_instance_t *linfo)
         jl_value_t *generated_body = jl_call_staged(sparam_vals, generator, jl_svec_data(tt->parameters), jl_nparams(tt));
         jl_array_ptr_set(body->args, 2, generated_body);
 
-        if (linfo->def.method->sparam_syms != jl_emptysvec) {
-            // mark this function as having the same static parameters as the generator
-            size_t i, nsp = jl_svec_len(linfo->def.method->sparam_syms);
-            jl_expr_t *newast = jl_exprn(jl_symbol("with-static-parameters"), nsp + 1);
-            jl_exprarg(newast, 0) = (jl_value_t*)ex;
-            // (with-static-parameters func_expr sp_1 sp_2 ...)
-            for (i = 0; i < nsp; i++)
-                jl_exprarg(newast, i+1) = jl_svecref(linfo->def.method->sparam_syms, i);
-            ex = newast;
-        }
+        if (jl_is_code_info(generated_body)) {
+            func = (jl_code_info_t*)generated_body;
+        } else {
+            if (linfo->def.method->sparam_syms != jl_emptysvec) {
+                // mark this function as having the same static parameters as the generator
+                size_t i, nsp = jl_svec_len(linfo->def.method->sparam_syms);
+                jl_expr_t *newast = jl_exprn(jl_symbol("with-static-parameters"), nsp + 1);
+                jl_exprarg(newast, 0) = (jl_value_t*)ex;
+                // (with-static-parameters func_expr sp_1 sp_2 ...)
+                for (i = 0; i < nsp; i++)
+                    jl_exprarg(newast, i+1) = jl_svecref(linfo->def.method->sparam_syms, i);
+                ex = newast;
+            }
 
-        func = (jl_code_info_t*)jl_expand((jl_value_t*)ex, linfo->def.method->module);
-        if (!jl_is_code_info(func)) {
-            if (jl_is_expr(func) && ((jl_expr_t*)func)->head == error_sym)
-                jl_interpret_toplevel_expr_in(linfo->def.method->module, (jl_value_t*)func, NULL, NULL);
-            jl_error("generated function body is not pure. this likely means it contains a closure or comprehension.");
-        }
+            func = (jl_code_info_t*)jl_expand((jl_value_t*)ex, linfo->def.method->module);
+            if (!jl_is_code_info(func)) {
+                if (jl_is_expr(func) && ((jl_expr_t*)func)->head == error_sym)
+                    jl_interpret_toplevel_expr_in(linfo->def.method->module, (jl_value_t*)func, NULL, NULL);
+                jl_error("generated function body is not pure. this likely means it contains a closure or comprehension.");
+            }
 
-        jl_array_t *stmts = (jl_array_t*)func->code;
-        size_t i, l;
-        for (i = 0, l = jl_array_len(stmts); i < l; i++) {
-            jl_value_t *stmt = jl_array_ptr_ref(stmts, i);
-            stmt = jl_resolve_globals(stmt, linfo->def.method->module, env);
-            jl_array_ptr_set(stmts, i, stmt);
-        }
+            jl_array_t *stmts = (jl_array_t*)func->code;
+            size_t i, l;
+            for (i = 0, l = jl_array_len(stmts); i < l; i++) {
+                jl_value_t *stmt = jl_array_ptr_ref(stmts, i);
+                stmt = jl_resolve_globals(stmt, linfo->def.method->module, env);
+                jl_array_ptr_set(stmts, i, stmt);
+            }
 
-        // add pop_loc meta
-        jl_array_ptr_1d_push(stmts, jl_nothing);
-        jl_expr_t *poploc = jl_exprn(meta_sym, 1);
-        jl_array_ptr_set(stmts, jl_array_len(stmts) - 1, poploc);
-        jl_array_ptr_set(poploc->args, 0, jl_symbol("pop_loc"));
+            // add pop_loc meta
+            jl_array_ptr_1d_push(stmts, jl_nothing);
+            jl_expr_t *poploc = jl_exprn(meta_sym, 1);
+            jl_array_ptr_set(stmts, jl_array_len(stmts) - 1, poploc);
+            jl_array_ptr_set(poploc->args, 0, jl_symbol("pop_loc"));
+        }
 
         ptls->in_pure_callback = last_in;
         jl_lineno = last_lineno;
@@ -653,6 +665,7 @@ JL_DLLEXPORT jl_value_t *jl_argument_datatype(jl_value_t *argt)
 }
 
 extern tracer_cb jl_newmeth_tracer;
+
 JL_DLLEXPORT void jl_method_def(jl_svec_t *argdata,
                                 jl_code_info_t *f,
                                 jl_module_t *module,
@@ -671,9 +684,11 @@ JL_DLLEXPORT void jl_method_def(jl_svec_t *argdata,
     jl_methtable_t *mt;
     jl_sym_t *name;
     jl_method_t *m = NULL;
+    jl_value_t *argtype = NULL;
+    JL_GC_PUSH3(&f, &m, &argtype);
     size_t i, na = jl_svec_len(atypes);
     int32_t nospec = 0;
-    for (i=1; i < na; i++) {
+    for (i = 1; i < na; i++) {
         jl_value_t *ti = jl_svecref(atypes, i);
         if (ti == jl_ANY_flag ||
             (jl_is_vararg_type(ti) && jl_tparam0(jl_unwrap_unionall(ti)) == jl_ANY_flag)) {
@@ -684,17 +699,15 @@ JL_DLLEXPORT void jl_method_def(jl_svec_t *argdata,
             jl_svecset(atypes, i, jl_substitute_var(ti, (jl_tvar_t*)jl_ANY_flag, (jl_value_t*)jl_any_type));
         }
     }
-    jl_value_t *argtype = (jl_value_t*)jl_apply_tuple_type(atypes);
-    JL_GC_PUSH3(&f, &m, &argtype);
 
-    if (!jl_is_code_info(f)) {
-        // this occurs when there is a closure being added to an out-of-scope function
-        // the user should only do this at the toplevel
-        // the result is that the closure variables get interpolated directly into the AST
-        f = jl_new_code_info_from_ast((jl_expr_t*)f);
+    argtype = (jl_value_t*)jl_apply_tuple_type(atypes);
+    for (i = jl_svec_len(tvars); i > 0; i--) {
+        jl_value_t *tv = jl_svecref(tvars, i - 1);
+        if (!jl_is_typevar(tv))
+            jl_type_error_rt("method definition", "type parameter", (jl_value_t*)jl_tvar_type, tv);
+        argtype = jl_new_struct(jl_unionall_type, tv, argtype);
     }
 
-    assert(jl_is_code_info(f));
     jl_datatype_t *ftype = jl_first_argument_datatype(argtype);
     if (ftype == NULL ||
         !(jl_is_type_type((jl_value_t*)ftype) ||
@@ -702,20 +715,17 @@ JL_DLLEXPORT void jl_method_def(jl_svec_t *argdata,
            (!ftype->abstract || jl_is_leaf_type((jl_value_t*)ftype)) &&
            ftype->name->mt != NULL)))
         jl_error("cannot add methods to an abstract type");
-    mt = ftype->name->mt;
-    name = mt->name;
-
     if (jl_subtype((jl_value_t*)ftype, (jl_value_t*)jl_builtin_type))
         jl_error("cannot add methods to a builtin function");
 
-    int j;
-    for (j = (int)jl_svec_len(tvars) - 1; j >= 0 ; j--) {
-        jl_value_t *tv = jl_svecref(tvars,j);
-        if (!jl_is_typevar(tv))
-            jl_type_error_rt(jl_symbol_name(name), "method definition", (jl_value_t*)jl_tvar_type, tv);
-        argtype = jl_new_struct(jl_unionall_type, tv, argtype);
+    mt = ftype->name->mt;
+    name = mt->name;
+    if (!jl_is_code_info(f)) {
+        // this occurs when there is a closure being added to an out-of-scope function
+        // the user should only do this at the toplevel
+        // the result is that the closure variables get interpolated directly into the AST
+        f = jl_new_code_info_from_ast((jl_expr_t*)f);
     }
-
     m = jl_new_method(f, name, module, (jl_tupletype_t*)argtype, nargs, isva, tvars, isstaged == jl_true);
     m->nospecialize |= nospec;
 
@@ -726,8 +736,6 @@ JL_DLLEXPORT void jl_method_def(jl_svec_t *argdata,
                       jl_symbol_name(m->file),
                       m->line);
     }
-
-    jl_check_static_parameter_conflicts(m, f, tvars);
 
     for (i = 0; i < na; i++) {
         jl_value_t *elt = jl_svecref(atypes, i);
@@ -757,18 +765,21 @@ JL_DLLEXPORT void jl_method_def(jl_svec_t *argdata,
     }
 
     int ishidden = !!strchr(jl_symbol_name(name), '#');
-    jl_value_t *atemp = argtype;
-    while (jl_is_unionall(atemp)) {
-        jl_unionall_t *ua = (jl_unionall_t*)atemp;
-        jl_tvar_t *tv = ua->var;
-        if (!ishidden && !jl_has_typevar(ua->body, tv)) {
-            jl_printf(JL_STDERR, "WARNING: static parameter %s does not occur in signature for %s",
-                      jl_symbol_name(tv->name), jl_symbol_name(name));
-            print_func_loc(JL_STDERR, m);
-            jl_printf(JL_STDERR, ".\nThe method will not be callable.\n");
+    if (!ishidden) {
+        jl_value_t *atemp = argtype;
+        while (jl_is_unionall(atemp)) {
+            jl_unionall_t *ua = (jl_unionall_t*)atemp;
+            jl_tvar_t *tv = ua->var;
+            if (!jl_has_typevar(ua->body, tv)) {
+                jl_printf(JL_STDERR, "WARNING: static parameter %s does not occur in signature for %s",
+                          jl_symbol_name(tv->name), jl_symbol_name(name));
+                print_func_loc(JL_STDERR, m);
+                jl_printf(JL_STDERR, ".\n");
+            }
+            atemp = ua->body;
         }
-        atemp = ua->body;
     }
+    jl_check_static_parameter_conflicts(m, f, tvars);
 
     jl_method_table_insert(mt, m, NULL);
     if (jl_newmeth_tracer)

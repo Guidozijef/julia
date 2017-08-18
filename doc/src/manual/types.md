@@ -343,9 +343,9 @@ must be convertible to `Int`:
 
 ```jldoctest footype
 julia> Foo((), 23.5, 1)
-ERROR: InexactError()
+ERROR: InexactError: convert(Int64, 23.5)
 Stacktrace:
- [1] convert(::Type{Int64}, ::Float64) at ./float.jl:680
+ [1] convert at ./float.jl:681 [inlined]
  [2] Foo(::Tuple{}, ::Float64, ::Int64) at ./none:2
 ```
 
@@ -471,7 +471,7 @@ DataType
 ```
 
 A `DataType` may be abstract or concrete. If it is concrete, it has a specified size, storage
-layout, and (optionally) field names. Thus a bits type is a `DataType` with nonzero size, but
+layout, and (optionally) field names. Thus a primitive type is a `DataType` with nonzero size, but
 no field names. A composite type is a `DataType` that has field names or is empty (zero size).
 
 Every concrete value in the system is an instance of some `DataType`.
@@ -517,7 +517,7 @@ easily handled.
 
 All declared types (the `DataType` variety) can be parameterized, with the same syntax in each
 case. We will discuss them in the following order: first, parametric composite types, then parametric
-abstract types, and finally parametric bits types.
+abstract types, and finally parametric primitive types.
 
 ### Parametric Composite Types
 
@@ -1318,7 +1318,9 @@ for cases where you don't need a more elaborate hierarchy.
 ```jldoctest valtype
 julia> struct Val{x}
        end
-Base.@pure Val(x) = Val{x}()
+
+julia> Base.@pure Val(x) = Val{x}()
+Val
 ```
 
 There is no more to the implementation of `Val` than this.  Some functions in Julia's standard

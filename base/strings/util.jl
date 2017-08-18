@@ -256,7 +256,6 @@ julia> rpad("March",20)
 ```
 """
 rpad(s, n::Integer, p=" ") = rpad(string(s),n,string(p))
-cpad(s, n::Integer, p=" ") = rpad(lpad(s,div(n+strwidth(s),2),p),n,p)
 
 # splitter can be a Char, Vector{Char}, AbstractString, Regex, ...
 # any splitter that provides search(s::AbstractString, splitter)
@@ -415,6 +414,7 @@ single character, a vector or a set of characters, a string, or a regular expres
 is a function, each occurrence is replaced with `r(s)` where `s` is the matched substring.
 If `pat` is a regular expression and `r` is a `SubstitutionString`, then capture group
 references in `r` are replaced with the corresponding matched text.
+To remove instances of `pat` from `string`, set `r` to the empty `String` (`""`).
 """
 replace(s::AbstractString, pat, f) = replace_new(String(s), pat, f, typemax(Int))
 # TODO: change this to the following when `replace` is removed from deprecated.jl:

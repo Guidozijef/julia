@@ -484,10 +484,12 @@ julia> hypot(a, a)
 1.4142135623730951e10
 
 julia> √(a^2 + a^2) # a^2 overflows
-ERROR: DomainError with -2914184810805067776:
-sqrt will only return a complex result if called with a complex argument. Try sqrt(complex(x)).
+ERROR: DomainError with -2.914184810805068e18:
+sqrt will only return a complex result if called with a complex argument. Try sqrt(Complex(x)).
 Stacktrace:
- [1] sqrt(::Int64) at ./math.jl:447
+ [1] throw_complex_domainerror(::Symbol, ::Float64) at ./math.jl:31
+ [2] sqrt at ./math.jl:462 [inlined]
+ [3] sqrt(::Int64) at ./math.jl:472
 ```
 """
 hypot(x::Number, y::Number) = hypot(promote(x, y)...)
@@ -756,9 +758,9 @@ end
 @inline literal_pow(::typeof(^), x::Float16, ::Val{p}) where {p} = Float16(literal_pow(^,Float32(x),Val(p)))
 
 function angle_restrict_symm(theta)
-    const P1 = 4 * 7.8539812564849853515625e-01
-    const P2 = 4 * 3.7748947079307981766760e-08
-    const P3 = 4 * 2.6951514290790594840552e-15
+    P1 = 4 * 7.8539812564849853515625e-01
+    P2 = 4 * 3.7748947079307981766760e-08
+    P3 = 4 * 2.6951514290790594840552e-15
 
     y = 2*floor(theta/(2*pi))
     r = ((theta - y*P1) - y*P2) - y*P3
@@ -779,25 +781,6 @@ function add22condh(xh::Float64, xl::Float64, yh::Float64, yl::Float64)
     s = (abs(xh) > abs(yh)) ? (xh-r+yh+yl+xl) : (yh-r+xh+xl+yl)
     zh = r+s
     return zh
-end
-
-@inline function ieee754_rem_pio2(x::Float64)
-    # rem_pio2 essentially computes x mod pi/2 (ie within a quarter circle)
-    # and returns the result as
-    # y between + and - pi/4 (for maximal accuracy (as the sign bit is exploited)), and
-    # n, where n specifies the integer part of the division, or, at any rate,
-    # in which quadrant we are.
-    # The invariant fulfilled by the returned values seems to be
-    #  x = y + n*pi/2 (where y = y1+y2 is a double-double and y2 is the "tail" of y).
-    # Note: for very large x (thus n), the invariant might hold only modulo 2pi
-    # (in other words, n might be off by a multiple of 4, or a multiple of 100)
-
-    # this is just wrapping up
-    # https://github.com/JuliaLang/openspecfun/blob/master/rem_pio2/e_rem_pio2.c
-
-    y = Ref{NTuple{2,Float64}}()
-    n = ccall((:__ieee754_rem_pio2, openspecfun), Cint, (Float64, Ptr{Void}), x, y)
-    return (n, y[])
 end
 
 # multiples of pi/2, as double-double (ie with "tail")
@@ -847,23 +830,23 @@ function rem2pi end
 function rem2pi(x::Float64, ::RoundingMode{:Nearest})
     abs(x) < pi && return x
 
-    (n,y) = ieee754_rem_pio2(x)
+    n,y = rem_pio2_kernel(x)
 
     if iseven(n)
         if n & 2 == 2 # n % 4 == 2: add/subtract pi
-            if y[1] <= 0
-                return add22condh(y[1],y[2],pi2o2_h,pi2o2_l)
+            if y.hi <= 0
+                return add22condh(y.hi,y.lo,pi2o2_h,pi2o2_l)
             else
-                return add22condh(y[1],y[2],-pi2o2_h,-pi2o2_l)
+                return add22condh(y.hi,y.lo,-pi2o2_h,-pi2o2_l)
             end
         else          # n % 4 == 0: add 0
-            return y[1]
+            return y.hi+y.lo
         end
     else
         if n & 2 == 2 # n % 4 == 3: subtract pi/2
-            return add22condh(y[1],y[2],-pi1o2_h,-pi1o2_l)
+            return add22condh(y.hi,y.lo,-pi1o2_h,-pi1o2_l)
         else          # n % 4 == 1: add pi/2
-            return add22condh(y[1],y[2],pi1o2_h,pi1o2_l)
+            return add22condh(y.hi,y.lo,pi1o2_h,pi1o2_l)
         end
     end
 end
@@ -871,23 +854,23 @@ function rem2pi(x::Float64, ::RoundingMode{:ToZero})
     ax = abs(x)
     ax <= 2*Float64(pi,RoundDown) && return x
 
-    (n,y) = ieee754_rem_pio2(ax)
+    n,y = rem_pio2_kernel(x)
 
     if iseven(n)
         if n & 2 == 2 # n % 4 == 2: add pi
-            z = add22condh(y[1],y[2],pi2o2_h,pi2o2_l)
+            z = add22condh(y.hi,y.lo,pi2o2_h,pi2o2_l)
         else          # n % 4 == 0: add 0 or 2pi
-            if y[1] > 0
-                z = y[1]
+            if y.hi > 0
+                z = y.hi+y.lo
             else      # negative: add 2pi
-                z = add22condh(y[1],y[2],pi4o2_h,pi4o2_l)
+                z = add22condh(y.hi,y.lo,pi4o2_h,pi4o2_l)
             end
         end
     else
         if n & 2 == 2 # n % 4 == 3: add 3pi/2
-            z = add22condh(y[1],y[2],pi3o2_h,pi3o2_l)
+            z = add22condh(y.hi,y.lo,pi3o2_h,pi3o2_l)
         else          # n % 4 == 1: add pi/2
-            z = add22condh(y[1],y[2],pi1o2_h,pi1o2_l)
+            z = add22condh(y.hi,y.lo,pi1o2_h,pi1o2_l)
         end
     end
     copysign(z,x)
@@ -901,23 +884,23 @@ function rem2pi(x::Float64, ::RoundingMode{:Down})
         end
     end
 
-    (n,y) = ieee754_rem_pio2(x)
+    n,y = rem_pio2_kernel(x)
 
     if iseven(n)
         if n & 2 == 2 # n % 4 == 2: add pi
-            return add22condh(y[1],y[2],pi2o2_h,pi2o2_l)
+            return add22condh(y.hi,y.lo,pi2o2_h,pi2o2_l)
         else          # n % 4 == 0: add 0 or 2pi
-            if y[1] > 0
-                return y[1]
+            if y.hi > 0
+                return y.hi+y.lo
             else      # negative: add 2pi
-                return add22condh(y[1],y[2],pi4o2_h,pi4o2_l)
+                return add22condh(y.hi,y.lo,pi4o2_h,pi4o2_l)
             end
         end
     else
         if n & 2 == 2 # n % 4 == 3: add 3pi/2
-            return add22condh(y[1],y[2],pi3o2_h,pi3o2_l)
+            return add22condh(y.hi,y.lo,pi3o2_h,pi3o2_l)
         else          # n % 4 == 1: add pi/2
-            return add22condh(y[1],y[2],pi1o2_h,pi1o2_l)
+            return add22condh(y.hi,y.lo,pi1o2_h,pi1o2_l)
         end
     end
 end
@@ -930,23 +913,23 @@ function rem2pi(x::Float64, ::RoundingMode{:Up})
         end
     end
 
-    (n,y) = ieee754_rem_pio2(x)
+    n,y = rem_pio2_kernel(x)
 
     if iseven(n)
         if n & 2 == 2 # n % 4 == 2: sub pi
-            return add22condh(y[1],y[2],-pi2o2_h,-pi2o2_l)
+            return add22condh(y.hi,y.lo,-pi2o2_h,-pi2o2_l)
         else          # n % 4 == 0: sub 0 or 2pi
-            if y[1] < 0
-                return y[1]
+            if y.hi < 0
+                return y.hi+y.lo
             else      # positive: sub 2pi
-                return add22condh(y[1],y[2],-pi4o2_h,-pi4o2_l)
+                return add22condh(y.hi,y.lo,-pi4o2_h,-pi4o2_l)
             end
         end
     else
         if n & 2 == 2 # n % 4 == 3: sub pi/2
-            return add22condh(y[1],y[2],-pi1o2_h,-pi1o2_l)
+            return add22condh(y.hi,y.lo,-pi1o2_h,-pi1o2_l)
         else          # n % 4 == 1: sub 3pi/2
-            return add22condh(y[1],y[2],-pi3o2_h,-pi3o2_l)
+            return add22condh(y.hi,y.lo,-pi3o2_h,-pi3o2_l)
         end
     end
 end
@@ -1023,6 +1006,7 @@ include(joinpath("special", "exp.jl"))
 include(joinpath("special", "exp10.jl"))
 include(joinpath("special", "trig.jl"))
 include(joinpath("special", "gamma.jl"))
+include(joinpath("special", "rem_pio2.jl"))
 
 module JuliaLibm
 include(joinpath("special", "log.jl"))

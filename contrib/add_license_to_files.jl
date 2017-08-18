@@ -30,11 +30,11 @@ const excludedirs = [
 
 const skipfiles = [
     "../contrib/add_license_to_files.jl",
-    "../contrib/windows/juliarc.jl",
     # files to check - already copyright
     # see: https://github.com/JuliaLang/julia/pull/11073#issuecomment-98099389
     "../base/special/trig.jl",
     "../base/special/exp.jl",
+    "../base/special/rem_pio2.jl",
     "../base/linalg/givens.jl",
     #
     "../src/abi_llvm.cpp",

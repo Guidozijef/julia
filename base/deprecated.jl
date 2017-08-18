@@ -28,8 +28,7 @@ macro deprecate(old, new, ex=true)
             ex ? Expr(:export, esc(old)) : nothing,
             :(function $(esc(old))(args...)
                   $meta
-                  depwarn(string($oldname, " is deprecated, use ", $newname, " instead."),
-                          $oldmtname)
+                  depwarn($"$old is deprecated, use $new instead.", $oldmtname)
                   $(esc(new))(args...)
               end),
             :(const $oldmtname = Core.Typeof($(esc(old))).name.mt.name))
@@ -54,8 +53,7 @@ macro deprecate(old, new, ex=true)
             ex ? Expr(:export, esc(oldsym)) : nothing,
             :($(esc(old)) = begin
                   $meta
-                  depwarn(string($oldcall, " is deprecated, use ", $newcall, " instead."),
-                          $oldmtname)
+                  depwarn($"$oldcall is deprecated, use $newcall instead.", $oldmtname)
                   $(esc(new))
               end),
             :(const $oldmtname = Core.Typeof($(esc(oldsym))).name.mt.name))
@@ -232,26 +230,16 @@ end
 
 # For deprecating vectorized functions in favor of compact broadcast syntax
 macro dep_vectorize_1arg(S, f)
-    S = esc(S)
-    f = esc(f)
-    T = esc(:T)
-    x = esc(:x)
-    AbsArr = esc(:AbstractArray)
-    :( @deprecate $f($x::$AbsArr{$T}) where {$T<:$S} $f.($x) )
+    AbstractArray = GlobalRef(Base, :AbstractArray)
+    return esc(:( @deprecate $f(x::$AbstractArray{T}) where {T<:$S} $f.(x) ))
 end
 macro dep_vectorize_2arg(S, f)
-    S = esc(S)
-    f = esc(f)
-    T1 = esc(:T1)
-    T2 = esc(:T2)
-    x = esc(:x)
-    y = esc(:y)
-    AbsArr = esc(:AbstractArray)
-    quote
-        @deprecate $f($x::$S, $y::$AbsArr{$T1}) where {$T1<:$S} $f.($x,$y)
-        @deprecate $f($x::$AbsArr{$T1}, $y::$S) where {$T1<:$S} $f.($x,$y)
-        @deprecate $f($x::$AbsArr{$T1}, $y::$AbsArr{$T2}) where {$T1<:$S,$T2<:$S} $f.($x,$y)
-    end
+    AbstractArray = GlobalRef(Base, :AbstractArray)
+    return esc(quote
+        @deprecate $f(x::$S, y::$AbstractArray{T1}) where {T1<:$S} $f.(x, y)
+        @deprecate $f(x::$AbstractArray{T1}, y::$S) where {T1<:$S} $f.(x, y)
+        @deprecate $f(x::$AbstractArray{T1}, y::$AbstractArray{T2}) where {T1<:$S, T2<:$S} $f.(x, y)
+    end)
 end
 
 # Deprecate @vectorize_1arg-vectorized functions from...
@@ -338,20 +326,20 @@ for f in (
 end
 
 # Deprecate @vectorize_1arg and @vectorize_2arg themselves
-macro vectorize_1arg(S,f)
+macro vectorize_1arg(S, f)
     depwarn(string("`@vectorize_1arg` is deprecated in favor of compact broadcast syntax. ",
         "Instead of `@vectorize_1arg`'ing function `f` and calling `f(arg)`, call `f.(arg)`."),
         :vectorize_1arg)
     quote
-        @dep_vectorize_1arg($(esc(S)),$(esc(f)))
+        @dep_vectorize_1arg($S, $f)
     end
 end
-macro vectorize_2arg(S,f)
+macro vectorize_2arg(S, f)
     depwarn(string("`@vectorize_2arg` is deprecated in favor of compact broadcast syntax. ",
         "Instead of `@vectorize_2arg`'ing function `f` and calling `f(arg1, arg2)`, call ",
-        "`f.(arg1,arg2)`. "), :vectorize_2arg)
+        "`f.(arg1, arg2)`. "), :vectorize_2arg)
     quote
-        @dep_vectorize_2arg($(esc(S)),$(esc(f)))
+        @dep_vectorize_2arg($S, $f)
     end
 end
 export @vectorize_1arg, @vectorize_2arg
@@ -1340,6 +1328,8 @@ end
 
 @deprecate issubtype (<:)
 
+@deprecate union() Set()
+
 # 12807
 start(::Union{Process, ProcessChain}) = 1
 done(::Union{Process, ProcessChain}, i::Int) = (i == 3)
@@ -1355,6 +1345,7 @@ end
 @deprecate srand(r::MersenneTwister, filename::AbstractString, n::Integer=4) srand(r, read!(filename, Array{UInt32}(Int(n))))
 @deprecate srand(filename::AbstractString, n::Integer=4) srand(read!(filename, Array{UInt32}(Int(n))))
 @deprecate MersenneTwister(filename::AbstractString)  srand(MersenneTwister(0), read!(filename, Array{UInt32}(Int(4))))
+
 
 # PR #21974
 @deprecate versioninfo(verbose::Bool) versioninfo(verbose=verbose)
@@ -1553,6 +1544,12 @@ function DomainError()
     DomainError(nothing)
 end
 
+# PR #22761
+function OverflowError()
+    depwarn("OverflowError now supports a message string, use `OverflowError(msg)` instead.", :OverflowError)
+    OverflowError("")
+end
+
 # PR #22703
 @deprecate Bidiagonal(dv::AbstractVector, ev::AbstractVector, isupper::Bool) Bidiagonal(dv, ev, ifelse(isupper, :U, :L))
 @deprecate Bidiagonal(dv::AbstractVector, ev::AbstractVector, uplo::Char) Bidiagonal(dv, ev, ifelse(uplo == 'U', :U, :L))
@@ -1570,6 +1567,43 @@ end
 #     move prec-bitshift after prec-rational
 #     remove parse-with-chains-warn and bitshift-warn
 # update precedence table in doc/src/manual/mathematical-operations.md
+
+# deprecate remaining vectorized methods over SparseVectors (zero-preserving)
+for op in (:floor, :ceil, :trunc, :round,
+        :log1p, :expm1,  :sinpi,
+        :sin,   :tan,    :sind,   :tand,
+        :asin,  :atan,   :asind,  :atand,
+        :sinh,  :tanh,   :asinh,  :atanh)
+    @eval @deprecate ($op)(x::AbstractSparseVector{<:Number,<:Integer}) ($op).(x)
+end
+# deprecate remaining vectorized methods over SparseVectors (not-zero-preserving)
+for op in (:exp, :exp2, :exp10, :log, :log2, :log10,
+        :cos, :cosd, :acos, :cosh, :cospi,
+        :csc, :cscd, :acot, :csch, :acsch,
+        :cot, :cotd, :acosd, :coth,
+        :sec, :secd, :acotd, :sech, :asech)
+    @eval @deprecate ($op)(x::AbstractSparseVector{<:Number,<:Integer}) ($op).(x)
+end
+
+# deprecate remaining vectorized methods from Base.Dates
+@eval Dates @deprecate(
+    DateTime(Y::AbstractArray{<:AbstractString}, f::AbstractString; locale::Locale=ENGLISH),
+    DateTime.(Y, f; locale=locale) )
+@eval Dates @deprecate(
+    DateTime(Y::AbstractArray{<:AbstractString}, df::DateFormat=ISODateTimeFormat),
+    DateTime.(Y, df) )
+@eval Dates @deprecate(
+    Date(Y::AbstractArray{<:AbstractString}, f::AbstractString; locale::Locale=ENGLISH),
+    Date.(Y, f; locale=locale) )
+@eval Dates @deprecate(
+    Date(Y::AbstractArray{<:AbstractString}, df::DateFormat=ISODateFormat),
+    Date.(Y, df) )
+@eval Dates @deprecate(
+    format(Y::AbstractArray{<:TimeType}, f::AbstractString; locale::Locale=ENGLISH),
+    format.(Y, f; locale=locale) )
+@eval Dates @deprecate(
+    format(Y::AbstractArray{T}, df::DateFormat=default_format(T)) where {T<:TimeType},
+    format.(Y, df) )
 
 # PR #22182
 @deprecate is_apple   Sys.isapple
@@ -1600,6 +1634,58 @@ end
 
 # issue #6466
 # `write` on non-isbits arrays is deprecated in io.jl.
+
+# PR #22925
+# also uncomment constructor tests in test/linalg/bidiag.jl
+function Bidiagonal(dv::AbstractVector{T}, ev::AbstractVector{S}, uplo::Symbol) where {T,S}
+    depwarn(string("Bidiagonal(dv::AbstractVector{T}, ev::AbstractVector{S}, uplo::Symbol) where {T,S}",
+        " is deprecated; manually convert both vectors to the same type instead."), :Bidiagonal)
+    R = promote_type(T, S)
+    Bidiagonal(convert(Vector{R}, dv), convert(Vector{R}, ev), uplo)
+end
+
+# PR #23035
+# also uncomment constructor tests in test/linalg/tridiag.jl
+function SymTridiagonal(dv::AbstractVector{T}, ev::AbstractVector{S}) where {T,S}
+    depwarn(string("SymTridiagonal(dv::AbstractVector{T}, ev::AbstractVector{S}) ",
+        "where {T,S} is deprecated; convert both vectors to the same type instead."), :SymTridiagonal)
+    R = promote_type(T, S)
+    SymTridiagonal(convert(Vector{R}, dv), convert(Vector{R}, ev))
+end
+
+# PR #23092
+@eval LibGit2 begin
+    function prompt(msg::AbstractString; default::AbstractString="", password::Bool=false)
+        Base.depwarn(string(
+            "`LibGit2.prompt(msg::AbstractString; default::AbstractString=\"\", password::Bool=false)` is deprecated, use ",
+            "`get(Base.prompt(msg, default=default, password=password), \"\")` instead."), :prompt)
+        Base.get(Base.prompt(msg, default=default, password=password), "")
+    end
+end
+
+# PR #23187
+@deprecate cpad(s, n::Integer, p=" ") rpad(lpad(s, div(n+strwidth(s), 2), p), n, p) false
+
+# PR #22088
+function hex2num(s::AbstractString)
+    depwarn("hex2num(s) is deprecated. Use reinterpret(Float64, parse(UInt64, s, 16)) instead.", :hex2num)
+    if length(s) <= 4
+        return reinterpret(Float16, parse(UInt16, s, 16))
+    end
+    if length(s) <= 8
+        return reinterpret(Float32, parse(UInt32, s, 16))
+    end
+    return reinterpret(Float64, parse(UInt64, s, 16))
+end
+
+@deprecate num2hex(x::Union{Float16,Float32,Float64}) hex(reinterpret(Unsigned, x), sizeof(x)*2)
+@deprecate num2hex(n::Integer) hex(n, sizeof(n)*2)
+
+# PR #22742: change in isapprox semantics
+@deprecate rtoldefault(x,y) rtoldefault(x,y,0) false
+
+# issue #5148, PR #23259
+# warning for `const` on locals should be changed to an error in julia-syntax.scm
 
 # END 0.7 deprecations
 

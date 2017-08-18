@@ -67,6 +67,7 @@ ex = quote
     end
     test_repl_comp_dict = CompletionFoo.test_dict
     test_repl_comp_customdict = CompletionFoo.test_customdict
+    test_dict_ℂ = Dict(1=>2)
 end
 ex.head = :toplevel
 eval(Main, ex)
@@ -75,7 +76,7 @@ function temp_pkg_dir_noinit(fn::Function)
     # Used in tests below to set up and tear down a sandboxed package directory
     # Unlike the version in test/pkg.jl, this does not run Pkg.init so does not
     # clone METADATA (only pkg and libgit2-online tests should need internet access)
-    const tmpdir = joinpath(tempdir(),randstring())
+    tmpdir = joinpath(tempdir(),randstring())
     withenv("JULIA_PKGDIR" => tmpdir) do
         @test !isdir(Pkg.dir())
         try
@@ -160,6 +161,16 @@ c,r = test_complete(s)
 @test "getindex" in c
 @test r == 19:23
 @test s[r] == "getin"
+
+# issue #23193: after `using`, identifiers can be prefixed by module names
+s = "using Base.Test, Base.Random"
+c,r = test_complete(s)
+@test !("RandomDevice" in c)
+
+# issue #23226: identifiers must be separated by a comma (not a newline)
+s = "using Base\nusi"
+c,r = test_complete(s)
+@test "using" in c
 
 # inexistent completion inside a string
 s = "Pkg.add(\"lol"
@@ -637,6 +648,26 @@ let #test that it can auto complete with spaces in file/path
         c,r = test_complete(s)
         @test r == 5:15
         @test s[r] ==  dir_space
+
+        #Test for #18479
+        for c in "'`@\$;&"
+            test_dir = "test$(c)test"
+            mkdir(joinpath(path, test_dir))
+            try
+                if !(c in ['\'','$']) # As these characters hold special meaning
+                    # in shell commands the shell path completion cannot complete
+                    # paths with these characters
+                    c,r,res = test_scomplete(test_dir)
+                    @test c[1] == test_dir*(Sys.iswindows() ? "\\\\" : "/")
+                    @test res
+                end
+                c,r,res  = test_complete("\""*test_dir)
+                @test c[1] == test_dir*(Sys.iswindows() ? "\\\\" : "/")
+                @test res
+            finally
+                rm(joinpath(path, test_dir), recursive=true)
+            end
+        end
     end
     rm(dir, recursive=true)
 end
@@ -748,3 +779,6 @@ test_dict_completion("CompletionFoo.test_dict")
 test_dict_completion("CompletionFoo.test_customdict")
 test_dict_completion("test_repl_comp_dict")
 test_dict_completion("test_repl_comp_customdict")
+
+# Issue #23004: this should not throw:
+@test REPLCompletions.dict_identifier_key("test_dict_ℂ[\\", :other) isa Tuple

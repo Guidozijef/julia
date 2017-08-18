@@ -101,15 +101,13 @@ function _chol!(A::AbstractMatrix, ::Type{LowerTriangular})
             end
             A[k,k] = Akk
             AkkInv = inv(Akk)
-            for j = 1:k
-                for i = k + 1:n
-                    if j == 1
-                        A[i,k] = A[i,k]*AkkInv'
-                    end
-                    if j < k
-                        A[i,k] -= A[i,j]*A[k,j]'*AkkInv'
-                    end
+            for j = 1:k - 1
+                @simd for i = k + 1:n
+                    A[i,k] -= A[i,j]*A[k,j]'
                 end
+            end
+            for i = k + 1:n
+                A[i,k] *= AkkInv'
             end
         end
      end
@@ -298,6 +296,7 @@ julia> A = [4. 12. -16.; 12. 37. -43.; -16. -43. 98.]
 julia> C = cholfact(A)
 Base.LinAlg.Cholesky{Float64,Array{Float64,2}} with factor:
 [2.0 6.0 -8.0; 0.0 1.0 5.0; 0.0 0.0 3.0]
+successful: true
 
 julia> C[:U]
 3×3 UpperTriangular{Float64,Array{Float64,2}}:

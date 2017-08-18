@@ -589,7 +589,8 @@ static void jl_write_values(jl_serializer_state *s)
             // make some header modifications in-place
             jl_array_t *newa = (jl_array_t*)&s->s->buf[reloc_offset];
             size_t alen = jl_array_len(ar);
-            size_t tot = alen * ar->elsize;
+            size_t extra = (!ar->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(ar)))) ? alen : 0;
+            size_t tot = alen * ar->elsize + extra;
             if (newa->flags.ndims == 1)
                 newa->maxsize = alen;
             newa->offset = 0;
@@ -1055,7 +1056,7 @@ static void jl_reinit_item(jl_value_t *v, int how, arraylist_t *tracee_list)
             case 2: { // reinsert module v into parent (const)
                 jl_module_t *mod = (jl_module_t*)v;
                 assert(jl_is_module(mod));
-                jl_binding_t *b = jl_get_binding_wr(mod->parent, mod->name);
+                jl_binding_t *b = jl_get_binding_wr(mod->parent, mod->name, 1);
                 jl_declare_constant(b); // this can throw
                 if (b->value != NULL) {
                     if (!jl_is_module(b->value)) {
@@ -1340,7 +1341,6 @@ JL_DLLEXPORT void jl_save_system_image(const char *fname)
 extern int jl_boot_file_loaded;
 extern void jl_get_builtins(void);
 extern void jl_get_builtin_hooks(void);
-extern void jl_get_system_hooks(void);
 extern void jl_gc_set_permalloc_region(void *start, void *end);
 
 // Takes in a path of the form "usr/lib/julia/sys.so" (jl_restore_system_image should be passed the same string)
@@ -1496,9 +1496,6 @@ static void jl_restore_system_image_from_stream(ios_t *f)
 
     jl_get_builtins();
     jl_get_builtin_hooks();
-    if (jl_base_module) {
-        jl_get_system_hooks();
-    }
     jl_boot_file_loaded = 1;
     jl_init_box_caches();
 

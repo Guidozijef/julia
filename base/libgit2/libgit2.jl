@@ -238,10 +238,6 @@ function is_ancestor_of(a::AbstractString, b::AbstractString, repo::GitRepo)
     merge_base(repo, a, b) == A
 end
 
-function make_payload(payload::Nullable{<:AbstractCredentials})
-    Ref{Nullable{AbstractCredentials}}(payload)
-end
-
 """
     fetch(repo::GitRepo; kwargs...)
 
@@ -269,7 +265,6 @@ function fetch(repo::GitRepo; remote::AbstractString="origin",
         GitRemoteAnon(repo, remoteurl)
     end
     try
-        payload = make_payload(payload)
         fo = FetchOptions(callbacks=RemoteCallbacks(credentials_cb(), payload))
         fetch(rmt, refspecs, msg="from $(url(rmt))", options = fo)
     finally
@@ -304,7 +299,6 @@ function push(repo::GitRepo; remote::AbstractString="origin",
         GitRemoteAnon(repo, remoteurl)
     end
     try
-        payload = make_payload(payload)
         push_opts=PushOptions(callbacks=RemoteCallbacks(credentials_cb(), payload))
         push(rmt, refspecs, force=force, options=push_opts)
     finally
@@ -510,7 +504,6 @@ function clone(repo_url::AbstractString, repo_path::AbstractString;
                payload::Nullable{<:AbstractCredentials}=Nullable{AbstractCredentials}())
     # setup clone options
     lbranch = Base.cconvert(Cstring, branch)
-    payload = make_payload(payload)
     fetch_opts=FetchOptions(callbacks = RemoteCallbacks(credentials_cb(), payload))
     clone_opts = CloneOptions(
                 bare = Cint(isbare),
@@ -536,6 +529,23 @@ set by `mode`:
   1. `Consts.RESET_SOFT` - move HEAD to `id`.
   2. `Consts.RESET_MIXED` - default, move HEAD to `id` and reset the index to `id`.
   3. `Consts.RESET_HARD` - move HEAD to `id`, reset the index to `id`, and discard all working changes.
+
+# Examples
+```julia
+# fetch changes
+LibGit2.fetch(repo)
+isfile(joinpath(repo_path, our_file)) # will be false
+
+# fastforward merge the changes
+LibGit2.merge!(repo, fastforward=true)
+
+# because there was not any file locally, but there is
+# a file remotely, we need to reset the branch
+head_oid = LibGit2.head_oid(repo)
+new_head = LibGit2.reset!(repo, head_oid, LibGit2.Consts.RESET_HARD)
+```
+In this example, the remote which is being fetched from *does* have
+a file called `our_file` in its index, which is why we must reset.
 
 Equivalent to `git reset [--soft | --mixed | --hard] <id>`.
 

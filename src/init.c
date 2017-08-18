@@ -744,11 +744,6 @@ static jl_value_t *core(const char *name)
     return jl_get_global(jl_core_module, jl_symbol(name));
 }
 
-static jl_value_t *basemod(const char *name)
-{
-    return jl_get_global(jl_base_module, jl_symbol(name));
-}
-
 // fetch references to things defined in boot.jl
 void jl_get_builtin_hooks(void)
 {
@@ -785,7 +780,6 @@ void jl_get_builtin_hooks(void)
     jl_errorexception_type = (jl_datatype_t*)core("ErrorException");
     jl_stackovf_exception  = jl_new_struct_uninit((jl_datatype_t*)core("StackOverflowError"));
     jl_diverror_exception  = jl_new_struct_uninit((jl_datatype_t*)core("DivideError"));
-    jl_overflow_exception  = jl_new_struct_uninit((jl_datatype_t*)core("OverflowError"));
     jl_undefref_exception  = jl_new_struct_uninit((jl_datatype_t*)core("UndefRefError"));
     jl_undefvarerror_type  = (jl_datatype_t*)core("UndefVarError");
     jl_interrupt_exception = jl_new_struct_uninit((jl_datatype_t*)core("InterruptException"));
@@ -800,17 +794,11 @@ void jl_get_builtin_hooks(void)
 
     jl_weakref_type = (jl_datatype_t*)core("WeakRef");
     jl_vecelement_typename = ((jl_datatype_t*)jl_unwrap_unionall(core("VecElement")))->name;
-}
 
-JL_DLLEXPORT void jl_get_system_hooks(void)
-{
-    if (jl_argumenterror_type) return; // only do this once
-
-    jl_argumenterror_type = (jl_datatype_t*)basemod("ArgumentError");
-    jl_methoderror_type = (jl_datatype_t*)basemod("MethodError");
-    jl_loaderror_type = (jl_datatype_t*)basemod("LoadError");
-    jl_initerror_type = (jl_datatype_t*)basemod("InitError");
-    jl_complex_type = (jl_unionall_t*)basemod("Complex");
+    jl_argumenterror_type = (jl_datatype_t*)core("ArgumentError");
+    jl_methoderror_type = (jl_datatype_t*)core("MethodError");
+    jl_loaderror_type = (jl_datatype_t*)core("LoadError");
+    jl_initerror_type = (jl_datatype_t*)core("InitError");
 }
 
 void jl_get_builtins(void)

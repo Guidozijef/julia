@@ -207,21 +207,24 @@ end
 let was_gced = false
     @noinline make_tuple(x) = tuple(x)
     @noinline use(x) = ccall(:jl_breakpoint, Void, ())
-    @noinline assert_not_gced() = @assert !was_gced
+    @noinline assert_not_gced() = @test !was_gced
 
     function foo22770()
         b = Ref(2)
-        finalizer(b, x->(global was_gced; was_gced=true))
+        finalizer(b, x -> was_gced = true)
         y = make_tuple(b)
         x = y[1]
         a = Ref(1)
         use(x); use(a); use(y)
         c = Ref(3)
-        gc(); assert_not_gced();
+        gc()
+        assert_not_gced()
         use(x)
         use(c)
     end
     foo22770()
+    gc()
+    @test was_gced
 end
 
 function egal_svecs()
@@ -231,3 +234,17 @@ function egal_svecs()
 end
 @test egal_svecs()
 @test Core.svec(:a, :b) === Core.svec(:a, :b)
+
+# issue #22582
+function issue22582!(a::AbstractArray, b)
+    len = length(a)
+    if b
+        ccall(:jl_array_grow_end, Void, (Any, Csize_t), a, 1)
+    end
+    return len
+end
+let c = [1,2,3]
+    len1 = length(c)
+    len2 = issue22582!(c, true)
+    @test len1 == len2
+end

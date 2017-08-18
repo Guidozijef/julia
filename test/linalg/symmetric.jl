@@ -176,6 +176,17 @@ end
                 end
             end
 
+            @testset "inversion" begin
+                for uplo in (:U, :L)
+                    @test inv(Symmetric(asym, uplo))::Symmetric ≈ inv(asym)
+                    @test inv(Hermitian(aherm, uplo))::Hermitian ≈ inv(aherm)
+                    @test inv(Symmetric(a, uplo))::Symmetric ≈ inv(Matrix(Symmetric(a, uplo)))
+                    if eltya <: Real
+                        @test inv(Hermitian(a, uplo))::Hermitian ≈ inv(Matrix(Hermitian(a, uplo)))
+                    end
+                end
+            end
+
             # Revisit when implemented in julia
             if eltya != BigFloat
                 @testset "cond" begin
@@ -183,19 +194,6 @@ end
                         @test cond(Symmetric(asym)) ≈ cond(asym)
                     end
                     @test cond(Hermitian(aherm)) ≈ cond(aherm)
-                end
-
-                @testset "inversion" begin
-                    @test inv(Symmetric(asym)) ≈ inv(asym)
-                    @test inv(Hermitian(aherm)) ≈ inv(aherm)
-                    for uplo in (:U, :L)
-                        @test inv(Symmetric(asym, uplo)) ≈ inv(full(Symmetric(asym, uplo)))
-                        @test inv(Hermitian(aherm, uplo)) ≈ inv(full(Hermitian(aherm, uplo)))
-                        @test inv(Symmetric(a, uplo)) ≈ inv(full(Symmetric(a, uplo)))
-                        if eltya <: Real
-                            @test inv(Hermitian(a, uplo)) ≈ inv(full(Hermitian(a, uplo)))
-                        end
-                    end
                 end
 
                 @testset "symmetric eigendecomposition" begin
@@ -245,29 +243,27 @@ end
                 end
 
                 @testset "pow" begin
-                    @test (asym)^2     ≈ Array(Symmetric(asym)^2)
-                    @test (asym)^-2    ≈ Array(Symmetric(asym)^-2)
-                    @test (aherm)^2    ≈ Array(Hermitian(aherm)^2)
-                    @test (aherm)^-2   ≈ Array(Hermitian(aherm)^-2)
-                    if eltya == Int
-                        @test (asym)^2.0   ≈ real(Array(Symmetric(asym)^2.0))
-                        @test (asym)^-2.0  ≈ real(Array(Symmetric(asym)^-2.0))
-                        @test (aherm)^2.0  ≈ real(Array(Hermitian(aherm)^2.0))
-                        @test (aherm)^-2.0 ≈ real(Array(Hermitian(aherm)^-2.0))
-                        @test (apos)^2.0   ≈ real(Array(Hermitian(apos)^2.0))
-                    elseif eltya <: Real
-                        @test (asym)^2.0   ≈ real(Array(Symmetric(asym)^2.0)) rtol=100*n^2*eps(real(eltya))
-                        @test (asym)^-2.0  ≈ real(Array(Symmetric(asym)^-2.0)) rtol=100*n^2*eps(real(eltya))
-                        @test (aherm)^2.0  ≈ real(Array(Hermitian(aherm)^2.0)) rtol=100*n^2*eps(real(eltya))
-                        @test (aherm)^-2.0 ≈ real(Array(Hermitian(aherm)^-2.0)) rtol=100*n^2*eps(real(eltya))
-                        @test (apos)^2.0   ≈ real(Array(Hermitian(apos)^2.0)) rtol=100*n^2*eps(real(eltya))
-                    else
-                        @test (asym)^2.0   ≈ Array(Symmetric(asym)^2.0) rtol=100*n^2*eps(real(eltya))
-                        @test (asym)^-2.0  ≈ Array(Symmetric(asym)^-2.0) rtol=100*n^2*eps(real(eltya))
-                        @test (aherm)^2.0  ≈ Array(Hermitian(aherm)^2.0) rtol=100*n^2*eps(real(eltya))
-                        @test (aherm)^-2.0 ≈ Array(Hermitian(aherm)^-2.0) rtol=100*n^2*eps(real(eltya))
-                        @test (apos)^2.0   ≈ Array(Hermitian(apos)^2.0) rtol=100*n^2*eps(real(eltya))
-                    end
+                    # Integer power
+                    @test (asym)^2   ≈ (Symmetric(asym)^2)::Symmetric
+                    @test (asym)^-2  ≈ (Symmetric(asym)^-2)::Symmetric
+                    @test (aposs)^2  ≈ (Symmetric(aposs)^2)::Symmetric
+                    @test (aherm)^2  ≈ (Hermitian(aherm)^2)::Hermitian
+                    @test (aherm)^-2 ≈ (Hermitian(aherm)^-2)::Hermitian
+                    @test (apos)^2   ≈ (Hermitian(apos)^2)::Hermitian
+                    # integer floating point power
+                    @test (asym)^2.0   ≈ (Symmetric(asym)^2.0)::Symmetric
+                    @test (asym)^-2.0  ≈ (Symmetric(asym)^-2.0)::Symmetric
+                    @test (aposs)^2.0  ≈ (Symmetric(aposs)^2.0)::Symmetric
+                    @test (aherm)^2.0  ≈ (Hermitian(aherm)^2.0)::Hermitian
+                    @test (aherm)^-2.0 ≈ (Hermitian(aherm)^-2.0)::Hermitian
+                    @test (apos)^2.0   ≈ (Hermitian(apos)^2.0)::Hermitian
+                    # non-integer floating point power
+                    @test (asym)^2.5   ≈ (Symmetric(asym)^2.5)::Symmetric
+                    @test (asym)^-2.5  ≈ (Symmetric(asym)^-2.5)::Symmetric
+                    @test (aposs)^2.5  ≈ (Symmetric(aposs)^2.5)::Symmetric
+                    @test (aherm)^2.5  ≈ (Hermitian(aherm)^2.5)#::Hermitian
+                    @test (aherm)^-2.5 ≈ (Hermitian(aherm)^-2.5)#::Hermitian
+                    @test (apos)^2.5   ≈ (Hermitian(apos)^2.5)::Hermitian
                 end
             end
         end

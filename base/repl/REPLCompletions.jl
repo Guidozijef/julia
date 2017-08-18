@@ -82,14 +82,15 @@ function complete_symbol(sym, ffunc)
     suggestions
 end
 
+const sorted_keywords = [
+    "abstract type", "baremodule", "begin", "break", "catch", "ccall",
+    "const", "continue", "do", "else", "elseif", "end", "export", "false",
+    "finally", "for", "function", "global", "if", "import",
+    "importall", "let", "local", "macro", "module", "mutable struct",
+    "primitive type", "quote", "return", "struct",
+    "true", "try", "using", "while"]
+
 function complete_keyword(s::String)
-    const sorted_keywords = [
-        "abstract type", "baremodule", "begin", "break", "catch", "ccall",
-        "const", "continue", "do", "else", "elseif", "end", "export", "false",
-        "finally", "for", "function", "global", "if", "import",
-        "importall", "let", "local", "macro", "module", "mutable struct",
-        "primitive type", "quote", "return", "struct",
-        "true", "try", "using", "while"]
     r = searchsorted(sorted_keywords, s)
     i = first(r)
     n = length(sorted_keywords)
@@ -368,7 +369,7 @@ function afterusing(string::String, startpos::Int)
     r = search(rstr, r"\s(gnisu|tropmi)\b")
     isempty(r) && return false
     fr = reverseind(str, last(r))
-    return ismatch(r"^\b(using|import)\s*(\w+\s*,\s*)*\w*$", str[fr:end])
+    return ismatch(r"^\b(using|import)\s*((\w+[.])*\w+\s*,\s*)*$", str[fr:end])
 end
 
 function bslash_completions(string, pos)
@@ -407,10 +408,10 @@ function dict_identifier_key(str,tag)
         str_close = str
     end
 
-    frange, end_of_indentifier = find_start_brace(str_close, c_start='[', c_end=']')
+    frange, end_of_identifier = find_start_brace(str_close, c_start='[', c_end=']')
     isempty(frange) && return (nothing, nothing, nothing)
     obj = Main
-    for name in split(str[frange[1]:end_of_indentifier], '.')
+    for name in split(str[frange[1]:end_of_identifier], '.')
         Base.isidentifier(name) || return (nothing, nothing, nothing)
         sym = Symbol(name)
         isdefined(obj, sym) || return (nothing, nothing, nothing)
@@ -418,7 +419,7 @@ function dict_identifier_key(str,tag)
         # Avoid `isdefined(::Array, ::Symbol)`
         isa(obj, Array) && return (nothing, nothing, nothing)
     end
-    begin_of_key = findnext(x->!in(x,whitespace_chars), str, end_of_indentifier+2)
+    begin_of_key = first(search(str, r"\S", nextind(str, end_of_identifier) + 1)) # 1 for [
     begin_of_key==0 && return (true, nothing, nothing)
     partial_key = str[begin_of_key:end]
     (isa(obj, Associative) && length(obj) < 1e6) || return (true, nothing, nothing)
@@ -456,7 +457,7 @@ function completions(string, pos)
 
     # otherwise...
     if inc_tag in [:cmd, :string]
-        m = match(r"[\t\n\r\"'`@\$><=;|&\{]| (?!\\)", reverse(partial))
+        m = match(r"[\t\n\r\"><=*?|]| (?!\\)", reverse(partial))
         startpos = nextind(partial, reverseind(partial, m.offset))
         r = startpos:pos
         paths, r, success = complete_path(replace(string[r], r"\\ ", " "), pos)
@@ -547,7 +548,7 @@ function completions(string, pos)
                 elseif c==']'
                     c_start='['; c_end=']'
                 end
-                frange, end_of_indentifier = find_start_brace(string[1:prevind(string, i)], c_start=c_start, c_end=c_end)
+                frange, end_of_identifier = find_start_brace(string[1:prevind(string, i)], c_start=c_start, c_end=c_end)
                 startpos = start(frange)
                 i = prevind(string, startpos)
             elseif c in ["\'\"\`"...]

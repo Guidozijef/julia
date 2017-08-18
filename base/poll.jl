@@ -145,8 +145,7 @@ mutable struct _FDWatcher
             end
         end
 
-        global uvfinalize
-        function uvfinalize(t::_FDWatcher)
+        function Base.uvfinalize(t::_FDWatcher)
             if t.handle != C_NULL
                 disassociate_julia_struct(t)
                 ccall(:jl_close_uv, Void, (Ptr{Void},), t.handle)
@@ -263,9 +262,9 @@ function _uv_hook_close(uv::FileMonitor)
 end
 
 function __init__()
-    global uv_jl_pollcb        = cfunction(uv_pollcb, Void, (Ptr{Void}, Cint, Cint))
-    global uv_jl_fspollcb      = cfunction(uv_fspollcb, Void, (Ptr{Void}, Cint, Ptr{Void}, Ptr{Void}))
-    global uv_jl_fseventscb    = cfunction(uv_fseventscb, Void, (Ptr{Void}, Ptr{Int8}, Int32, Int32))
+    global uv_jl_pollcb        = cfunction(uv_pollcb, Void, Tuple{Ptr{Void}, Cint, Cint})
+    global uv_jl_fspollcb      = cfunction(uv_fspollcb, Void, Tuple{Ptr{Void}, Cint, Ptr{Void}, Ptr{Void}})
+    global uv_jl_fseventscb    = cfunction(uv_fseventscb, Void, Tuple{Ptr{Void}, Ptr{Int8}, Int32, Int32})
 end
 
 function uv_fseventscb(handle::Ptr{Void}, filename::Ptr, events::Int32, status::Int32)

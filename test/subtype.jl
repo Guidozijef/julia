@@ -14,7 +14,7 @@ notequal_type(@nospecialize(x),@nospecialize(y)) = !isequal_type(x, y)
 
 _type_intersect(@nospecialize(x), @nospecialize(y)) = ccall(:jl_intersect_types, Any, (Any, Any), x, y)
 
-intersection_env(@nospecialize(x), @nospecialize(y)) = ccall(:jl_env_from_type_intersection, Any, (Any,Any), x, y)
+intersection_env(@nospecialize(x), @nospecialize(y)) = ccall(:jl_type_intersection_with_env, Any, (Any,Any), x, y)
 
 # level 1: no varags, union, UnionAll
 function test_1()
@@ -600,15 +600,25 @@ function test_properties()
 end
 
 macro testintersect(a, b, result)
-    if isa(result,Expr) && result.head === :call && length(result.args)==2 && result.args[1] === :!
+    if isa(result, Expr) && result.head === :call && length(result.args) == 2 && result.args[1] === :!
         result = result.args[2]
-        cmp = :notequal_type
+        cmp = :(!=)
     else
-        cmp = :isequal_type
+        cmp = :(==)
     end
+    cmp = esc(cmp)
+    a = esc(a)
+    b = esc(b)
+    result = esc(result)
     Base.remove_linenums!(quote
-        @test $(esc(cmp))(_type_intersect($(esc(a)), $(esc(b))), $(esc(result)))
-        @test $(esc(cmp))(_type_intersect($(esc(b)), $(esc(a))), $(esc(result)))
+        # test real intersect
+        @test $cmp(_type_intersect($a, $b), $result)
+        @test $cmp(_type_intersect($b, $a), $result)
+        # test simplified intersect
+        if !($result === Union{})
+            @test typeintersect($a, $b) != Union{}
+            @test typeintersect($b, $a) != Union{}
+        end
     end)
 end
 
@@ -1084,12 +1094,12 @@ f20103(::Type{TT20103{X,Y}},x::X,y::Y) where {X,Y} = 1
 f20103(::Type{TT20103{X,X}},x::X) where {X} = 100
 @test_broken typeintersect(Type{NTuple{N,E}} where E where N, Type{NTuple{N,E} where N} where E) == Union{} # use @testintersect once fixed
 let ints = (Int, Int32, UInt, UInt32)
-    const Ints = Union{ints...}
+    Ints = Union{ints...}
     vecs = []
     for i = 2:4, t in ints
         push!(vecs, NTuple{i, t})
     end
-    const Vecs = Union{vecs...}
+    Vecs = Union{vecs...}
     T = Type{Tuple{V, I}} where V <: Vecs where I <: Ints
     @testintersect(T, T, T)
     test(a::Type{Tuple{V, I}}) where {V <: Vecs, I <: Ints} = I
@@ -1115,3 +1125,8 @@ end
 @testintersect(Val{Pair{T,T}} where T,
                Val{Pair{Int,T}} where T,
                Val{Pair{Int,Int}})
+
+# issue #23024
+@testintersect(Tuple{DataType, Any},
+               Tuple{Type{T}, Int} where T,
+               Tuple{DataType, Int})

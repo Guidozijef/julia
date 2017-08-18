@@ -119,6 +119,7 @@ readdlm_auto(input::Vector{UInt8}, dlm::Char, T::Type, eol::Char, auto::Bool; op
 readdlm_auto(input::IO, dlm::Char, T::Type, eol::Char, auto::Bool; opts...) =
     readdlm_string(read(input, String), dlm, T, eol, auto, val_opts(opts))
 function readdlm_auto(input::AbstractString, dlm::Char, T::Type, eol::Char, auto::Bool; opts...)
+    isfile(input) || throw(ArgumentError("Cannot open \'$input\': not a file"))
     optsd = val_opts(opts)
     use_mmap = get(optsd, :use_mmap, Sys.iswindows() ? false : true)
     fsz = filesize(input)
@@ -615,6 +616,11 @@ function dlm_parse(dbuff::String, eol::D, dlm::D, qchar::D, cchar::D,
     return (nrows, ncols)
 end
 
+"""
+    readcsv(source, [T::Type]; options...)
+
+Equivalent to [`readdlm`](@ref) with `delim` set to comma, and type optionally defined by `T`.
+"""
 readcsv(io; opts...)          = readdlm(io, ','; opts...)
 readcsv(io, T::Type; opts...) = readdlm(io, ',', T; opts...)
 

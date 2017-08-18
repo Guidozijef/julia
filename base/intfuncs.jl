@@ -28,6 +28,7 @@ end
 # binary GCD (aka Stein's) algorithm
 # about 1.7x (2.1x) faster for random Int64s (Int128s)
 function gcd(a::T, b::T) where T<:Union{Int64,UInt64,Int128,UInt128}
+    @noinline throw1(a, b) = throw(OverflowError("gcd($a, $b) overflows"))
     a == 0 && return abs(b)
     b == 0 && return abs(a)
     za = trailing_zeros(a)
@@ -44,7 +45,7 @@ function gcd(a::T, b::T) where T<:Union{Int64,UInt64,Int128,UInt128}
     end
     r = u << k
     # T(r) would throw InexactError; we want OverflowError instead
-    r > typemax(T) && throw(OverflowError())
+    r > typemax(T) && throw1(a, b)
     r % T
 end
 
@@ -583,8 +584,6 @@ function hex(x::Unsigned, pad::Int, neg::Bool)
     String(a)
 end
 
-num2hex(n::Integer) = hex(n, sizeof(n)*2)
-
 const base36digits = ['0':'9';'a':'z']
 const base62digits = ['0':'9';'A':'Z';'a':'z']
 
@@ -700,6 +699,22 @@ julia> dec(20, 3)
 ```
 """
 dec
+
+"""
+    bits(n)
+
+A string giving the literal bit representation of a number.
+
+# Examples
+```jldoctest
+julia> bits(4)
+"0000000000000000000000000000000000000000000000000000000000000100"
+
+julia> bits(2.2)
+"0100000000000001100110011001100110011001100110011001100110011010"
+```
+"""
+function bits end
 
 bits(x::Union{Bool,Int8,UInt8})           = bin(reinterpret(UInt8,x),8)
 bits(x::Union{Int16,UInt16,Float16})      = bin(reinterpret(UInt16,x),16)
@@ -841,6 +856,7 @@ julia> factorial(5) ÷ (factorial(5-3) * factorial(3))
 ```
 """
 function binomial(n::T, k::T) where T<:Integer
+    n0, k0 = n, k
     k < 0 && return zero(T)
     sgn = one(T)
     if n < 0
@@ -861,7 +877,7 @@ function binomial(n::T, k::T) where T<:Integer
     while rr <= k
         xt = div(widemul(x, nn), rr)
         x = xt
-        x == xt || throw(OverflowError())
+        x == xt || throw(OverflowError("binomial($n0, $k0) overflows"))
         rr += 1
         nn += 1
     end

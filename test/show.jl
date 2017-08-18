@@ -3,7 +3,7 @@
 # For curmod_*
 include("testenv.jl")
 
-replstr(x) = sprint((io,x) -> show(IOContext(io, :limit => true), MIME("text/plain"), x), x)
+replstr(x) = sprint((io,x) -> show(IOContext(io, limit=true, displaysize=(24, 80)), MIME("text/plain"), x), x)
 
 @test replstr(Array{Any}(2)) == "2-element Array{Any,1}:\n #undef\n #undef"
 @test replstr(Array{Any}(2,2)) == "2×2 Array{Any,2}:\n #undef  #undef\n #undef  #undef"
@@ -235,6 +235,45 @@ end"""
     # line meta
     return
 end"""
+
+@test_repr """if a
+# line meta
+b
+end
+"""
+
+@test_repr """if a
+# line meta
+b
+elseif c
+# line meta
+d
+end
+"""
+
+@test_repr """if a
+# line meta
+b
+elseif c
+# line meta
+d
+else
+# line meta
+e
+end
+"""
+
+@test_repr """if a
+# line meta
+b
+elseif c
+# line meta
+d
+elseif e
+# line meta
+f
+end
+"""
 
 # issue #7188
 @test sprint(show, :foo) == ":foo"
@@ -556,9 +595,9 @@ end
 # test structured zero matrix printing for select structured types
 A = reshape(1:16,4,4)
 @test replstr(Diagonal(A)) == "4×4 Diagonal{$(Int),Array{$(Int),1}}:\n 1  ⋅   ⋅   ⋅\n ⋅  6   ⋅   ⋅\n ⋅  ⋅  11   ⋅\n ⋅  ⋅   ⋅  16"
-@test replstr(Bidiagonal(A,:U)) == "4×4 Bidiagonal{$Int}:\n 1  5   ⋅   ⋅\n ⋅  6  10   ⋅\n ⋅  ⋅  11  15\n ⋅  ⋅   ⋅  16"
-@test replstr(Bidiagonal(A,:L)) == "4×4 Bidiagonal{$Int}:\n 1  ⋅   ⋅   ⋅\n 2  6   ⋅   ⋅\n ⋅  7  11   ⋅\n ⋅  ⋅  12  16"
-@test replstr(SymTridiagonal(A+A')) == "4×4 SymTridiagonal{$Int}:\n 2   7   ⋅   ⋅\n 7  12  17   ⋅\n ⋅  17  22  27\n ⋅   ⋅  27  32"
+@test replstr(Bidiagonal(A,:U)) == "4×4 Bidiagonal{$(Int),Array{$(Int),1}}:\n 1  5   ⋅   ⋅\n ⋅  6  10   ⋅\n ⋅  ⋅  11  15\n ⋅  ⋅   ⋅  16"
+@test replstr(Bidiagonal(A,:L)) == "4×4 Bidiagonal{$(Int),Array{$(Int),1}}:\n 1  ⋅   ⋅   ⋅\n 2  6   ⋅   ⋅\n ⋅  7  11   ⋅\n ⋅  ⋅  12  16"
+@test replstr(SymTridiagonal(A+A')) == "4×4 SymTridiagonal{$(Int),Array{$(Int),1}}:\n 2   7   ⋅   ⋅\n 7  12  17   ⋅\n ⋅  17  22  27\n ⋅   ⋅  27  32"
 @test replstr(Tridiagonal(diag(A,-1),diag(A),diag(A,+1))) == "4×4 Tridiagonal{$Int}:\n 1  5   ⋅   ⋅\n 2  6  10   ⋅\n ⋅  7  11  15\n ⋅  ⋅  12  16"
 @test replstr(UpperTriangular(copy(A))) == "4×4 UpperTriangular{$Int,Array{$Int,2}}:\n 1  5   9  13\n ⋅  6  10  14\n ⋅  ⋅  11  15\n ⋅  ⋅   ⋅  16"
 @test replstr(LowerTriangular(copy(A))) == "4×4 LowerTriangular{$Int,Array{$Int,2}}:\n 1  ⋅   ⋅   ⋅\n 2  6   ⋅   ⋅\n 3  7  11   ⋅\n 4  8  12  16"
@@ -846,13 +885,65 @@ end
 end
 
 @testset "alignment for pairs" begin  # (#22899)
-    @test replstr([1=>22,33=>4]) == "2-element Array{Pair{$Int,$Int},1}:\n  1=>22\n 33=>4 "
+    @test replstr([1=>22,33=>4]) == "2-element Array{Pair{$Int,$Int},1}:\n  1 => 22\n 33 => 4 "
     # first field may have "=>" in its representation
     @test replstr(Pair[(1=>2)=>3, 4=>5]) ==
-        "2-element Array{Pair,1}:\n (1=>2)=>3\n      4=>5"
+        "2-element Array{Pair,1}:\n (1=>2) => 3\n      4 => 5"
     @test replstr(Any[Dict(1=>2)=> (3=>4), 1=>2]) ==
-        "2-element Array{Any,1}:\n Dict(1=>2)=>(3=>4)\n          1=>2     "
+        "2-element Array{Any,1}:\n Dict(1=>2) => (3=>4)\n          1 => 2     "
     # left-alignment when not using the "=>" symbol
     @test replstr(Pair{Integer,Int64}[1=>2, 33=>4]) ==
         "2-element Array{Pair{Integer,Int64},1}:\n Pair{Integer,Int64}(1, 2) \n Pair{Integer,Int64}(33, 4)"
+end
+
+@testset "display arrays non-compactly when size(⋅, 2) == 1" begin
+    # 0-dim
+    @test replstr(zeros(Complex{Int})) == "0-dimensional Array{Complex{$Int},0}:\n0 + 0im"
+    A = Array{Pair}(); A[] = 1=>2
+    @test replstr(A) == "0-dimensional Array{Pair,0}:\n1 => 2"
+    # 1-dim
+    @test replstr(zeros(Complex{Int}, 2)) ==
+        "2-element Array{Complex{$Int},1}:\n 0 + 0im\n 0 + 0im"
+    @test replstr([1=>2, 3=>4]) == "2-element Array{Pair{$Int,$Int},1}:\n 1 => 2\n 3 => 4"
+    # 2-dim
+    @test replstr(zeros(Complex{Int}, 2, 1)) ==
+        "2×1 Array{Complex{$Int},2}:\n 0 + 0im\n 0 + 0im"
+    @test replstr(zeros(Complex{Int}, 1, 2)) ==
+        "1×2 Array{Complex{$Int},2}:\n 0+0im  0+0im"
+    @test replstr([1=>2 3=>4]) == "1×2 Array{Pair{$Int,$Int},2}:\n 1=>2  3=>4"
+    @test replstr([1=>2 for x in 1:2, y in 1:1]) ==
+        "2×1 Array{Pair{$Int,$Int},2}:\n 1 => 2\n 1 => 2"
+    # 3-dim
+    @test replstr(zeros(Complex{Int}, 1, 1, 1)) ==
+        "1×1×1 Array{Complex{$Int},3}:\n[:, :, 1] =\n 0 + 0im"
+    @test replstr(zeros(Complex{Int}, 1, 2, 1)) ==
+        "1×2×1 Array{Complex{$Int},3}:\n[:, :, 1] =\n 0+0im  0+0im"
+end
+
+@testset "Array printing with limited rows" begin
+    arrstr = let buf = IOBuffer()
+        function (A, rows)
+            Base.showarray(IOContext(buf, displaysize=(rows, 80), limit=true),
+                           A, false, header=true)
+            String(take!(buf))
+        end
+    end
+    A = Int64[1]
+    @test arrstr(A, 4) == "1-element Array{Int64,1}: …"
+    @test arrstr(A, 5) == "1-element Array{Int64,1}:\n 1"
+    push!(A, 2)
+    @test arrstr(A, 5) == "2-element Array{Int64,1}:\n ⋮"
+    @test arrstr(A, 6) == "2-element Array{Int64,1}:\n 1\n 2"
+    push!(A, 3)
+    @test arrstr(A, 6) == "3-element Array{Int64,1}:\n 1\n ⋮"
+
+    @test arrstr(zeros(4, 3), 4)  == "4×3 Array{Float64,2}: …"
+    @test arrstr(zeros(4, 30), 4) == "4×30 Array{Float64,2}: …"
+    @test arrstr(zeros(4, 3), 5)  == "4×3 Array{Float64,2}:\n ⋮      ⋱  "
+    @test arrstr(zeros(4, 30), 5) == "4×30 Array{Float64,2}:\n ⋮      ⋱  "
+    @test arrstr(zeros(4, 3), 6)  == "4×3 Array{Float64,2}:\n 0.0  0.0  0.0\n ⋮            "
+    @test arrstr(zeros(4, 30), 6) ==
+              string("4×30 Array{Float64,2}:\n",
+                     " 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  …  0.0  0.0  0.0  0.0  0.0  0.0  0.0\n",
+                     " ⋮                        ⋮              ⋱            ⋮                      ")
 end

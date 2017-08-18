@@ -137,16 +137,15 @@ function print_response(errio::IO, @nospecialize(val), bt, show_value::Bool, hav
         try
             Base.sigatomic_end()
             if bt !== nothing
-                eval(Main, Expr(:body, Expr(:return, Expr(:call, Base.display_error,
-                                                          errio, QuoteNode(val), bt))))
+                Base.invokelatest(Base.display_error, errio, val, bt)
                 iserr, lasterr = false, ()
             else
                 if val !== nothing && show_value
                     try
                         if specialdisplay === nothing
-                            eval(Main, Expr(:body, Expr(:return, Expr(:call, display, QuoteNode(val)))))
+                            Base.invokelatest(display, val)
                         else
-                            eval(Main, Expr(:body, Expr(:return, Expr(:call, specialdisplay, QuoteNode(val)))))
+                            Base.invokelatest(display, specialdisplay, val)
                         end
                     catch err
                         println(errio, "Error showing value of type ", typeof(val), ":")
@@ -508,7 +507,8 @@ function history_next(s::LineEdit.MIState, hist::REPLHistoryProvider,
 end
 
 history_first(s::LineEdit.MIState, hist::REPLHistoryProvider) =
-    history_prev(s, hist, hist.cur_idx - 1)
+    history_prev(s, hist, hist.cur_idx - 1 -
+                 (hist.cur_idx > hist.start_idx+1 ? hist.start_idx : 0))
 
 history_last(s::LineEdit.MIState, hist::REPLHistoryProvider) =
     history_next(s, hist, length(hist.history) - hist.cur_idx + 1)
@@ -648,8 +648,7 @@ function respond(f, repl, main; pass_empty = false)
             reset(repl)
             local val, bt
             try
-                # note: value wrapped carefully here to ensure it doesn't get passed through expand
-                response = eval(Main, Expr(:body, Expr(:return, Expr(:call, QuoteNode(f), QuoteNode(line)))))
+                response = Base.invokelatest(f, line)
                 val, bt = send_to_backend(response, backend(repl))
             catch err
                 val = err
@@ -809,7 +808,7 @@ function setup_interface(
         extra_repl_keymap = [extra_repl_keymap]
     end
 
-    const repl_keymap = AnyDict(
+    repl_keymap = AnyDict(
         ';' => function (s,o...)
             if isempty(s) || position(LineEdit.buffer(s)) == 0
                 buf = copy(LineEdit.buffer(s))

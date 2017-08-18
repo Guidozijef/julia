@@ -86,6 +86,10 @@ end
 
     i = IntSet(1:6)
     @test symdiff!(i, IntSet([6, 513])) == IntSet([1:5; 513])
+
+    # issue #23099 : these tests should not segfault
+    @test_throws ArgumentError symdiff!(IntSet(rand(1:100, 30)), 0)
+    @test_throws ArgumentError symdiff!(IntSet(rand(1:100, 30)), [0, 2, 4])
 end
 
 @testset "copy, copy!, similar" begin
@@ -135,6 +139,12 @@ end
 
 @testset "pop!, delete!" begin
     s = IntSet(1:2:10)
+    # deleting non-positive values should be no-op
+    # (Issue #23179 : delete!(s, 0) should not crash)
+    len = length(s)
+    for n in -20:0
+        @test length(delete!(s, n)) == len
+    end
     @test pop!(s, 1) === 1
     @test !(1 in s)
     @test_throws KeyError pop!(s, 1)
@@ -193,6 +203,10 @@ end
     s2 = setdiff(IntSet(1:100), IntSet(1:2:100))
     @test s1 == s2 == IntSet(2:2:100)
     @test collect(s1) == collect(2:2:100)
+
+    # issue #23191 : these tests should not segfault
+    @test setdiff(s1, 0) == s1
+    @test setdiff(s1, -9:0) == s1
 
     @test symdiff(IntSet([1, 2, 3, 4]), IntSet([2, 4, 5, 6])) ==
           symdiff(IntSet([2, 4, 5, 6]), IntSet([1, 2, 3, 4])) ==

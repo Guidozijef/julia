@@ -144,7 +144,8 @@
 (define range-colon-enabled #t)
 ; in space-sensitive mode "x -y" is 2 expressions, not a subtraction
 (define space-sensitive #f)
-(define inside-vec #f)
+; seeing `for` stops parsing macro arguments and makes a generator
+(define for-generator #f)
 ; treat 'end' like a normal symbol instead of a reserved word
 (define end-symbol #f)
 ; treat newline like ordinary whitespace instead of as a potential separator
@@ -164,7 +165,7 @@
   `(with-bindings ((range-colon-enabled #t)
                    (space-sensitive #f)
                    (where-enabled #t)
-                   (inside-vec #f)
+                   (for-generator #f)
                    (end-symbol #f)
                    (whitespace-newline #f))
                   ,@body))
@@ -175,12 +176,6 @@
 
 (define-macro (with-space-sensitive . body)
   `(with-bindings ((space-sensitive #t)
-                   (whitespace-newline #f))
-                  ,@body))
-
-(define-macro (with-inside-vec . body)
-  `(with-bindings ((space-sensitive #t)
-                   (inside-vec #t)
                    (whitespace-newline #f))
                   ,@body))
 
@@ -690,14 +685,14 @@
                             (parse-assignment s parse-cond)))))
         (parse-assignment s parse-cond))))
 
-(define (eventually-call ex)
+(define (eventually-call? ex)
   (and (pair? ex)
        (or (eq? (car ex) 'call)
            (and (or (eq? (car ex) 'where) (eq? (car ex) '|::|))
-                (eventually-call (cadr ex))))))
+                (eventually-call? (cadr ex))))))
 
 (define (short-form-function-loc ex lno)
-  (if (eventually-call (cadr ex))
+  (if (eventually-call? (cadr ex))
       `(= ,(cadr ex) (block (line ,lno ,current-filename) ,(caddr ex)))
       ex))
 
@@ -1129,7 +1124,7 @@
             ((#\( )
              (if (ts:space? s) (disallowed-space ex t))
              (take-token s)
-             (let ((c (let ((al (parse-arglist s #\) )))
+             (let ((c (let ((al (parse-call-arglist s #\) )))
                         (receive
                          (params args) (separate (lambda (x)
                                                    (and (pair? x)
@@ -1172,7 +1167,7 @@
               (cond ((eqv? (peek-token s) #\()
                      (begin
                        (take-token s)
-                       `(|.| ,ex (tuple ,@(parse-arglist s #\) )))))
+                       `(|.| ,ex (tuple ,@(parse-call-arglist s #\) )))))
                     ((eqv? (peek-token s) ':)
                      (begin
                        (take-token s)
@@ -1195,7 +1190,7 @@
             ((#\{ )
              (if (ts:space? s) (disallowed-space ex t))
              (take-token s)
-             (loop (list* 'curly ex (parse-arglist s #\} ))))
+             (loop (list* 'curly ex (parse-call-arglist s #\} ))))
             ((#\" #\`)
              (if (and (or (symbol? ex) (valid-modref? ex))
                       (not (operator? ex))
@@ -1243,6 +1238,11 @@
            (and (eq? (car sig) 'where)
                 (valid-func-sig? paren (cadr sig))))))
 
+(define (valid-1arg-func-sig? sig)
+  (or (symbol? sig)
+      (and (pair? sig) (eq? (car sig) '|::|)
+           (symbol? (cadr sig)))))
+
 (define (unwrap-where x)
   (if (and (pair? x) (eq? (car x) 'where))
       (unwrap-where (cadr x))
@@ -1257,7 +1257,7 @@
   (if (reserved-word? (peek-token s))
       (error (string "invalid type name \"" (take-token s) "\"")))
   (let ((sig (parse-subtype-spec s)))
-    (begin0 (list 'type (if mut? 'true 'false) sig (parse-block s))
+    (begin0 (list 'struct (if mut? 'true 'false) sig (parse-block s))
             (expect-end s word))))
 
 ;; consume any number of line endings from a token stream
@@ -1296,31 +1296,33 @@
           `(for ,(if (length= ranges 1) (car ranges) (cons 'block ranges))
                 ,body)))
 
-       ((if)
+       ((if elseif)
         (if (newline? (peek-token s))
             (error (string "missing condition in \"if\" at " current-filename
                            ":" (- (input-port-line (ts:port s)) 1))))
-        (let* ((test (parse-cond s))
+        (let* ((lno (line-number-node s))  ;; line number for elseif condition
+               (test (parse-cond s))
+               (test (if (eq? word 'elseif)
+                         `(block ,lno ,test)
+                         test))
                (then (if (memq (require-token s) '(else elseif))
                          '(block)
                          (parse-block s)))
                (nxt  (require-token s)))
           (take-token s)
           (case nxt
-            ((end)     (list 'if test then))
+            ((end)     (list word test then))
             ((elseif)
              (if (newline? (peek-token s))
                  (error (string "missing condition in \"elseif\" at " current-filename
                                 ":" (- (input-port-line (ts:port s)) 1))))
-             `(if ,test ,then
-                  ;; line number for elseif condition
-                  (block ,(line-number-node s)
-                         ,(parse-resword s 'if))))
+             `(,word ,test ,then
+                     ,(parse-resword s 'elseif)))
             ((else)
              (if (eq? (peek-token s) 'if)
                  (error "use \"elseif\" instead of \"else if\""))
-             (begin0 (list 'if test then (parse-block s))
-                     (expect-end s word)))
+             (begin0 (list word test then (parse-block s))
+                     (expect-end s 'if)))
             (else      (error (string "unexpected \"" nxt "\""))))))
        ((let)
         (let ((binds (if (memv (peek-token s) '(#\newline #\;))
@@ -1364,9 +1366,9 @@
                      (take-token s)
                      `(function ,sig))
               (let* ((usig (unwrap-where sig))
-                     (def  (if (or (symbol? usig)
-                                   (and (pair? usig) (eq? (car usig) '|::|)
-                                        (symbol? (cadr usig))))
+                     (def  (if (or (valid-1arg-func-sig? usig)
+                                   (and (assignment? usig)
+                                        (valid-1arg-func-sig? (cadr usig))))
                                (if paren
                                    ;; in "function (x)" the (x) is a tuple
                                    (rewrap-where `(tuple ,usig) sig)
@@ -1403,7 +1405,7 @@
             (begin (take-token s)
                    (let* ((spec (with-space-sensitive (parse-subtype-spec s)))
                           (nb   (with-space-sensitive (parse-cond s))))
-                     (begin0 (list 'bitstype nb spec)
+                     (begin0 (list 'primitive spec nb)
                              (expect-end (take-lineendings s) "primitive type"))))))
        ;; deprecated type keywords
        ((type)
@@ -1417,7 +1419,7 @@
                (spec (parse-subtype-spec s)))
           (syntax-deprecation s (string "bitstype " (deparse nb) " " (deparse spec))
                               (string "primitive type " (deparse spec) " " (deparse nb) " end"))
-          (list 'bitstype nb spec)))
+          (list 'primitive spec nb)))
        ((typealias)
         (let ((lhs (with-space-sensitive (parse-call s)))
               (rhs (parse-where s parse-call)))
@@ -1629,7 +1631,7 @@
    (let loop ((exprs '()))
      (if (or (closing-token? (peek-token s))
              (newline? (peek-token s))
-             (and inside-vec (eq? (peek-token s) 'for)))
+             (and for-generator (eq? (peek-token s) 'for)))
          (reverse! exprs)
          (let ((e (parse-eq s)))
            (case (peek-token s)
@@ -1645,13 +1647,20 @@
                        x))
        lst))
 
+;; like parse-arglist, but with `for` parsed as a generator
+(define (parse-call-arglist s closer)
+  (with-bindings ((for-generator #t))
+   (parse-arglist s closer)))
+
 ;; handle function call argument list, or any comma-delimited list.
 ;; . an extra comma at the end is allowed
 ;; . expressions after a ; are enclosed in (parameters ...)
 ;; . an expression followed by ... becomes (... x)
 (define (parse-arglist s closer)
-(with-normal-ops
- (with-whitespace-newline
+(with-bindings ((range-colon-enabled #t)
+                (space-sensitive #f)
+                (where-enabled #t)
+                (whitespace-newline #t))
   (let loop ((lst '()))
     (let ((t (require-token s)))
       (if (eqv? t closer)
@@ -1689,7 +1698,7 @@
                        (error (string "unexpected \"" c "\" in argument list")))
                       (else
                        (error (string "missing comma or " closer
-                                      " in argument list"))))))))))))
+                                      " in argument list")))))))))))
 
 (define (parse-vect s first closer)
   (let loop ((lst '())
@@ -1701,16 +1710,26 @@
           (case t
             ((#\,)
              (take-token s)
-             (if (eqv? (require-token s) closer)
-                 ;; allow ending with ,
-                 (begin (take-token s)
-                        (cons 'vect (reverse (cons nxt lst))))
-                 (loop (cons nxt lst) (parse-eq* s))))
+             (cond ((eqv? (require-token s) closer)
+                    ;; allow ending with ,
+                    (begin (take-token s)
+                           (cons 'vect (reverse (cons nxt lst)))))
+                   ((eqv? (require-token s) #\;)
+                    ;; [a,; ...
+                    (let ((params (parse-arglist s closer)))
+                      `(vect ,@params ,@(reverse lst) ,nxt)))
+                   (else
+                    (loop (cons nxt lst) (parse-eq* s)))))
             ((#\;)
              (if (eqv? (require-token s) closer)
                  (loop lst nxt)
-                 (let ((params (parse-arglist s closer)))
-                   `(vcat ,@params ,@(reverse lst) ,nxt))))
+                 (let ((params (parse-call-arglist s closer)))
+                   (if (null? params)
+                       (begin (syntax-deprecation s (deparse `(vect (parameters) ,@(reverse lst) ,nxt))
+                                                  (deparse `(vcat ,@(reverse lst) ,nxt)))
+                              ;; TODO: post 0.7, remove deprecation and change parsing to 'vect
+                              `(vcat ,@(reverse lst) ,nxt))
+                       `(vect ,@params ,@(reverse lst) ,nxt)))))
             ((#\] #\})
              (error (string "unexpected \"" t "\"")))
             (else
@@ -1792,8 +1811,11 @@
       (error (string "expected space before \"" t "\""))))
 
 (define (parse-cat s closer last-end-symbol)
-  (with-normal-ops
-   (with-inside-vec
+  (with-bindings ((range-colon-enabled #t)
+                  (space-sensitive #t)
+                  (where-enabled #t)
+                  (whitespace-newline #f)
+                  (for-generator #t))
     (if (eqv? (require-token s) closer)
         (begin (take-token s)
                '())
@@ -1811,7 +1833,7 @@
                      (parse-vect s first closer)
                      (parse-matrix s first closer #t last-end-symbol)))
                 (else
-                 (parse-matrix s first closer #f last-end-symbol))))))))
+                 (parse-matrix s first closer #f last-end-symbol)))))))
 
 (define (kw-to-= e) (if (kwarg? e) (cons '= (cdr e)) e))
 (define (=-to-kw e) (if (assignment? e) (cons 'kw (cdr e)) e))
@@ -2257,7 +2279,7 @@
         ((valid-modref? e)
          `(|.| ,(cadr e)
                (quote ,(apply macroify-name (cadr (caddr e)) suffixes))))
-        (else (error (string "invalid macro use \"@(" (deparse e) ")\"" )))))
+        (else (error (string "invalid macro usage \"@(" (deparse e) ")\"" )))))
 
 (define (simple-string-literal? e) (string? e))
 

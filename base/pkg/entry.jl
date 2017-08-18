@@ -572,7 +572,8 @@ end
 
 function warnbanner(msg...; label="[ WARNING ]", prefix="")
     cols = Base.displaysize(STDERR)[2]
-    warn(prefix="", Base.cpad(label,cols,"="))
+    str = rpad(lpad(label, div(cols+strwidth(label), 2), "="), cols, "=")
+    warn(prefix="", str)
     println(STDERR)
     warn(prefix=prefix, msg...)
     println(STDERR)
@@ -718,6 +719,7 @@ function test!(pkg::AbstractString,
                     --color=$(Base.have_color ? "yes" : "no")
                     --compilecache=$(Bool(Base.JLOptions().use_compilecache) ? "yes" : "no")
                     --check-bounds=yes
+                    --warn-overwrite=yes
                     --startup-file=$(Base.JLOptions().startupfile != 2 ? "yes" : "no")
                     $test_path
                     ```

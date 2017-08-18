@@ -122,7 +122,17 @@ function show_circular(io::IOContext, @nospecialize(x))
     return false
 end
 
+"""
+    show(x)
+
+Write an informative text representation of a value to the current output stream. New types
+should overload `show(io, x)` where the first argument is a stream. The representation used
+by `show` generally includes Julia-specific formatting and type information.
+"""
+show(x) = show(STDOUT::IO, x)
+
 show(io::IO, @nospecialize(x)) = show_default(io, x)
+
 function show_default(io::IO, @nospecialize(x))
     t = typeof(x)::DataType
     show(io, t)
@@ -187,8 +197,7 @@ show(io::IO, ::Core.TypeofBottom) = print(io, "Union{}")
 
 function show(io::IO, x::Union)
     print(io, "Union")
-    sorted_types = sort!(uniontypes(x); by=string)
-    show_comma_array(io, sorted_types, '{', '}')
+    show_comma_array(io, uniontypes(x), '{', '}')
 end
 
 function print_without_params(@nospecialize(x))
@@ -557,7 +566,11 @@ function show_block(io::IO, head, args::Vector, body, indent::Int)
     print(io, head)
     if !isempty(args)
         print(io, ' ')
-        show_list(io, args, ", ", indent)
+        if head === :elseif
+            show_list(io, args, " ", indent)
+        else
+            show_list(io, args, ", ", indent)
+        end
     end
 
     ind = head === :module || head === :baremodule ? indent : indent + indent_width
@@ -880,22 +893,31 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
         print(io, "function ", args[1], " end")
 
     # block with argument
-    elseif head in (:for,:while,:function,:if) && nargs==2
+    elseif head in (:for,:while,:function,:if,:elseif) && nargs==2
         show_block(io, head, args[1], args[2], indent)
         print(io, "end")
+
+    elseif (head === :if || head === :elseif) && nargs == 3
+        show_block(io, head, args[1], args[2], indent)
+        if isa(args[3],Expr) && args[3].head == :elseif
+            show_unquoted(io, args[3], indent, prec)
+        else
+            show_block(io, "else", args[3], indent)
+            print(io, "end")
+        end
 
     elseif head === :module && nargs==3 && isa(args[1],Bool)
         show_block(io, args[1] ? :module : :baremodule, args[2], args[3], indent)
         print(io, "end")
 
     # type declaration
-    elseif head === :type && nargs==3
+    elseif head === :struct && nargs==3
         show_block(io, args[1] ? Symbol("mutable struct") : Symbol("struct"), args[2], args[3], indent)
         print(io, "end")
 
-    elseif head === :bitstype && nargs == 2
+    elseif head === :primitive && nargs == 2
         print(io, "primitive type ")
-        show_list(io, reverse(args), ' ', indent)
+        show_list(io, args, ' ', indent)
         print(io, " end")
 
     elseif head === :abstract && nargs == 1
@@ -944,11 +966,6 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
 
     elseif head === :line && 1 <= nargs <= 2
         show_linenumber(io, args...)
-
-    elseif head === :if && nargs == 3     # if/else
-        show_block(io, "if",   args[1], args[2], indent)
-        show_block(io, "else", args[3], indent)
-        print(io, "end")
 
     elseif head === :try && 3 <= nargs <= 4
         show_block(io, "try", args[1], indent)
@@ -1355,6 +1372,12 @@ end
 dump(io::IO, x::DataType; maxdepth=8) = ((x.abstract ? dumptype : dump)(io, x, maxdepth, ""); println(io))
 
 dump(io::IO, arg; maxdepth=8) = (dump(io, arg, maxdepth, ""); println(io))
+
+"""
+    dump(x)
+
+Show every part of the representation of a value.
+"""
 dump(arg; maxdepth=8) = dump(IOContext(STDOUT::IO, :limit => true), arg; maxdepth=maxdepth)
 
 
@@ -1387,7 +1410,10 @@ end
 function alignment(io::IO, x::Pair)
     s = sprint(0, show, x, env=io)
     if has_tight_type(x) # i.e. use "=>" for display
-        left = length(sprint(0, show, x.first, env=io)) + 2isa(x.first, Pair) # 2 for parens
+        iocompact = IOContext(io, :compact => get(io, :compact, true))
+        left = length(sprint(0, show, x.first, env=iocompact))
+        left += 2 * !isdelimited(iocompact, x.first) # for parens around p.first
+        left += !get(io, :compact, false) # spaces are added around "=>"
         (left+1, length(s)-left-1) # +1 for the "=" part of "=>"
     else
         (0, length(s)) # as for x::Any
@@ -1575,11 +1601,11 @@ function print_matrix(io::IO, X::AbstractVecOrMat,
                 print(io, i == first(rowsA) ? pre : presp)
                 print_matrix_row(io, X,A,i,colsA,sep)
                 print(io, i == last(rowsA) ? post : postsp)
-                if i != rowsA[end]; println(io); end
+                if i != rowsA[end] || i == rowsA[halfheight]; println(io); end
                 if i == rowsA[halfheight]
                     print(io, i == first(rowsA) ? pre : presp)
                     print_matrix_vdots(io, vdots,A,sep,vmod,1)
-                    println(io, i == last(rowsA) ? post : postsp)
+                    print(io, i == last(rowsA) ? post : postsp * '\n')
                 end
             end
         else # neither rows nor cols fit, so use all 3 kinds of dots
@@ -1594,15 +1620,21 @@ function print_matrix(io::IO, X::AbstractVecOrMat,
                 print(io, (i - first(rowsA)) % hmod == 0 ? hdots : repeat(" ", length(hdots)))
                 print_matrix_row(io, X,Ralign,i,n-length(Ralign)+colsA,sep)
                 print(io, i == last(rowsA) ? post : postsp)
-                if i != rowsA[end]; println(io); end
+                if i != rowsA[end] || i == rowsA[halfheight]; println(io); end
                 if i == rowsA[halfheight]
                     print(io, i == first(rowsA) ? pre : presp)
                     print_matrix_vdots(io, vdots,Lalign,sep,vmod,1)
                     print(io, ddots)
                     print_matrix_vdots(io, vdots,Ralign,sep,vmod,r)
-                    println(io, i == last(rowsA) ? post : postsp)
+                    print(io, i == last(rowsA) ? post : postsp * '\n')
                 end
             end
+        end
+        if isempty(rowsA)
+            print(io, pre)
+            print(io, vdots)
+            length(colsA) > 1 && print(io, "    ", ddots)
+            print(io, post)
         end
     end
 end
@@ -1741,7 +1773,7 @@ function showarray(io::IO, X::AbstractArray, repr::Bool = true; header = true)
     if repr && ndims(X) == 1
         return show_vector(io, X, "[", "]")
     end
-    if !haskey(io, :compact)
+    if !haskey(io, :compact) && length(indices(X, 2)) > 1
         io = IOContext(io, :compact => true)
     end
     if !repr && get(io, :limit, false) && eltype(X) === Method
@@ -1750,7 +1782,14 @@ function showarray(io::IO, X::AbstractArray, repr::Bool = true; header = true)
     end
     (!repr && header) && print(io, summary(X))
     if !isempty(X)
-        (!repr && header) && println(io, ":")
+        if !repr && header
+            print(io, ":")
+            if get(io, :limit, false) && displaysize(io)[1]-4 <= 0
+                return print(io, " …")
+            else
+                println(io)
+            end
+        end
         if ndims(X) == 0
             if isassigned(X)
                 return show(io, X[])

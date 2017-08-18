@@ -161,6 +161,8 @@ Matches the [`git_checkout_options`](https://libgit2.github.com/libgit2/#HEAD/ty
     perfdata_payload::Ptr{Void}
 end
 
+abstract type Payload end
+
 """
     LibGit2.RemoteCallbacks
 
@@ -183,8 +185,16 @@ Matches the [`git_remote_callbacks`](https://libgit2.github.com/libgit2/#HEAD/ty
     payload::Ptr{Void}
 end
 
-function RemoteCallbacks(credentials::Ptr{Void}, payload::Ref{Nullable{AbstractCredentials}})
-    RemoteCallbacks(credentials=credentials_cb(), payload=pointer_from_objref(payload))
+function RemoteCallbacks(credentials_cb::Ptr{Void}, payload::Ref{<:Payload})
+    RemoteCallbacks(credentials=credentials_cb, payload=pointer_from_objref(payload))
+end
+
+function RemoteCallbacks(credentials_cb::Ptr{Void}, payload::Payload)
+    RemoteCallbacks(credentials_cb, Ref(payload))
+end
+
+function RemoteCallbacks(credentials_cb::Ptr{Void}, credentials)
+    RemoteCallbacks(credentials_cb, CredentialPayload(credentials))
 end
 
 """
@@ -741,14 +751,14 @@ The fields represent:
     * `final_start_line_number`: the *one based* line number in the file where the
        hunk starts, in the *final* version of the file.
     * `final_signature`: the signature of the person who last modified this hunk. You will
-       need to pass this to [`Signature`](@ref) to access its fields.
+       need to pass this to `Signature` to access its fields.
     * `orig_commit_id`: the [`GitHash`](@ref) of the commit where this hunk was first found.
     * `orig_path`: the path to the file where the hunk originated. This may be different
        than the current/final path, for instance if the file has been moved.
     * `orig_start_line_number`: the *one based* line number in the file where the
        hunk starts, in the *original* version of the file at `orig_path`.
     * `orig_signature`: the signature of the person who introduced this hunk. You will
-       need to pass this to [`Signature`](@ref) to access its fields.
+       need to pass this to `Signature` to access its fields.
     * `boundary`: `'1'` if the original commit is a "boundary" commit (for instance, if it's
        equal to an oldest commit set in `options`).
 """
@@ -915,4 +925,36 @@ end
 function securezero!(p::CachedCredentials)
     foreach(securezero!, values(p.cred))
     return p
+end
+
+"""
+    LibGit2.CredentialPayload
+
+Retains state between multiple calls to the credential callback. A single
+`CredentialPayload` instance will be used when authentication fails for a URL but different
+instances will be used when the URL has changed.
+"""
+mutable struct CredentialPayload <: Payload
+    credential::Nullable{AbstractCredentials}
+    cache::Nullable{CachedCredentials}
+    scheme::String
+    username::String
+    host::String
+    path::String
+
+    function CredentialPayload(credential::Nullable{<:AbstractCredentials}, cache::Nullable{CachedCredentials})
+        new(credential, cache, "", "", "", "")
+    end
+end
+
+function CredentialPayload(credential::Nullable{<:AbstractCredentials})
+    CredentialPayload(credential, Nullable{CachedCredentials}())
+end
+
+function CredentialPayload(cache::Nullable{CachedCredentials})
+    CredentialPayload(Nullable{AbstractCredentials}(), cache)
+end
+
+function CredentialPayload()
+    CredentialPayload(Nullable{AbstractCredentials}(), Nullable{CachedCredentials}())
 end

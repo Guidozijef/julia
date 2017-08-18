@@ -457,8 +457,8 @@ end
     # @test find(s) == [1,2,3,4,5]
     @test find(c -> c == 'l', s) == [3]
     g = graphemes("日本語")
-    @test find(g) == [1,2,3]
     @test find(isascii, g) == Int[]
+    @test find((i % 2 for i in 1:10)) == collect(1:2:9)
 end
 @testset "findn" begin
     b = findn(ones(2,2,2,2))
@@ -495,6 +495,20 @@ end
     @test indmax(5:-2:1) == 1
     @test findmin(5:-2:1) == (1,3)
     @test indmin(5:-2:1) == 3
+
+    #23094
+    @test findmax(Set(["abc"])) === ("abc", 1)
+    @test findmin(["abc", "a"]) === ("a", 2)
+    @test_throws MethodError findmax([Set([1]), Set([2])])
+    @test findmin([0.0, -0.0]) === (-0.0, 2)
+    @test findmax([0.0, -0.0]) === (0.0, 1)
+    @test findmin([-0.0, 0.0]) === (-0.0, 1)
+    @test findmax([-0.0, 0.0]) === (0.0, 2)
+    @test isnan(findmin([NaN, NaN, 0.0/0.0])[1])
+    @test findmin([NaN, NaN, 0.0/0.0])[2] == 1
+    @test isnan(findmax([NaN, NaN, 0.0/0.0])[1])
+    @test findmax([NaN, NaN, 0.0/0.0])[2] == 1
+
 end
 
 @testset "permutedims" begin

@@ -293,11 +293,17 @@ let g() = Int <: Real ? 1 : ""
 end
 
 const NInt{N} = Tuple{Vararg{Int, N}}
+const NInt1{N} = Tuple{Int, Vararg{Int, N}}
 @test Base.eltype(NInt) === Int
-@test Base.return_types(eltype, (NInt,)) == Any[Union{Type{Int}, Type{Union{}}}] # issue 21763
+@test Base.eltype(NInt1) === Int
+@test Base.eltype(NInt{0}) === Union{}
+@test Base.eltype(NInt{1}) === Int
+@test Base.eltype(NInt1{0}) === Int
+@test Base.eltype(NInt1{1}) === Int
 fNInt(x::NInt) = (x...)
 gNInt() = fNInt(x)
 @test Base.return_types(gNInt, ()) == Any[NInt]
+@test Base.return_types(eltype, (NInt,)) == Any[Union{Type{Int}, Type{Union{}}}] # issue 21763
 
 # issue #17572
 function f17572(::Type{Val{A}}) where A
@@ -368,7 +374,7 @@ end
 f18222(::Union{T, Int}) where {T<:AbstractFloat} = false
 f18222(x) = true
 g18222(x) = f18222(x)
-@test f18222(1) == g18222(1) == true
+@test f18222(1) == g18222(1) == false
 @test f18222(1.0) == g18222(1.0) == false
 
 # issue #18399
@@ -992,7 +998,7 @@ function get_linfo(@nospecialize(f), @nospecialize(t))
     ft = isa(f, Type) ? Type{f} : typeof(f)
     tt = Tuple{ft, t.parameters...}
     precompile(tt)
-    (ti, env) = ccall(:jl_match_method, Ref{SimpleVector}, (Any, Any), tt, meth.sig)
+    (ti, env) = ccall(:jl_type_intersection_with_env, Ref{SimpleVector}, (Any, Any), tt, meth.sig)
     meth = Base.func_for_method_checked(meth, tt)
     return ccall(:jl_specializations_get_linfo, Ref{Core.MethodInstance},
                  (Any, Any, Any, UInt), meth, tt, env, world)
@@ -1092,7 +1098,7 @@ let isa_tfunc = Core.Inference.t_ffunc_val[
     @test isa_tfunc(Array, Const(AbstractArray)) === Const(true)
     @test isa_tfunc(Array, Type{AbstractArray}) === Const(true)
     @test isa_tfunc(Array, Type{AbstractArray{Int}}) == Bool
-    @test isa_tfunc(Array{Real}, Type{AbstractArray{Int}}) === Bool # could be improved
+    @test isa_tfunc(Array{Real}, Type{AbstractArray{Int}}) === Const(false)
     @test isa_tfunc(Array{Real, 2}, Const(AbstractArray{Real, 2})) === Const(true)
     @test isa_tfunc(Array{Real, 2}, Const(AbstractArray{Int, 2})) === Const(false)
     @test isa_tfunc(DataType, Int) === Bool # could be improved
@@ -1103,9 +1109,9 @@ let isa_tfunc = Core.Inference.t_ffunc_val[
     @test isa_tfunc(Union, Const(Union{Float32, Float64})) === Bool
     @test isa_tfunc(Union, Type{Union}) === Const(true)
     @test isa_tfunc(typeof(Union{}), Const(Int)) === Bool # any result is ok
-    @test isa_tfunc(typeof(Union{}), Const(Union{})) === Bool # could be improved
-    @test isa_tfunc(typeof(Union{}), typeof(Union{})) === Bool # could be improved
-    @test isa_tfunc(typeof(Union{}), Union{}) === Bool # could be improved
+    @test isa_tfunc(typeof(Union{}), Const(Union{})) === Const(false)
+    @test isa_tfunc(typeof(Union{}), typeof(Union{})) === Const(false)
+    @test isa_tfunc(typeof(Union{}), Union{}) === Const(false) # any result is ok
     @test isa_tfunc(typeof(Union{}), Type{typeof(Union{})}) === Const(true)
     @test isa_tfunc(typeof(Union{}), Const(typeof(Union{}))) === Const(true)
     let c = Conditional(Core.SlotNumber(0), Const(Union{}), Const(Union{}))
@@ -1117,4 +1123,72 @@ let isa_tfunc = Core.Inference.t_ffunc_val[
         @test isa_tfunc(c, Type{Complex}) === Const(false)
         @test isa_tfunc(c, Type{Complex{T}} where T) === Const(false)
     end
+    @test isa_tfunc(Val{1}, Type{Val{T}} where T) === Bool
+    @test isa_tfunc(Val{1}, DataType) === Bool
+    @test isa_tfunc(Any, Const(Any)) === Const(true)
+    @test isa_tfunc(Any, Union{}) === Const(false) # any result is ok
+    @test isa_tfunc(Any, Type{Union{}}) === Const(false)
+    @test isa_tfunc(Union{Int64, Float64}, Type{Real}) === Const(true)
+    @test isa_tfunc(Union{Int64, Float64}, Type{Integer}) === Bool
+    @test isa_tfunc(Union{Int64, Float64}, Type{AbstractArray}) === Const(false)
 end
+
+let subtype_tfunc = Core.Inference.t_ffunc_val[
+        findfirst(Core.Inference.t_ffunc_key, <:)][3]
+    @test subtype_tfunc(Type{<:Array}, Const(AbstractArray)) === Const(true)
+    @test subtype_tfunc(Type{<:Array}, Type{AbstractArray}) === Const(true)
+    @test subtype_tfunc(Type{<:Array}, Type{AbstractArray{Int}}) == Bool
+    @test subtype_tfunc(Type{<:Array{Real}}, Type{AbstractArray{Int}}) === Const(false)
+    @test subtype_tfunc(Type{<:Array{Real, 2}}, Const(AbstractArray{Real, 2})) === Const(true)
+    @test subtype_tfunc(Type{Array{Real, 2}}, Const(AbstractArray{Int, 2})) === Const(false)
+    @test subtype_tfunc(DataType, Int) === Bool
+    @test subtype_tfunc(DataType, Const(Type{Int})) === Bool
+    @test subtype_tfunc(DataType, Const(Type{Array})) === Bool
+    @test subtype_tfunc(UnionAll, Const(Type{Int})) === Bool
+    @test subtype_tfunc(UnionAll, Const(Type{Array})) === Bool
+    @test subtype_tfunc(Union, Const(Union{Float32, Float64})) === Bool
+    @test subtype_tfunc(Union, Type{Union}) === Bool
+    @test subtype_tfunc(Union{}, Const(Int)) === Const(true) # any result is ok
+    @test subtype_tfunc(Union{}, Const(Union{})) === Const(true) # any result is ok
+    @test subtype_tfunc(Union{}, typeof(Union{})) === Const(true) # any result is ok
+    @test subtype_tfunc(Union{}, Union{}) === Const(true) # any result is ok
+    @test subtype_tfunc(Union{}, Type{typeof(Union{})}) === Const(true) # any result is ok
+    @test subtype_tfunc(Union{}, Const(typeof(Union{}))) === Const(true) # any result is ok
+    @test subtype_tfunc(typeof(Union{}), Const(typeof(Union{}))) === Const(true) # Union{} <: typeof(Union{})
+    @test subtype_tfunc(typeof(Union{}), Const(Int)) === Const(true) # Union{} <: Int
+    @test subtype_tfunc(typeof(Union{}), Const(Union{})) === Const(true) # Union{} <: Union{}
+    @test subtype_tfunc(typeof(Union{}), Type{typeof(Union{})}) === Const(true) # Union{} <: Union{}
+    @test subtype_tfunc(typeof(Union{}), Type{typeof(Union{})}) === Const(true) # Union{} <: typeof(Union{})
+    @test subtype_tfunc(typeof(Union{}), Type{Union{}}) === Const(true) # Union{} <: Union{}
+    @test subtype_tfunc(Type{Union{}}, typeof(Union{})) === Const(true) # Union{} <: Union{}
+    @test subtype_tfunc(Type{Union{}}, Const(typeof(Union{}))) === Const(true) # Union{} <: typeof(Union{})
+    @test subtype_tfunc(Type{Union{}}, Const(Int)) === Const(true) # Union{} <: typeof(Union{})
+    @test subtype_tfunc(Type{Union{}}, Any) === Const(true) # Union{} <: Any
+    @test subtype_tfunc(Type{Union{}}, Union{Type{Int64}, Type{Float64}}) === Const(true)
+    @test subtype_tfunc(Type{Union{}}, Union{Type{T}, Type{Float64}} where T) === Const(true)
+    let c = Conditional(Core.SlotNumber(0), Const(Union{}), Const(Union{}))
+        @test subtype_tfunc(c, Const(Bool)) === Bool # any result is ok
+    end
+    @test subtype_tfunc(Type{Val{1}}, Type{Val{T}} where T) === Bool
+    @test subtype_tfunc(Type{Val{1}}, DataType) === Bool
+    @test subtype_tfunc(Type, Type{Val{T}} where T) === Bool
+    @test subtype_tfunc(Type{Val{T}} where T, Type) === Bool
+    @test subtype_tfunc(Any, Const(Any)) === Const(true)
+    @test subtype_tfunc(Type{Any}, Const(Any)) === Const(true)
+    @test subtype_tfunc(Any, Union{}) === Bool # any result is ok
+    @test subtype_tfunc(Type{Any}, Union{}) === Const(false) # any result is ok
+    @test subtype_tfunc(Type, Union{}) === Bool # any result is ok
+    @test subtype_tfunc(Type, Type{Union{}}) === Bool
+    @test subtype_tfunc(Union{Type{Int64}, Type{Float64}}, Type{Real}) === Const(true)
+    @test subtype_tfunc(Union{Type{Int64}, Type{Float64}}, Type{Integer}) === Bool
+    @test subtype_tfunc(Union{Type{Int64}, Type{Float64}}, Type{AbstractArray}) === Const(false)
+end
+
+function f23024(::Type{T}, ::Int) where T
+    1 + 1
+end
+v23024 = 0
+g23024(TT::Tuple{DataType}) = f23024(TT[1], v23024)
+@test Base.return_types(f23024, (DataType, Any)) == Any[Int]
+@test Base.return_types(g23024, (Tuple{DataType},)) == Any[Int]
+@test g23024((UInt8,)) === 2

@@ -629,6 +629,16 @@ end
 @test parse("{:a=>1, :b=>2}") == Expr(:braces, Expr(:call, :(=>), QuoteNode(:a), 1),
                                       Expr(:call, :(=>), QuoteNode(:b), 2))
 
+@test parse("[a,b;c]")  == Expr(:vect, Expr(:parameters, :c), :a, :b)
+@test parse("[a,;c]")   == Expr(:vect, Expr(:parameters, :c), :a)
+@test parse("a[b,c;d]") == Expr(:ref, :a, Expr(:parameters, :d), :b, :c)
+@test parse("a[b,;d]")  == Expr(:ref, :a, Expr(:parameters, :d), :b)
+@test_throws ParseError parse("[a,;,b]")
+@test parse("{a,b;c}")  == Expr(:braces, Expr(:parameters, :c), :a, :b)
+@test parse("{a,;c}")   == Expr(:braces, Expr(:parameters, :c), :a)
+@test parse("a{b,c;d}") == Expr(:curly, :a, Expr(:parameters, :d), :b, :c)
+@test parse("a{b,;d}")  == Expr(:curly, :a, Expr(:parameters, :d), :b)
+
 # this now is parsed as getindex(Pair{Any,Any}, ...)
 @test_throws MethodError eval(parse("(Any=>Any)[]"))
 @test_throws MethodError eval(parse("(Any=>Any)[:a=>1,:b=>2]"))
@@ -754,18 +764,36 @@ end
 module M16096
 macro iter()
     return quote
-        @inline function foo(sub)
+        @inline function foo16096(sub)
             it = 1
         end
     end
 end
 end
-let ex = expand(@__MODULE__, :(@M16096.iter))
+let ex = expand(M16096, :(@iter))
     @test isa(ex, Expr) && ex.head === :thunk
 end
 let ex = expand(Main, :($M16096.@iter))
     @test isa(ex, Expr) && ex.head === :thunk
 end
+let thismodule = @__MODULE__,
+    ex = expand(thismodule, :(@M16096.iter))
+    @test isa(ex, Expr) && ex.head === :thunk
+    @test !isdefined(M16096, :foo16096)
+    local_foo16096 = eval(@__MODULE__, ex)
+    @test local_foo16096(2.0) == 1
+    @test !@isdefined foo16096
+    @test !@isdefined it
+    @test !isdefined(M16096, :foo16096)
+    @test !isdefined(M16096, :it)
+    @test typeof(local_foo16096).name.module === thismodule
+    @test typeof(local_foo16096).name.mt.module === thismodule
+    @test getfield(thismodule, typeof(local_foo16096).name.mt.name) === local_foo16096
+    @test getfield(thismodule, typeof(local_foo16096).name.name) === typeof(local_foo16096)
+    @test !isdefined(M16096, typeof(local_foo16096).name.mt.name)
+    @test !isdefined(M16096, typeof(local_foo16096).name.name)
+end
+
 macro f16096()
     quote
         g16096($(esc(:x))) = 2x
@@ -776,7 +804,7 @@ let g = @f16096
 end
 macro f16096_2()
     quote
-        g16096_2(;$(esc(:x))=2) = 2x
+        g16096_2(; $(esc(:x))=2) = 2x
     end
 end
 let g = @f16096_2
@@ -1176,10 +1204,7 @@ end
 # comment 298107224 on pull #21607
 module Test21607
     using Base.Test
-
-    @test_warn(
-    "WARNING: imported binding for Any overwritten in module Test21607",
-    @eval const Any = Integer)
+    const Any = Integer
 
     # check that X <: Core.Any, not Integer
     mutable struct X; end
@@ -1276,3 +1301,21 @@ end
 @test parse("(::A)") == Expr(Symbol("::"), :A)
 @test_throws ParseError parse("(::, 1)")
 @test_throws ParseError parse("(1, ::)")
+
+# issue #18650
+let ex = parse("maximum(@elapsed sleep(1) for k = 1:10)")
+    @test isa(ex, Expr) && ex.head === :call && ex.args[2].head === :generator &&
+        ex.args[2].args[1].head === :macrocall
+end
+
+# issue #23173
+@test_throws ErrorException("invalid module path") eval(:(import $(:.)))
+
+# issue #23234
+let
+    f = function (x=0)
+        x
+    end
+    @test f() == 0
+    @test f(2) == 2
+end

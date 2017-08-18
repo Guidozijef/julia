@@ -65,9 +65,38 @@ done(s::Set, state) = done(s.dict, state)
 # NOTE: manually optimized to take advantage of Dict representation
 next(s::Set, i)     = (s.dict.keys[i], skip_deleted(s.dict, i+1))
 
-union() = Set()
+"""
+    union(s1,s2...)
+    ∪(s1,s2...)
+
+Construct the union of two or more sets. Maintains order with arrays.
+
+# Examples
+```jldoctest
+julia> union([1, 2], [3, 4])
+4-element Array{Int64,1}:
+ 1
+ 2
+ 3
+ 4
+
+julia> union([1, 2], [2, 4])
+3-element Array{Int64,1}:
+ 1
+ 2
+ 4
+
+julia> union([4, 2], [1, 2])
+3-element Array{Int64,1}:
+ 4
+ 2
+ 1
+```
+"""
+function union end
+
 union(s::Set) = copy(s)
-function union(s::Set, sets::Set...)
+function union(s::Set, sets...)
     u = Set{join_eltype(s, sets...)}()
     union!(u, s)
     for t in sets
@@ -104,8 +133,30 @@ end
 join_eltype() = Bottom
 join_eltype(v1, vs...) = typejoin(eltype(v1), join_eltype(vs...))
 
+"""
+    intersect(s1,s2...)
+    ∩(s1,s2)
+
+Construct the intersection of two or more sets.
+Maintains order and multiplicity of the first argument for arrays and ranges.
+
+# Examples
+```jldoctest
+julia> intersect([1, 2, 3], [3, 4, 5])
+1-element Array{Int64,1}:
+ 3
+
+julia> intersect([1, 4, 4, 5, 6], [4, 6, 6, 7, 8])
+3-element Array{Int64,1}:
+ 4
+ 4
+ 6
+```
+"""
+function intersect end
+
 intersect(s::Set) = copy(s)
-function intersect(s::Set, sets::Set...)
+function intersect(s::Set, sets...)
     i = similar(s)
     for x in s
         inall = true
@@ -121,7 +172,7 @@ function intersect(s::Set, sets::Set...)
 end
 const ∩ = intersect
 
-function setdiff(a::Set, b::Set)
+function setdiff(a::Set, b)
     d = similar(a)
     for x in a
         if !(x in b)
@@ -333,8 +384,8 @@ julia> sort!(B);  # unique! is able to process sorted data much more efficiently
 
 julia> unique!(B)
 3-element Array{Int64,1}:
- 6
- 7
+  6
+  7
  42
 ```
 """

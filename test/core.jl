@@ -124,21 +124,6 @@ end
 
 @test promote_type(Bool,Bottom) === Bool
 
-# ntuples
-nttest1(x::NTuple{n,Int}) where {n} = n
-@test nttest1(()) == 0
-@test nttest1((1,2)) == 2
-@test NTuple <: Tuple
-@test (NTuple{T,Int32} where T) <: Tuple{Vararg{Int32}}
-@test !((NTuple{T,Int32} where T) <: Tuple{Int32,Vararg{Int32}})
-@test Tuple{Vararg{Int32}} <: (NTuple{T,Int32} where T)
-@test Tuple{Int32,Vararg{Int32}} <: (NTuple{T,Int32} where T)
-
-# #17198
-@test_throws MethodError convert(Tuple{Int}, (1.0, 2.0, 3.0))
-# #21238
-@test_throws MethodError convert(Tuple{Int,Int,Int}, (1, 2))
-
 # type declarations
 
 abstract type Sup_{A,B} end
@@ -453,7 +438,8 @@ function const_implies_local()
         x = 1
         local y
         let
-            const x = 0
+            # TODO: change back to `const` if that's ever allowed
+            local x = 0
             y = x
         end
         x, y
@@ -484,6 +470,12 @@ let t = (22,33)
     (g(), x) = t
     @test g() == 22
     @test x == 33
+end
+
+# issue #23091
+let (f(), x) = (1, 2)
+    @test f() == 1
+    @test x == 2
 end
 
 # issue #21900
@@ -1460,8 +1452,8 @@ end
 import Base: promote_rule
 promote_rule(A::Type{SIQ{T,T2}},B::Type{SIQ{S,S2}}) where {T,T2,S,S2} = SIQ{promote_type(T,S)}
 @test_throws ErrorException promote_type(SIQ{Int},SIQ{Float64})
-f4731(x::T...) where {T} = 0
-f4731(x...) = ""
+f4731(x::T...) where {T} = ""
+f4731(x...) = 0
 g4731() = f4731()
 @test f4731() == ""
 @test g4731() == ""
@@ -2064,11 +2056,11 @@ end
 
 # issue #8798
 let
-    const npy_typestrs = Dict("b1"=>Bool,
-                              "i1"=>Int8,      "u1"=>UInt8,
-                              "i2"=>Int16,     "u2"=>UInt16,
-                              "i4"=>Int32,     "u4"=>UInt32,
-                              "i8"=>Int64,     "u8"=>UInt64)
+    npy_typestrs = Dict("b1"=>Bool,
+                        "i1"=>Int8,      "u1"=>UInt8,
+                        "i2"=>Int16,     "u2"=>UInt16,
+                        "i4"=>Int32,     "u4"=>UInt32,
+                        "i8"=>Int64,     "u8"=>UInt64)
     sizeof_lookup() = sizeof(npy_typestrs["i8"])
     @test sizeof_lookup() == 8
 end
@@ -3458,9 +3450,13 @@ end
 @test_throws MethodError @eval @m8846(a,b,c)
 
 # a simple case of parametric dispatch with unions
-let foo(x::Union{T,Void},y::Union{T,Void}) where {T} = 1
+let foo(x::Union{T, Void}, y::Union{T, Void}) where {T} = 1
     @test foo(1, nothing) === 1
-    @test_throws MethodError foo(nothing, nothing)  # can't determine T
+    @test foo(nothing, nothing) === 1
+end
+let foo(x::Union{T, Void}, y::Union{T, Void}) where {T} = T
+    @test foo(1, nothing) === Int
+    @test_throws UndefVarError(:T) foo(nothing, nothing)
 end
 
 module TestMacroGlobalFunction
@@ -4550,8 +4546,15 @@ gc_enable(true)
 
 # issue #18710
 bad_tvars() where {T} = 1
-@test_throws ErrorException @which(bad_tvars())
-@test_throws MethodError bad_tvars()
+@test isa(@which(bad_tvars()), Method)
+@test bad_tvars() === 1
+bad_tvars2() where {T} = T
+@test_throws UndefVarError(:T) bad_tvars2()
+missing_tvar(::T...) where {T} = T
+@test_throws UndefVarError(:T) missing_tvar()
+@test missing_tvar(1) === Int
+@test missing_tvar(1, 2, 3) === Int
+@test_throws MethodError missing_tvar(1, 2, "3")
 
 # issue #19059 - test for lowering of `let` with assignment not adding Box in simple cases
 contains_Box(e::GlobalRef) = (e.name === :Box)
@@ -4677,17 +4680,6 @@ end
 
 @test f14893() == 14893
 @test M14893.f14893() == 14893
-
-# issue #18725
-@test_nowarn @eval Main begin
-    f18725(x) = 1
-    f18725(x) = 2
-end
-@test Main.f18725(0) == 2
-@test_warn "WARNING: Method definition f18725(Any) in module Module18725" @eval Main module Module18725
-    f18725(x) = 1
-    f18725(x) = 2
-end
 
 # issue #19599
 f19599(x::((S)->Vector{S})(T)...) where {T} = 1
@@ -4997,6 +4989,50 @@ let a_foo = Foo22256(Bar22256{true}(2))
     @test a_foo.bar.inner == 3
 end
 
+# macro hygiene scope (#22307, #23239)
+macro a22307()
+    return esc(:a22307)
+end
+macro b22307()
+    return :(@a22307)
+end
+function c22307()
+    a22307 = 1
+    return @b22307
+end
+a22307 = 2
+@test c22307() == 2
+
+macro identity23239b(x)
+    return esc(x)
+end
+macro identity23239c(x)
+    return quote
+        $(esc(x))
+    end
+end
+macro assign23239d(x, v)
+    return esc(:($x = $v))
+end
+macro assign23239e(x, v)
+    return quote
+        $(esc(:($x = $v)))
+    end
+end
+macro aa23239()
+    return quote
+        a = 1
+        @identity23239b b = 2
+        @identity23239c c = 3
+        @assign23239d d 4
+        @assign23239e e 5
+        (a, b, c, d, e)
+    end
+end
+f23239() = @aa23239()
+@test @inferred(f23239()) === (1, 2, 3, 4, 5)
+
+
 # issue #22026
 module M22026
 
@@ -5075,6 +5111,11 @@ f_isdefined_cl_6() = (local x; () -> @isdefined x)
 @test !f_isdefined_cl_4()
 @test f_isdefined_cl_5()()
 @test !f_isdefined_cl_6()()
+f_isdefined_tv(::T) where {T} = @isdefined T
+@test f_isdefined_tv(1)
+f_isdefined_va(::T...) where {T} = @isdefined T
+@test !f_isdefined_va()
+@test f_isdefined_va(1, 2, 3)
 
 mutable struct MyStruct22929
     x::MyStruct22929
@@ -5089,3 +5130,315 @@ m22929_2.x = m22929_1
 @test !isdefined_22929_x(m22929_1)
 @test isdefined_22929_1(m22929_2)
 @test isdefined_22929_x(m22929_2)
+
+# Union type sorting
+for T in (
+        (Void, Int8),
+        (Void, Int64),
+        (Void, Tuple{Int64, String}),
+        (Void, Array),
+        (Float64, Int64),
+        (Float64, String),
+        (Float64, Array),
+        (String, Array),
+        (Int64, Tuple{Int64, Float64}),
+        (Tuple{Int64, Float64}, Array)
+    )
+    @test Base.uniontypes(Union{T...}) == collect(T)
+    @test Base.uniontypes(Union{reverse(T)...}) == collect(T)
+end
+@test Base.uniontypes(Union{Void, Union{Int64, Float64}}) == Any[Void, Float64, Int64]
+module AlternativeIntModule
+    struct Int64
+        val::UInt64
+    end
+end
+@test Base.uniontypes(Union{Int64, AlternativeIntModule.Int64}) == Any[AlternativeIntModule.Int64, Int64]
+@test Base.uniontypes(Union{AlternativeIntModule.Int64, Int64}) == Any[AlternativeIntModule.Int64, Int64]
+# because DAlternativeIntModule is alphabetically after Core.Int64
+module DAlternativeIntModule
+    struct Int64
+        val::UInt64
+    end
+end
+@test Base.uniontypes(Union{Int64, DAlternativeIntModule.Int64}) == Any[Int64, DAlternativeIntModule.Int64]
+@test Base.uniontypes(Union{DAlternativeIntModule.Int64, Int64}) == Any[Int64, DAlternativeIntModule.Int64]
+@test Base.uniontypes(Union{Vector{Int8}, Vector{Int16}}) == Base.uniontypes(Union{Vector{Int16}, Vector{Int8}})
+mutable struct ANonIsBitsType
+    v::Int64
+end
+@test Base.uniontypes(Union{Int64, ANonIsBitsType}) == Base.uniontypes(Union{ANonIsBitsType, Int64})
+
+# issue 18933
+module GlobalDef18933
+    using Base.Test
+    import Base.sqrt
+    # test that global declaration vs assignment operates correctly in local scope
+    f() = (global sin; nothing)
+    g() = (global cos; cos = 2; nothing)
+    h() = (global sqrt; nothing)
+    @test !@isdefined sin
+    @test !@isdefined cos
+    @test @isdefined sqrt
+    f()
+    g()
+    h()
+    @test !@isdefined sin
+    @test @isdefined cos
+    @test sqrt === Base.sqrt
+    @test cos === 2
+    # test that function definitions declared global
+    # introduce a new, local global
+    let
+        global tan
+        @test !@isdefined tan
+        tan() = nothing
+        @test @isdefined tan
+        @test tan() === nothing
+    end
+    # test that global declaration side-effects don't ignore conditionals
+    if false
+        global sincos
+        nothing
+    end
+    @test @which(sincos) === Base.Math
+    @test @isdefined sincos
+    @test sincos === Base.sincos
+end
+
+# issue #23218
+let idx = (7,5,9)
+    (v,) = (idx...,)
+    @test v == 7
+end
+
+module UnionOptimizations
+
+using Base.Test
+
+const boxedunions = [Union{}, Union{String, Void}]
+const unboxedunions = [Union{Int8, Void}, Union{Int8, Float16, Void},
+                       Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64, UInt64, Int128, UInt128},
+                       Union{Char, Date, Int}]
+
+@test !Base.isbitsunion(boxedunions[1])
+@test !Base.isbitsunion(boxedunions[2])
+@test Base.isbitsunion(unboxedunions[1])
+@test Base.isbitsunion(unboxedunions[2])
+@test Base.isbitsunion(unboxedunions[3])
+
+@test Base.bitsunionsize(unboxedunions[1]) == 1
+@test Base.bitsunionsize(unboxedunions[2]) == 2
+@test Base.bitsunionsize(unboxedunions[3]) == 16
+@test Base.bitsunionsize(unboxedunions[4]) == 8
+
+initvalue(::Type{Void}) = nothing
+initvalue(::Type{Char}) = '\0'
+initvalue(::Type{Date}) = Date(0, 12, 31)
+initvalue(::Type{T}) where {T <: Number} = T(0)
+
+initvalue2(::Type{Void}) = nothing
+initvalue2(::Type{Char}) = Char(0x01)
+initvalue2(::Type{Date}) = Date(1)
+initvalue2(::Type{T}) where {T <: Number} = T(1)
+
+U = unboxedunions[1]
+
+mutable struct UnionField
+    u::U
+end
+
+x = UnionField(initvalue(Base.uniontypes(U)[1]))
+@test x.u === initvalue(Base.uniontypes(U)[1])
+x.u = initvalue2(Base.uniontypes(U)[1])
+@test x.u === initvalue2(Base.uniontypes(U)[1])
+x.u = initvalue(Base.uniontypes(U)[2])
+@test x.u === initvalue(Base.uniontypes(U)[2])
+
+for U in boxedunions
+    for N in (1, 2, 3, 4)
+        A = Array{U}(ntuple(x->0, N)...)
+        @test isempty(A)
+        @test Core.sizeof(A) == 0
+
+        A = Array{U}(ntuple(x->10, N)...)
+        @test length(A) == 10^N
+        @test Core.sizeof(A) == sizeof(Int) * (10^N)
+        @test !isassigned(A, 1)
+    end
+end
+
+# unsafe_wrap
+A4 = [1, 2, 3]
+@test_throws ArgumentError unsafe_wrap(Array, convert(Ptr{Union{Int, Void}}, pointer(A4)), 3)
+A5 = [1 2 3; 4 5 6]
+@test_throws ArgumentError unsafe_wrap(Array, convert(Ptr{Union{Int, Void}}, pointer(A5)), 6)
+
+for U in unboxedunions
+    for N in (1, 2, 3, 4)
+        A = Array{U}(ntuple(x->0, N)...)
+        @test isempty(A)
+        @test Core.sizeof(A) == 0
+
+        len = ntuple(x->10, N)
+        mxsz = maximum(sizeof, Base.uniontypes(U))
+        A = Array{U}(len)
+        @test length(A) == prod(len)
+        @test Core.sizeof(A) == prod(len) * mxsz
+        @test isassigned(A, 1)
+        @test isassigned(A, length(A))
+
+        # arrayref / arrayset
+        F = Base.uniontypes(U)[1]
+        @test A[1] === initvalue(F)
+        A[1] = initvalue2(F)
+        @test A[1] === initvalue2(F)
+
+        F2 = Base.uniontypes(U)[2]
+        A[2] = initvalue(F2)
+        @test A[2] === initvalue(F2)
+
+        for (i, U2) in enumerate(Base.uniontypes(U))
+            A[i] = initvalue2(U2)
+            @test A[i] === initvalue2(U2)
+        end
+
+        # serialize / deserialize
+        io = IOBuffer()
+        serialize(io, A)
+        seekstart(io)
+        A2 = deserialize(io)
+        @test A == A2
+
+        # reshape
+        A3 = reshape(A, (div(prod(len), 2), 2))
+        @test Core.sizeof(A) == prod(len) * mxsz
+        @test isassigned(A, 1)
+        @test A[1] === initvalue2(F)
+
+        # copy
+        A4 = copy(A)
+        @test A == A4
+
+        if N == 1
+            ## Dequeue functions
+            # pop!
+            F2 = Base.uniontypes(U)[2]
+            len = len[1]
+            A = U[initvalue2(F2) for i = 1:len]
+            for i = 1:len
+                @test A[end] === initvalue2(F2)
+                v = pop!(A)
+                @test v === initvalue2(F2)
+            end
+            @test isempty(A)
+
+            # shift!
+            A = U[initvalue2(F2) for i = 1:len]
+            for i = 1:len
+                @test A[1] === initvalue2(F2)
+                shift!(A)
+            end
+            @test isempty(A)
+
+            # empty!
+            A = U[initvalue2(F2) for i = 1:len]
+            empty!(A)
+            @test isempty(A)
+
+            # resize!
+            A = U[initvalue2(F2) for i = 1:len]
+            resize!(A, 1)
+            @test length(A) === 1
+            @test A[1] === initvalue2(F2)
+            resize!(A, len)
+            @test length(A) === len
+            @test A[1] === initvalue2(F2)
+            @test typeof(A[end]) === F
+
+            # deleteat!
+            F = Base.uniontypes(U)[2]
+            A = U[rand(F(1):F(len)) for i = 1:len]
+            deleteat!(A, map(Int, sort!(unique(A[1:4]))))
+            A = U[initvalue2(F2) for i = 1:len]
+            deleteat!(A, 1:2)
+            @test length(A) == len - 2
+            @test all(A .== initvalue2(F2))
+            deleteat!(A, 1:2)
+            @test length(A) == len - 4
+            @test all(A .== initvalue2(F2))
+            A = U[initvalue2(F2) for i = 1:len]
+            deleteat!(A, length(A)-1:length(A))
+            @test length(A) == len - 2
+            @test all(A .== initvalue2(F2))
+            deleteat!(A, length(A)-1:length(A))
+            @test length(A) == len - 4
+            @test all(A .== initvalue2(F2))
+            A = U[initvalue2(F2) for i = 1:len]
+            deleteat!(A, 2:3)
+            @test length(A) == len - 2
+            @test all(A .== initvalue2(F2))
+            A = U[initvalue2(F2) for i = 1:len]
+            deleteat!(A, length(A)-2:length(A)-1)
+            @test length(A) == len - 2
+            @test all(A .== initvalue2(F2))
+
+            # unshift!
+            A = U[initvalue2(F2) for i = 1:len]
+            for i = 1:5
+                unshift!(A, initvalue2(F))
+                unshift!(A, initvalue(F2))
+                @test A[1] === initvalue(F2)
+                @test A[2] === initvalue2(F)
+            end
+
+            # push! / append! / prepend!
+            A = U[initvalue2(F2) for i = 1:len]
+            push!(A, initvalue2(F))
+            @test A[end] === initvalue2(F)
+            push!(A, initvalue2(F2))
+            @test A[end] === initvalue2(F2)
+            append!(A, [initvalue(F), initvalue2(F)])
+            @test A[end] === initvalue2(F)
+            @test A[end-1] === initvalue(F)
+            prepend!(A, [initvalue(F), initvalue2(F)])
+            @test A[2] === initvalue2(F)
+            @test A[1] === initvalue(F)
+
+            # insert!
+            A = U[initvalue2(F2) for i = 1:len]
+            insert!(A, 2, initvalue2(F))
+            @test A[2] === initvalue2(F)
+            @test A[1] === initvalue2(F2)
+            @test A[3] === initvalue2(F2)
+            @test A[end] === initvalue2(F2)
+            A = U[initvalue2(F2) for i = 1:len]
+            insert!(A, 8, initvalue2(F))
+            @test A[8] === initvalue2(F)
+            @test A[7] === initvalue2(F2)
+            @test A[9] === initvalue2(F2)
+            @test A[end] === initvalue2(F2)
+
+            # splice!
+            A = U[initvalue2(F2) for i = 1:len]
+            V = splice!(A, 1:2)
+            @test length(A) == len - 2
+            @test length(V) == 2
+            @test V[1] == initvalue2(F2)
+            @test V[2] == initvalue2(F2)
+            @test A[1] == initvalue2(F2)
+            @test A[end] == initvalue2(F2)
+
+            A = U[initvalue2(F2) for i = 1:len]
+            V = splice!(A, 4:5)
+            @test length(A) == len - 2
+            @test length(V) == 2
+            @test V[1] == initvalue2(F2)
+            @test V[2] == initvalue2(F2)
+            @test A[1] == initvalue2(F2)
+            @test A[end] == initvalue2(F2)
+        end
+    end
+end
+
+end # module UnionOptimizations

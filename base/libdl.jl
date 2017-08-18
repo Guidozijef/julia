@@ -221,7 +221,7 @@ if Sys.isbsd() && !Sys.isapple()
         phnum::Cshort
     end
 
-    function dl_phdr_info_callback(di::dl_phdr_info, size::Csize_t, dy_libs::Array{AbstractString,1})
+    function dl_phdr_info_callback(di::dl_phdr_info, size::Csize_t, dy_libs::Vector{AbstractString})
         name = unsafe_string(di.name)
         if !isempty(name)
             push!(dy_libs, name)
@@ -234,9 +234,9 @@ function dllist()
     dynamic_libraries = Vector{AbstractString}(0)
 
     @static if Sys.islinux()
-        const callback = cfunction(dl_phdr_info_callback, Cint,
-                                   (Ref{dl_phdr_info}, Csize_t, Ref{Array{AbstractString,1}} ))
-        ccall(:dl_iterate_phdr, Cint, (Ptr{Void}, Ref{Array{AbstractString,1}}), callback, dynamic_libraries)
+        callback = cfunction(dl_phdr_info_callback, Cint,
+                             Tuple{Ref{dl_phdr_info}, Csize_t, Ref{Vector{AbstractString}}})
+        ccall(:dl_iterate_phdr, Cint, (Ptr{Void}, Ref{Vector{AbstractString}}), callback, dynamic_libraries)
     end
 
     @static if Sys.isapple()
@@ -254,9 +254,9 @@ function dllist()
     end
 
     @static if Sys.isbsd() && !Sys.isapple()
-        const callback = cfunction(dl_phdr_info_callback, Cint,
-                                   (Ref{dl_phdr_info}, Csize_t, Ref{Array{AbstractString,1}} ))
-        ccall(:dl_iterate_phdr, Cint, (Ptr{Void}, Ref{Array{AbstractString,1}}), callback, dynamic_libraries)
+        callback = cfunction(dl_phdr_info_callback, Cint,
+                             Tuple{Ref{dl_phdr_info}, Csize_t, Ref{Vector{AbstractString}}})
+        ccall(:dl_iterate_phdr, Cint, (Ptr{Void}, Ref{Vector{AbstractString}}), callback, dynamic_libraries)
         shift!(dynamic_libraries)
     end
 
