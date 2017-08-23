@@ -405,3 +405,17 @@ function hash(r::Regex, h::UInt)
     h = hash(r.compile_options, h)
     h = hash(r.match_options, h)
 end
+
+## String operations ##
+
+unwrap_string(r::Regex) = r.pattern
+unwrap_string(s::Union{AbstractString,Char}) = s
+
+function *(r1::Union{Regex,AbstractString,Char}, rs::Union{Regex,AbstractString,Char}...)
+    opts = unique((r.compile_options, r.match_options) for r in (r1, rs...) if r isa Regex)
+    length(opts) == 1 ||
+        throw(ArgumentError("Can not multiply Regexes with incompatible options"))
+    Regex(*(unwrap_string(r1), unwrap_string.(rs)...), opts[1][1], opts[1][2])
+end
+
+^(r::Regex, i::Integer) = Regex(r.pattern^i, r.compile_options, r.match_options)
