@@ -374,11 +374,6 @@ Command-line option changes
   * New option `--warn-overwrite={yes|no}` to control the warning for overwriting method
     definitions. The default is `no` ([#23002]).
 
-  * New option `--banner={yes,no}` allows suppressing or forcing the printing of the
-    startup banner, overriding the default behavior (banner in REPL, no banner otherwise).
-    The `--quiet` option implies `--banner=no` even in REPL mode but can be overridden by
-    passing `--quiet` together with `--banner=yes` ([#23342]).
-
 Julia v0.6.0 Release Notes
 ==========================
 

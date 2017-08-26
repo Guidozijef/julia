@@ -251,10 +251,9 @@ function process_options(opts::JLOptions)
         length(idxs) > 0 && deleteat!(ARGS, idxs[1])
     end
     repl                  = true
-    quiet                 = (opts.quiet != 0)
-    banner                = (opts.banner == 1 || opts.banner != 0 && opts.isinteractive != 0)
     startup               = (opts.startupfile != 2)
     history_file          = (opts.historyfile != 0)
+    quiet                 = (opts.quiet != 0)
     color_set             = (opts.color != 0)
     global have_color     = (opts.color == 1)
     global is_interactive = (opts.isinteractive != 0)
@@ -318,7 +317,7 @@ function process_options(opts::JLOptions)
         break
     end
     repl |= is_interactive
-    return (quiet,banner,repl,startup,color_set,history_file)
+    return (quiet,repl,startup,color_set,history_file)
 end
 
 function load_juliarc()
@@ -381,7 +380,7 @@ function _start()
     opts = JLOptions()
     @eval Main include(x) = $include(Main, x)
     try
-        (quiet,banner,repl,startup,color_set,history_file) = process_options(opts)
+        (quiet,repl,startup,color_set,history_file) = process_options(opts)
 
         local term
         global active_repl
@@ -394,7 +393,7 @@ function _start()
                 term = Terminals.TTYTerminal(get(ENV, "TERM", @static Sys.iswindows() ? "" : "dumb"), STDIN, STDOUT, STDERR)
                 global is_interactive = true
                 color_set || (global have_color = Terminals.hascolor(term))
-                banner && REPL.banner(term,term)
+                quiet || REPL.banner(term,term)
                 if term.term_type == "dumb"
                     active_repl = REPL.BasicREPL(term)
                     quiet || warn("Terminal not fully functional")
