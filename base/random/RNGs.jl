@@ -133,6 +133,9 @@ copy(src::MersenneTwister) =
 
 hash(r::MersenneTwister, h::UInt) = foldr(hash, h, (r.seed, r.state, r.vals, r.idx))
 
+show(io::IO, rng::MersenneTwister) =
+    print(io, "MersenneTwister RNG with seed 0x$(hex(from_seed(m.seed)))")
+
 
 ### low level API
 
@@ -186,6 +189,9 @@ function make_seed(n::Integer)
         end
     end
 end
+
+# inverse of make_seed(::Integer)
+from_seed(a::Vector{UInt32})::BigInt = sum(a[i] * big(2)^(32*(i-1)) for i in 1:length(a))
 
 #### srand()
 
