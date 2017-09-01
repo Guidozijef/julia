@@ -396,7 +396,7 @@
           ((<= l 32)  (numchk n s) (uint32 n))
           ((<= l 64)  (numchk n s) (uint64 n))
           ((<= l 128) `(macrocall @uint128_str (null) ,s))
-          (else       (error "Hex or binary literal too large for UInt128")))))
+          (else       `(macrocall @big_str (null) ,s)))))
 
 (define (sized-uint-oct-literal n s)
   (if (string.find s "o0")
@@ -409,7 +409,8 @@
           (begin (if (equal? s "0o") (numchk n s))
                  (if (oct-within-uint128? s)
                      `(macrocall @uint128_str (null) ,s)
-                     (error "Octal literal too large for UInt128"))))))
+                     `(macrocall @big_str (null) ,s))))))
+
 
 (define (strip-leading-0s s)
   (define (loop i)
