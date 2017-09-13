@@ -313,9 +313,10 @@ concrete type (e.g. `T == Float64`), or if you *really, really* know what you're
 
 ## Do not write `x->f(x)`
 
-Since higher-order functions are often called with anonymous functions, it is easy to conclude
-that this is desirable or even necessary. But any function can be passed directly, without being
-"wrapped" in an anonymous function. Instead of writing `map(x->f(x), a)`, write [`map(f, a)`](@ref).
+Since higher-order functions, like [`map`](@ref), are often called with anonymous
+functions, it is easy to conclude that this is desirable or even necessary.
+But any function can be passed directly, without being "wrapped" in an anonymous
+function. Instead of writing `map(x->f(x), a)`, write `map(f, a)`.
 
 ## Avoid using floats for numeric literals in generic code when possible
 
