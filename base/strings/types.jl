@@ -8,7 +8,7 @@
     SubString(s::AbstractString, i::Integer, j::Integer=endof(s))
     SubString(s::AbstractString, r::UnitRange{<:Integer})
 
-Like [`getindex`](@ref), but returns a view into the parent AbstractString `s`
+Like [`getindex`](@ref), but returns a view into the parent string `s`
 within range `i:j` or `r` respectively instead of making a copy.
 """
 struct SubString{T<:AbstractString} <: AbstractString

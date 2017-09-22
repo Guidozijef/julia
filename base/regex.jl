@@ -180,8 +180,8 @@ function match(re::Regex, str::Union{SubString{String}, String}, idx::Integer, a
     n = div(length(ovec),2) - 1
     mat = SubString(str, ovec[1]+1, prevind(str, ovec[2]+1))
     cap = Union{Void,SubString{String}}[
-    ovec[2i+1] == PCRE.UNSET ? nothing : SubString(str, ovec[2i+1]+1,
-                                                   prevind(str, ovec[2i+2]+1)) for i=1:n ]
+            ovec[2i+1] == PCRE.UNSET ? nothing : SubString(str, ovec[2i+1]+1,
+            prevind(str, ovec[2i+2]+1)) for i=1:n ]
     off = Int[ ovec[2i+1]+1 for i=1:n ]
     RegexMatch(mat, cap, ovec[1]+1, off, re)
 end
