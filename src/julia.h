@@ -1426,6 +1426,8 @@ JL_DLLEXPORT uint8_t jl_ast_flag_pure(jl_array_t *data);
 JL_DLLEXPORT void jl_fill_argnames(jl_array_t *data, jl_array_t *names);
 
 JL_DLLEXPORT int jl_is_operator(char *sym);
+JL_DLLEXPORT int jl_is_unary_operator(char *sym);
+JL_DLLEXPORT int jl_is_unary_and_binary_operator(char *sym);
 JL_DLLEXPORT int jl_operator_precedence(char *sym);
 
 STATIC_INLINE int jl_vinfo_sa(uint8_t vi)
@@ -1677,9 +1679,7 @@ typedef struct {
     int8_t banner;
     const char *julia_home;
     const char *julia_bin;
-    const char *eval;
-    const char *print;
-    const char *load;
+    const char **cmds;
     const char *image_file;
     const char *cpu_target;
     int32_t nprocs;

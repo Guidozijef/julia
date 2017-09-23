@@ -158,6 +158,8 @@ function show(io::IO, ::MIME"text/plain", opt::JLOptions)
         v = getfield(opt, i)
         if isa(v, Ptr{UInt8})
             v = (v != C_NULL) ? unsafe_string(v) : ""
+        elseif isa(v, Ptr{Ptr{UInt8}})
+            v = unsafe_load_commands(v)
         end
         println(io, "  ", f, " = ", repr(v), i < nfields ? "," : "")
     end
@@ -228,7 +230,7 @@ end
 function showerror(io::IO, ex::LoadError, bt; backtrace=true)
     print(io, "LoadError: ")
     showerror(io, ex.error, bt, backtrace=backtrace)
-    print(io, "\nwhile loading $(ex.file), in expression starting on line $(ex.line)")
+    print(io, "\nin expression starting at $(ex.file):$(ex.line)")
 end
 showerror(io::IO, ex::LoadError) = showerror(io, ex, [])
 

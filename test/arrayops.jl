@@ -2,7 +2,7 @@
 
 # Array test
 isdefined(Main, :TestHelpers) || @eval Main include("TestHelpers.jl")
-using TestHelpers.OAs
+using Main.TestHelpers.OAs
 
 @testset "basics" begin
     @test length([1, 2, 3]) == 3
@@ -2230,4 +2230,10 @@ let a = Vector{Int}[[1]],
     c = Vector{Char}[['a']]
     @test eltype([a;b]) == Vector{Float64}
     @test eltype([a;c]) == Vector
+end
+
+# Issue #23629
+@testset "issue 23629" begin
+    @test_throws BoundsError zeros(2,3,0)[2,3]
+    @test_throws BoundsError checkbounds(zeros(2,3,0), 2, 3)
 end
