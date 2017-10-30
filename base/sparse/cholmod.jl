@@ -1406,11 +1406,26 @@ it should be a permutation of `1:size(A,1)` giving the ordering to use
     Many other functions from CHOLMOD are wrapped but not exported from the
     `Base.SparseArrays.CHOLMOD` module.
 """
-cholfact(A::Union{SparseMatrixCSC{T}, SparseMatrixCSC{Complex{T}},
-    Symmetric{T,SparseMatrixCSC{T,SuiteSparse_long}},
-    Hermitian{Complex{T},SparseMatrixCSC{Complex{T},SuiteSparse_long}},
-    Hermitian{T,SparseMatrixCSC{T,SuiteSparse_long}}};
-    kws...) where {T<:Real} = cholfact(Sparse(A); kws...)
+cholfact(A::Union{SparseMatrixCSC{Float64,SuiteSparse_long}, SparseMatrixCSC{Complex{Float64},SuiteSparse_long},
+    Symmetric{Float64,SparseMatrixCSC{Float64,SuiteSparse_long}},
+    Hermitian{Complex{Float64},SparseMatrixCSC{Complex{Float64},SuiteSparse_long}},
+    Hermitian{Float64,SparseMatrixCSC{Float64,SuiteSparse_long}}}; kws...) = cholfact(Sparse(A); kws...)
+
+## methods that convert to CHOLMOD compatible types
+cholfact(A::SparseMatrixCSC{<:Real}; kws...) =
+    cholfact(convert(SparseMatrixCSC{Float64,SuiteSparse_long}, A); kws...)
+cholfact(A::SparseMatrixCSC{<:Complex}; kws...) =
+    cholfact(convert(SparseMatrixCSC{Complex{Float64},SuiteSparse_long}, A); kws...)
+function cholfact(A::Union{Symmetric{Tv,SparseMatrixCSC{Tv,Ti}},Hermitian{Tv,SparseMatrixCSC{Tv,Ti}}}; kws...) where {Tv<:Real,Ti}
+    AA = convert(SparseMatrixCSC{Float64,SuiteSparse_long}, A.data)
+    H = Hermitian(AA, ifelse(A.uplo == 'U', :U, :L))
+    return cholfact(H; kws...)
+end
+function cholfact(A::Hermitian{Tv,SparseMatrixCSC{Tv,Ti}}; kws...) where {Tv<:Complex,Ti}
+    AA = convert(SparseMatrixCSC{Complex{Float64},SuiteSparse_long}, A.data)
+    H = Hermitian(AA, ifelse(A.uplo == 'U', :U, :L))
+    return cholfact(H; kws...)
+end
 
 
 function ldltfact!(F::Factor{Tv}, A::Sparse{Tv}; shift::Real=0.0) where Tv
@@ -1667,9 +1682,7 @@ Ac_ldiv_B(L::Factor, B::Sparse) = spsolve(CHOLMOD_A, L, B)
 Ac_ldiv_B(L::Factor, B::SparseVecOrMat) = Ac_ldiv_B(L, Sparse(B))
 
 for f in (:\, :Ac_ldiv_B)
-    @eval function ($f)(A::Union{Symmetric{Float64,SparseMatrixCSC{Float64,SuiteSparse_long}},
-                          Hermitian{Float64,SparseMatrixCSC{Float64,SuiteSparse_long}},
-                          Hermitian{Complex{Float64},SparseMatrixCSC{Complex{Float64},SuiteSparse_long}}}, B::StridedVecOrMat)
+    @eval function ($f)(A::LinAlg.RealHermSymComplexHerm{Tv,SparseMatrixCSC{Tv,Ti}}, B::StridedVecOrMat) where {Tv,Ti}
         F = cholfact(A)
         if issuccess(F)
             return ($f)(F, B)
