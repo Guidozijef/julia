@@ -898,6 +898,10 @@ Deprecated or removed
     in favor of dot overloading (`getproperty`) so factors should now be accessed as e.g.
     `F.Q` instead of `F[:Q]` ([#25184]).
 
+  * `search` and `rsearch` have been deprecated in favor of `findfirst`/`findnext` and
+    `findlast`/`findprev` respectively, in combination with the new `equalto` and `occursin`
+    predicates for some methods ([#24673]
+
 Command-line option changes
 ---------------------------
 
@@ -1123,3 +1127,4 @@ Command-line option changes
 [#25056]: https://github.com/JuliaLang/julia/issues/25056
 [#25057]: https://github.com/JuliaLang/julia/issues/25057
 [#25088]: https://github.com/JuliaLang/julia/issues/25088
+[#24684]: https://github.com/JuliaLang/julia/issues/24684
