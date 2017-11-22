@@ -287,7 +287,7 @@ mul!(C::AbstractMatrix, transA::Transpose{<:Any,<:Diagonal}, transB::Transpose{<
 
 (/)(Da::Diagonal, Db::Diagonal) = Diagonal(Da.diag ./ Db.diag)
 
-function ldiv!(D::Diagonal{T}, v::AbstractVector{T}) where {T}
+function ldiv2!(D::Diagonal{T}, v::AbstractVector{T}) where {T}
     if length(v) != length(D.diag)
         throw(DimensionMismatch("diagonal matrix is $(length(D.diag)) by $(length(D.diag)) but right hand side has $(length(v)) rows"))
     end
@@ -300,7 +300,7 @@ function ldiv!(D::Diagonal{T}, v::AbstractVector{T}) where {T}
     end
     v
 end
-function ldiv!(D::Diagonal{T}, V::AbstractMatrix{T}) where {T}
+function ldiv2!(D::Diagonal{T}, V::AbstractMatrix{T}) where {T}
     if size(V,1) != length(D.diag)
         throw(DimensionMismatch("diagonal matrix is $(length(D.diag)) by $(length(D.diag)) but right hand side has $(size(V,1)) rows"))
     end
@@ -317,12 +317,12 @@ function ldiv!(D::Diagonal{T}, V::AbstractMatrix{T}) where {T}
 end
 
 
-ldiv!(adjD::Adjoint{<:Any,<:Diagonal{T}}, B::AbstractVecOrMat{T}) where {T} =
-    (D = adjD.parent; ldiv!(conj(D), B))
-ldiv!(transD::Transpose{<:Any,<:Diagonal{T}}, B::AbstractVecOrMat{T}) where {T} =
-    (D = transD.parent; ldiv!(D, B))
+ldiv2!(adjD::Adjoint{<:Any,<:Diagonal{T}}, B::AbstractVecOrMat{T}) where {T} =
+    (D = adjD.parent; ldiv2!(conj(D), B))
+ldiv2!(transD::Transpose{<:Any,<:Diagonal{T}}, B::AbstractVecOrMat{T}) where {T} =
+    (D = transD.parent; ldiv2!(D, B))
 
-function rdiv!(A::AbstractMatrix{T}, D::Diagonal{T}) where {T}
+function rdiv1!(A::AbstractMatrix{T}, D::Diagonal{T}) where {T}
     dd = D.diag
     m, n = size(A)
     if (k = length(dd)) ≠ n
@@ -341,15 +341,15 @@ function rdiv!(A::AbstractMatrix{T}, D::Diagonal{T}) where {T}
 end
 
 
-rdiv!(A::AbstractMatrix{T}, adjD::Adjoint{<:Any,<:Diagonal{T}}) where {T} =
-    (D = adjD.parent; rdiv!(A, conj(D)))
-rdiv!(A::AbstractMatrix{T}, transD::Transpose{<:Any,<:Diagonal{T}}) where {T} =
-    (D = transD.parent; rdiv!(A, D))
+rdiv1!(A::AbstractMatrix{T}, adjD::Adjoint{<:Any,<:Diagonal{T}}) where {T} =
+    (D = adjD.parent; rdiv1!(A, conj(D)))
+rdiv1!(A::AbstractMatrix{T}, transD::Transpose{<:Any,<:Diagonal{T}}) where {T} =
+    (D = transD.parent; rdiv1!(A, D))
 
 (\)(F::Factorization, D::Diagonal) =
-    ldiv!(F, Matrix{typeof(oneunit(eltype(D))/oneunit(eltype(F)))}(D))
+    ldiv2!(F, Matrix{typeof(oneunit(eltype(D))/oneunit(eltype(F)))}(D))
 \(adjF::Adjoint{<:Any,<:Factorization}, D::Diagonal) =
-    (F = adjF.parent; ldiv!(Adjoint(F), Matrix{typeof(oneunit(eltype(D))/oneunit(eltype(F)))}(D)))
+    (F = adjF.parent; ldiv2!(Adjoint(F), Matrix{typeof(oneunit(eltype(D))/oneunit(eltype(F)))}(D)))
 
 conj(D::Diagonal) = Diagonal(conj(D.diag))
 transpose(D::Diagonal{<:Number}) = D
@@ -387,7 +387,7 @@ for f in (:exp, :log, :sqrt,
 end
 
 #Linear solver
-function ldiv!(D::Diagonal, B::StridedVecOrMat)
+function ldiv2!(D::Diagonal, B::StridedVecOrMat)
     m, n = size(B, 1), size(B, 2)
     if m != length(D.diag)
         throw(DimensionMismatch("diagonal matrix is $(length(D.diag)) by $(length(D.diag)) but right hand side has $m rows"))

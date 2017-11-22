@@ -2,7 +2,7 @@
 
 using Test
 
-using Base.LinAlg: mul!, mul1!, mul2!, ldiv!, rdiv!, Adjoint, Transpose
+using Base.LinAlg: mul!, mul1!, mul2!, ldiv2!, rdiv1!, Adjoint, Transpose
 import Base.LinAlg: BlasFloat, BlasComplex, SingularException
 
 n=12 #Size of matrix problem to test
@@ -98,37 +98,37 @@ srand(1)
                 atol_three = 2n^3 * eps(relty) * (1 + (elty <: Complex))
                 @test D\v ≈ DM\v atol=atol_two
                 @test D\U ≈ DM\U atol=atol_three
-                @test ldiv!(D, copy(v)) ≈ DM\v atol=atol_two
-                @test ldiv!(Transpose(D), copy(v)) ≈ DM\v atol=atol_two
-                @test ldiv!(Adjoint(conj(D)), copy(v)) ≈ DM\v atol=atol_two
-                @test ldiv!(D, copy(U)) ≈ DM\U atol=atol_three
-                @test ldiv!(Transpose(D), copy(U)) ≈ DM\U atol=atol_three
-                @test ldiv!(Adjoint(conj(D)), copy(U)) ≈ DM\U atol=atol_three
+                @test ldiv2!(D, copy(v)) ≈ DM\v atol=atol_two
+                @test ldiv2!(Transpose(D), copy(v)) ≈ DM\v atol=atol_two
+                @test ldiv2!(Adjoint(conj(D)), copy(v)) ≈ DM\v atol=atol_two
+                @test ldiv2!(D, copy(U)) ≈ DM\U atol=atol_three
+                @test ldiv2!(Transpose(D), copy(U)) ≈ DM\U atol=atol_three
+                @test ldiv2!(Adjoint(conj(D)), copy(U)) ≈ DM\U atol=atol_three
                 Uc = adjoint(U)
                 target = scale!(Uc, inv.(D.diag))
-                @test rdiv!(Uc, D) ≈ target atol=atol_three
-                @test_throws DimensionMismatch rdiv!(Matrix{elty}(I, n-1, n-1), D)
-                @test_throws SingularException rdiv!(Uc, Diagonal(fill!(similar(D.diag), 0)))
-                @test rdiv!(Uc, Transpose(D)) ≈ target atol=atol_three
-                @test rdiv!(Uc, Adjoint(conj(D))) ≈ target atol=atol_three
-                @test ldiv!(D, Matrix{eltype(D)}(I, size(D))) ≈ D \ Matrix{eltype(D)}(I, size(D)) atol=atol_three
-                @test_throws DimensionMismatch ldiv!(D, fill(elty(1), n + 1))
-                @test_throws SingularException ldiv!(Diagonal(zeros(relty, n)), copy(v))
+                @test rdiv1!(Uc, D) ≈ target atol=atol_three
+                @test_throws DimensionMismatch rdiv1!(Matrix{elty}(I, n-1, n-1), D)
+                @test_throws SingularException rdiv1!(Uc, Diagonal(fill!(similar(D.diag), 0)))
+                @test rdiv1!(Uc, Transpose(D)) ≈ target atol=atol_three
+                @test rdiv1!(Uc, Adjoint(conj(D))) ≈ target atol=atol_three
+                @test ldiv2!(D, Matrix{eltype(D)}(I, size(D))) ≈ D \ Matrix{eltype(D)}(I, size(D)) atol=atol_three
+                @test_throws DimensionMismatch ldiv2!(D, fill(elty(1), n + 1))
+                @test_throws SingularException ldiv2!(Diagonal(zeros(relty, n)), copy(v))
                 b = rand(elty, n, n)
                 b = sparse(b)
-                @test ldiv!(D, copy(b)) ≈ Array(D)\Array(b)
-                @test_throws SingularException ldiv!(Diagonal(zeros(elty, n)), copy(b))
+                @test ldiv2!(D, copy(b)) ≈ Array(D)\Array(b)
+                @test_throws SingularException ldiv2!(Diagonal(zeros(elty, n)), copy(b))
                 b = view(rand(elty, n), collect(1:n))
                 b2 = copy(b)
-                c = ldiv!(D, b)
+                c = ldiv2!(D, b)
                 d = Array(D)\b2
                 @test c ≈ d
-                @test_throws SingularException ldiv!(Diagonal(zeros(elty, n)), b)
+                @test_throws SingularException ldiv2!(Diagonal(zeros(elty, n)), b)
                 b = rand(elty, n+1, n+1)
                 b = sparse(b)
-                @test_throws DimensionMismatch ldiv!(D, copy(b))
+                @test_throws DimensionMismatch ldiv2!(D, copy(b))
                 b = view(rand(elty, n+1), collect(1:n+1))
-                @test_throws DimensionMismatch ldiv!(D, b)
+                @test_throws DimensionMismatch ldiv2!(D, b)
             end
         end
     end

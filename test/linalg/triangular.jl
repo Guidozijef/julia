@@ -5,7 +5,7 @@ using Test
 
 using Base.LinAlg: BlasFloat, errorbounds, full!, naivesub!, transpose!,
                     UnitUpperTriangular, UnitLowerTriangular,
-                    mul!, mul1!, mul2!, rdiv!, Adjoint, Transpose
+                    mul!, mul1!, mul2!, rdiv1!, Adjoint, Transpose
 
 debug && println("Triangular matrices")
 
@@ -495,20 +495,20 @@ let n = 5
     A = rand(Float16, n, n)
     B = rand(Float16, n-1, n-1)
 
-    @test_throws DimensionMismatch rdiv!(A, LowerTriangular(B))
-    @test_throws DimensionMismatch rdiv!(A, UpperTriangular(B))
-    @test_throws DimensionMismatch rdiv!(A, UnitLowerTriangular(B))
-    @test_throws DimensionMismatch rdiv!(A, UnitUpperTriangular(B))
+    @test_throws DimensionMismatch rdiv1!(A, LowerTriangular(B))
+    @test_throws DimensionMismatch rdiv1!(A, UpperTriangular(B))
+    @test_throws DimensionMismatch rdiv1!(A, UnitLowerTriangular(B))
+    @test_throws DimensionMismatch rdiv1!(A, UnitUpperTriangular(B))
 
-    @test_throws DimensionMismatch rdiv!(A, Adjoint(LowerTriangular(B)))
-    @test_throws DimensionMismatch rdiv!(A, Adjoint(UpperTriangular(B)))
-    @test_throws DimensionMismatch rdiv!(A, Adjoint(UnitLowerTriangular(B)))
-    @test_throws DimensionMismatch rdiv!(A, Adjoint(UnitUpperTriangular(B)))
+    @test_throws DimensionMismatch rdiv1!(A, Adjoint(LowerTriangular(B)))
+    @test_throws DimensionMismatch rdiv1!(A, Adjoint(UpperTriangular(B)))
+    @test_throws DimensionMismatch rdiv1!(A, Adjoint(UnitLowerTriangular(B)))
+    @test_throws DimensionMismatch rdiv1!(A, Adjoint(UnitUpperTriangular(B)))
 
-    @test_throws DimensionMismatch rdiv!(A, Transpose(LowerTriangular(B)))
-    @test_throws DimensionMismatch rdiv!(A, Transpose(UpperTriangular(B)))
-    @test_throws DimensionMismatch rdiv!(A, Transpose(UnitLowerTriangular(B)))
-    @test_throws DimensionMismatch rdiv!(A, Transpose(UnitUpperTriangular(B)))
+    @test_throws DimensionMismatch rdiv1!(A, Transpose(LowerTriangular(B)))
+    @test_throws DimensionMismatch rdiv1!(A, Transpose(UpperTriangular(B)))
+    @test_throws DimensionMismatch rdiv1!(A, Transpose(UnitLowerTriangular(B)))
+    @test_throws DimensionMismatch rdiv1!(A, Transpose(UnitUpperTriangular(B)))
 end
 
 # Test that UpperTriangular(LowerTriangular) throws. See #16201

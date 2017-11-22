@@ -252,7 +252,7 @@ control over the factorization of `A`.
 ldiv!(Y, A, B)
 
 """
-    ldiv!(A, B)
+    ldiv2!(A, B)
 
 Compute `A \\ B` in-place and overwriting `B` to store the result.
 
@@ -263,11 +263,11 @@ The reason for this is that factorization itself is both expensive and typically
 and performance-critical situations requiring `ldiv!` usually also require fine-grained
 control over the factorization of `A`.
 """
-ldiv!(A, B)
+ldiv2!(A, B)
 
 
 """
-    rdiv!(A, B)
+    rdiv1!(A, B)
 
 Compute `A / B` in-place and overwriting `A` to store the result.
 
@@ -275,10 +275,10 @@ The argument `B` should *not* be a matrix.  Rather, instead of matrices it shoul
 factorization object (e.g. produced by [`factorize`](@ref) or [`cholfact`](@ref)).
 The reason for this is that factorization itself is both expensive and typically allocates memory
 (although it can also be done in-place via, e.g., [`lufact!`](@ref)),
-and performance-critical situations requiring `rdiv!` usually also require fine-grained
+and performance-critical situations requiring `rdiv1!` usually also require fine-grained
 control over the factorization of `B`.
 """
-rdiv!(A, B)
+rdiv1!(A, B)
 
 copy_oftype(A::AbstractArray{T}, ::Type{T}) where {T} = copy(A)
 copy_oftype(A::AbstractArray{T,N}, ::Type{S}) where {T,N,S} = convert(AbstractArray{S,N}, A)

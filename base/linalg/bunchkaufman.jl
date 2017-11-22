@@ -253,7 +253,7 @@ function inv(B::BunchKaufman{<:BlasComplex})
     end
 end
 
-function ldiv!(B::BunchKaufman{T}, R::StridedVecOrMat{T}) where T<:BlasReal
+function ldiv2!(B::BunchKaufman{T}, R::StridedVecOrMat{T}) where T<:BlasReal
     if !issuccess(B)
         throw(SingularException(B.info))
     end
@@ -264,7 +264,7 @@ function ldiv!(B::BunchKaufman{T}, R::StridedVecOrMat{T}) where T<:BlasReal
         LAPACK.sytrs!(B.uplo, B.LD, B.ipiv, R)
     end
 end
-function ldiv!(B::BunchKaufman{T}, R::StridedVecOrMat{T}) where T<:BlasComplex
+function ldiv2!(B::BunchKaufman{T}, R::StridedVecOrMat{T}) where T<:BlasComplex
     if !issuccess(B)
         throw(SingularException(B.info))
     end
@@ -284,9 +284,9 @@ function ldiv!(B::BunchKaufman{T}, R::StridedVecOrMat{T}) where T<:BlasComplex
     end
 end
 # There is no fallback solver for Bunch-Kaufman so we'll have to promote to same element type
-function ldiv!(B::BunchKaufman{T}, R::StridedVecOrMat{S}) where {T,S}
+function ldiv2!(B::BunchKaufman{T}, R::StridedVecOrMat{S}) where {T,S}
     TS = promote_type(T,S)
-    return ldiv!(convert(BunchKaufman{TS}, B), convert(AbstractArray{TS}, R))
+    return ldiv2!(convert(BunchKaufman{TS}, B), convert(AbstractArray{TS}, R))
 end
 
 function logabsdet(F::BunchKaufman)

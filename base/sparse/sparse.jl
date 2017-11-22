@@ -10,7 +10,7 @@ using Base.Sort: Forward
 using Base.LinAlg: AbstractTriangular, PosDefException, fillstored!
 
 import Base: +, -, *, \, /, &, |, xor, ==
-import Base.LinAlg: mul!, ldiv!, rdiv!
+import Base.LinAlg: mul!, ldiv2!, rdiv1!
 
 import Base: @get!, acos, acosd, acot, acotd, acsch, asech, asin, asind, asinh,
     atan, atand, atanh, broadcast!, chol, conj!, cos, cosc, cosd, cosh, cospi, cot,

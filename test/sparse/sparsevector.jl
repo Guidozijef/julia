@@ -1,6 +1,6 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-using Base.LinAlg: mul!, ldiv!, Adjoint, Transpose
+using Base.LinAlg: mul!, ldiv2!, Adjoint, Transpose
 
 ### Data
 
@@ -964,17 +964,17 @@ end
                     # test in-place left-division methods not involving quotients
                     if eltypevec == typeof(zero(eltypemat)*zero(eltypevec) + zero(eltypemat)*zero(eltypevec))
                         for mat in unittrimats
-                            @test ldiv!(mat, copy(spvec)) ≈ ldiv!(mat, copy(fspvec))
-                            @test ldiv!(Adjoint(mat), copy(spvec)) ≈ ldiv!(Adjoint(mat), copy(fspvec))
-                            @test ldiv!(Transpose(mat), copy(spvec)) ≈ ldiv!(Transpose(mat), copy(fspvec))
+                            @test ldiv2!(mat, copy(spvec)) ≈ ldiv2!(mat, copy(fspvec))
+                            @test ldiv2!(Adjoint(mat), copy(spvec)) ≈ ldiv2!(Adjoint(mat), copy(fspvec))
+                            @test ldiv2!(Transpose(mat), copy(spvec)) ≈ ldiv2!(Transpose(mat), copy(fspvec))
                         end
                     end
                     # test in-place left-division methods involving quotients
                     if eltypevec == typeof((zero(eltypemat)*zero(eltypevec) + zero(eltypemat)*zero(eltypevec))/one(eltypemat))
                         for mat in trimats
-                            @test ldiv!(mat, copy(spvec)) ≈ ldiv!(mat, copy(fspvec))
-                            @test ldiv!(Adjoint(mat), copy(spvec)) ≈ ldiv!(Adjoint(mat), copy(fspvec))
-                            @test ldiv!(Transpose(mat), copy(spvec)) ≈ ldiv!(Transpose(mat), copy(fspvec))
+                            @test ldiv2!(mat, copy(spvec)) ≈ ldiv2!(mat, copy(fspvec))
+                            @test ldiv2!(Adjoint(mat), copy(spvec)) ≈ ldiv2!(Adjoint(mat), copy(fspvec))
+                            @test ldiv2!(Transpose(mat), copy(spvec)) ≈ ldiv2!(Transpose(mat), copy(fspvec))
                         end
                     end
                 end
@@ -997,9 +997,9 @@ end
             @test isequal(\(mat, zerospvec), zerodvec)
             @test isequal(\(Adjoint(mat), zerospvec), zerodvec)
             @test isequal(\(Transpose(mat), zerospvec), zerodvec)
-            @test isequal(ldiv!(mat, copy(zerospvec)), zerospvec)
-            @test isequal(ldiv!(Adjoint(mat), copy(zerospvec)), zerospvec)
-            @test isequal(ldiv!(Transpose(mat), copy(zerospvec)), zerospvec)
+            @test isequal(ldiv2!(mat, copy(zerospvec)), zerospvec)
+            @test isequal(ldiv2!(Adjoint(mat), copy(zerospvec)), zerospvec)
+            @test isequal(ldiv2!(Transpose(mat), copy(zerospvec)), zerospvec)
         end
     end
 end

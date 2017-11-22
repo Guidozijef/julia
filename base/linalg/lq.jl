@@ -252,7 +252,7 @@ function (\)(A::LQ{TA}, b::StridedVector{Tb}) where {TA,Tb}
     m = checksquare(A)
     m == length(b) || throw(DimensionMismatch("left hand side has $m rows, but right hand side has length $(length(b))"))
     AA = Factorization{S}(A)
-    x = ldiv!(AA, copy_oftype(b, S))
+    x = ldiv2!(AA, copy_oftype(b, S))
     return x
 end
 function (\)(A::LQ{TA},B::StridedMatrix{TB}) where {TA,TB}
@@ -260,19 +260,19 @@ function (\)(A::LQ{TA},B::StridedMatrix{TB}) where {TA,TB}
     m = checksquare(A)
     m == size(B,1) || throw(DimensionMismatch("left hand side has $m rows, but right hand side has $(size(B,1)) rows"))
     AA = Factorization{S}(A)
-    X = ldiv!(AA, copy_oftype(B, S))
+    X = ldiv2!(AA, copy_oftype(B, S))
     return X
 end
 # With a real lhs and complex rhs with the same precision, we can reinterpret
 # the complex rhs as a real rhs with twice the number of columns
 function (\)(F::LQ{T}, B::VecOrMat{Complex{T}}) where T<:BlasReal
     c2r = reshape(transpose(reinterpret(T, reshape(B, (1, length(B))))), size(B, 1), 2*size(B, 2))
-    x = ldiv!(F, c2r)
+    x = ldiv2!(F, c2r)
     return reshape(collect(reinterpret(Complex{T}, transpose(reshape(x, div(length(x), 2), 2)))),
                            isa(B, AbstractVector) ? (size(F,2),) : (size(F,2), size(B,2)))
 end
 
 
-function ldiv!(A::LQ{T}, B::StridedVecOrMat{T}) where T
-    mul2!(Adjoint(A.Q), ldiv!(LowerTriangular(A.L),B))
+function ldiv2!(A::LQ{T}, B::StridedVecOrMat{T}) where T
+    mul2!(Adjoint(A.Q), ldiv2!(LowerTriangular(A.L),B))
 end

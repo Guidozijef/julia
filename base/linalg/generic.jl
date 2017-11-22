@@ -813,7 +813,7 @@ function inv(A::AbstractMatrix{T}) where T
     S = typeof(zero(T)/one(T))      # dimensionful
     S0 = typeof(zero(T)/oneunit(T)) # dimensionless
     dest = Matrix{S0}(I, n, n)
-    ldiv!(factorize(convert(AbstractMatrix{S}, A)), dest)
+    ldiv2!(factorize(convert(AbstractMatrix{S}, A)), dest)
 end
 
 pinv(v::AbstractVector{T}, tol::Real = real(zero(T))) where {T<:Real} = _vectorpinv(Transpose, v, tol)

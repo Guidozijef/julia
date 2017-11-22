@@ -736,13 +736,13 @@ function *(adjA::Adjoint{<:Any,<:StridedVecOrMat}, adjQ::Adjoint{<:Any,<:Abstrac
     return mul1!(Ac, Adjoint(convert(AbstractMatrix{TAQ}, Q)))
 end
 
-ldiv!(A::QRCompactWY{T}, b::StridedVector{T}) where {T<:BlasFloat} =
-    (ldiv!(UpperTriangular(A.R), view(mul2!(Adjoint(A.Q), b), 1:size(A, 2))); b)
-ldiv!(A::QRCompactWY{T}, B::StridedMatrix{T}) where {T<:BlasFloat} =
-    (ldiv!(UpperTriangular(A.R), view(mul2!(Adjoint(A.Q), B), 1:size(A, 2), 1:size(B, 2))); B)
+ldiv2!(A::QRCompactWY{T}, b::StridedVector{T}) where {T<:BlasFloat} =
+    (ldiv2!(UpperTriangular(A.R), view(mul2!(Adjoint(A.Q), b), 1:size(A, 2))); b)
+ldiv2!(A::QRCompactWY{T}, B::StridedMatrix{T}) where {T<:BlasFloat} =
+    (ldiv2!(UpperTriangular(A.R), view(mul2!(Adjoint(A.Q), B), 1:size(A, 2), 1:size(B, 2))); B)
 
 # Julia implementation similar to xgelsy
-function ldiv!(A::QRPivoted{T}, B::StridedMatrix{T}, rcond::Real) where T<:BlasFloat
+function ldiv2!(A::QRPivoted{T}, B::StridedMatrix{T}, rcond::Real) where T<:BlasFloat
     mA, nA = size(A.factors)
     nr = min(mA,nA)
     nrhs = size(B, 2)
@@ -771,17 +771,17 @@ function ldiv!(A::QRPivoted{T}, B::StridedMatrix{T}, rcond::Real) where T<:BlasF
         rnk += 1
     end
     C, τ = LAPACK.tzrzf!(A.factors[1:rnk,:])
-    ldiv!(UpperTriangular(C[1:rnk,1:rnk]),view(mul2!(Adjoint(A.Q), view(B, 1:mA, 1:nrhs)), 1:rnk, 1:nrhs))
+    ldiv2!(UpperTriangular(C[1:rnk,1:rnk]),view(mul2!(Adjoint(A.Q), view(B, 1:mA, 1:nrhs)), 1:rnk, 1:nrhs))
     B[rnk+1:end,:] = zero(T)
     LAPACK.ormrz!('L', eltype(B)<:Complex ? 'C' : 'T', C, τ, view(B,1:nA,1:nrhs))
     B[1:nA,:] = view(B, 1:nA, :)[invperm(A.p),:]
     return B, rnk
 end
-ldiv!(A::QRPivoted{T}, B::StridedVector{T}) where {T<:BlasFloat} =
-    vec(ldiv!(A,reshape(B,length(B),1)))
-ldiv!(A::QRPivoted{T}, B::StridedVecOrMat{T}) where {T<:BlasFloat} =
-    ldiv!(A, B, min(size(A)...)*eps(real(float(one(eltype(B))))))[1]
-function ldiv!(A::QR{T}, B::StridedMatrix{T}) where T
+ldiv2!(A::QRPivoted{T}, B::StridedVector{T}) where {T<:BlasFloat} =
+    vec(ldiv2!(A,reshape(B,length(B),1)))
+ldiv2!(A::QRPivoted{T}, B::StridedVecOrMat{T}) where {T<:BlasFloat} =
+    ldiv2!(A, B, min(size(A)...)*eps(real(float(one(eltype(B))))))[1]
+function ldiv2!(A::QR{T}, B::StridedMatrix{T}) where T
     m, n = size(A)
     minmn = min(m,n)
     mB, nB = size(B)
@@ -807,7 +807,7 @@ function ldiv!(A::QR{T}, B::StridedMatrix{T}) where T
                 end
             end
         end
-        Base.LinAlg.ldiv!(UpperTriangular(view(R, :, 1:minmn)), view(B, 1:minmn, :))
+        Base.LinAlg.ldiv2!(UpperTriangular(view(R, :, 1:minmn)), view(B, 1:minmn, :))
         if n > m # Apply elementary transformation to solution
             B[m + 1:mB,1:nB] = zero(T)
             for j = 1:nB
@@ -827,14 +827,14 @@ function ldiv!(A::QR{T}, B::StridedMatrix{T}) where T
     end
     return B
 end
-ldiv!(A::QR, B::StridedVector) = ldiv!(A, reshape(B, length(B), 1))[:]
-function ldiv!(A::QRPivoted, b::StridedVector)
-    ldiv!(QR(A.factors,A.τ), b)
+ldiv2!(A::QR, B::StridedVector) = ldiv2!(A, reshape(B, length(B), 1))[:]
+function ldiv2!(A::QRPivoted, b::StridedVector)
+    ldiv2!(QR(A.factors,A.τ), b)
     b[1:size(A.factors, 2)] = view(b, 1:size(A.factors, 2))[invperm(A.jpvt)]
     b
 end
-function ldiv!(A::QRPivoted, B::StridedMatrix)
-    ldiv!(QR(A.factors, A.τ), B)
+function ldiv2!(A::QRPivoted, B::StridedMatrix)
+    ldiv2!(QR(A.factors, A.τ), B)
     B[1:size(A.factors, 2),:] = view(B, 1:size(A.factors, 2), :)[invperm(A.jpvt),:]
     B
 end
@@ -858,7 +858,7 @@ function (\)(A::Union{QR{TA},QRCompactWY{TA},QRPivoted{TA}}, B::AbstractVecOrMat
 
     X = _zeros(S, B, n)
     X[1:size(B, 1), :] = B
-    ldiv!(AA, X)
+    ldiv2!(AA, X)
     return _cut_B(X, 1:n)
 end
 
@@ -882,7 +882,7 @@ function (\)(A::Union{QR{T},QRCompactWY{T},QRPivoted{T}}, BIn::VecOrMat{Complex{
     X = _zeros(T, B, n)
     X[1:size(B, 1), :] = B
 
-    ldiv!(A, X)
+    ldiv2!(A, X)
 
 # |z1|z3|  reinterpret  |x1|x2|x3|x4|  transpose  |x1|y1|  reshape  |x1|y1|x3|y3|
 # |z2|z4|      <-       |y1|y2|y3|y4|     <-      |x2|y2|     <-    |x2|y2|x4|y4|

@@ -432,22 +432,22 @@ function show(io::IO, mime::MIME{Symbol("text/plain")}, C::CholeskyPivoted{<:Any
     show(io, mime, C.p)
 end
 
-ldiv!(C::Cholesky{T,<:AbstractMatrix}, B::StridedVecOrMat{T}) where {T<:BlasFloat} =
+ldiv2!(C::Cholesky{T,<:AbstractMatrix}, B::StridedVecOrMat{T}) where {T<:BlasFloat} =
     @assertposdef LAPACK.potrs!(C.uplo, C.factors, B) C.info
 
-function ldiv!(C::Cholesky{<:Any,<:AbstractMatrix}, B::StridedVecOrMat)
+function ldiv2!(C::Cholesky{<:Any,<:AbstractMatrix}, B::StridedVecOrMat)
     if C.uplo == 'L'
-        return ldiv!(Adjoint(LowerTriangular(C.factors)), ldiv!(LowerTriangular(C.factors), B))
+        return ldiv2!(Adjoint(LowerTriangular(C.factors)), ldiv2!(LowerTriangular(C.factors), B))
     else
-        return ldiv!(UpperTriangular(C.factors), ldiv!(Adjoint(UpperTriangular(C.factors)), B))
+        return ldiv2!(UpperTriangular(C.factors), ldiv2!(Adjoint(UpperTriangular(C.factors)), B))
     end
 end
 
-function ldiv!(C::CholeskyPivoted{T}, B::StridedVector{T}) where T<:BlasFloat
+function ldiv2!(C::CholeskyPivoted{T}, B::StridedVector{T}) where T<:BlasFloat
     chkfullrank(C)
     invpermute!(LAPACK.potrs!(C.uplo, C.factors, permute!(B, C.piv)), C.piv)
 end
-function ldiv!(C::CholeskyPivoted{T}, B::StridedMatrix{T}) where T<:BlasFloat
+function ldiv2!(C::CholeskyPivoted{T}, B::StridedMatrix{T}) where T<:BlasFloat
     chkfullrank(C)
     n = size(C, 1)
     for i=1:size(B, 2)
@@ -460,23 +460,23 @@ function ldiv!(C::CholeskyPivoted{T}, B::StridedMatrix{T}) where T<:BlasFloat
     B
 end
 
-function ldiv!(C::CholeskyPivoted, B::StridedVector)
+function ldiv2!(C::CholeskyPivoted, B::StridedVector)
     if C.uplo == 'L'
-        ldiv!(Adjoint(LowerTriangular(C.factors)),
-            ldiv!(LowerTriangular(C.factors), B[C.piv]))[invperm(C.piv)]
+        ldiv2!(Adjoint(LowerTriangular(C.factors)),
+            ldiv2!(LowerTriangular(C.factors), B[C.piv]))[invperm(C.piv)]
     else
-        ldiv!(UpperTriangular(C.factors),
-            ldiv!(Adjoint(UpperTriangular(C.factors)), B[C.piv]))[invperm(C.piv)]
+        ldiv2!(UpperTriangular(C.factors),
+            ldiv2!(Adjoint(UpperTriangular(C.factors)), B[C.piv]))[invperm(C.piv)]
     end
 end
 
-function ldiv!(C::CholeskyPivoted, B::StridedMatrix)
+function ldiv2!(C::CholeskyPivoted, B::StridedMatrix)
     if C.uplo == 'L'
-        ldiv!(Adjoint(LowerTriangular(C.factors)),
-            ldiv!(LowerTriangular(C.factors), B[C.piv,:]))[invperm(C.piv),:]
+        ldiv2!(Adjoint(LowerTriangular(C.factors)),
+            ldiv2!(LowerTriangular(C.factors), B[C.piv,:]))[invperm(C.piv),:]
     else
-        ldiv!(UpperTriangular(C.factors),
-            ldiv!(Adjoint(UpperTriangular(C.factors)), B[C.piv,:]))[invperm(C.piv),:]
+        ldiv2!(UpperTriangular(C.factors),
+            ldiv2!(Adjoint(UpperTriangular(C.factors)), B[C.piv,:]))[invperm(C.piv),:]
     end
 end
 

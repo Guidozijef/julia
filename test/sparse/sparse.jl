@@ -1,6 +1,6 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-using Base.LinAlg: mul!, rdiv!, Adjoint, Transpose
+using Base.LinAlg: mul!, rdiv1!, Adjoint, Transpose
 using Base.Printf: @printf
 
 @testset "issparse" begin
@@ -343,11 +343,11 @@ dA = Array(sA)
         bi = inv.(b)
         dAt = transpose(dA)
         sAt = transpose(sA)
-        @test scale!(copy(dAt), bi) ≈ rdiv!(copy(sAt), Diagonal(b))
-        @test scale!(copy(dAt), bi) ≈ rdiv!(copy(sAt), Transpose(Diagonal(b)))
-        @test scale!(copy(dAt), conj(bi)) ≈ rdiv!(copy(sAt), Adjoint(Diagonal(b)))
-        @test_throws DimensionMismatch rdiv!(copy(sAt), Diagonal(fill(1., length(b)+1)))
-        @test_throws LinAlg.SingularException rdiv!(copy(sAt), Diagonal(zeros(length(b))))
+        @test scale!(copy(dAt), bi) ≈ rdiv1!(copy(sAt), Diagonal(b))
+        @test scale!(copy(dAt), bi) ≈ rdiv1!(copy(sAt), Transpose(Diagonal(b)))
+        @test scale!(copy(dAt), conj(bi)) ≈ rdiv1!(copy(sAt), Adjoint(Diagonal(b)))
+        @test_throws DimensionMismatch rdiv1!(copy(sAt), Diagonal(fill(1., length(b)+1)))
+        @test_throws LinAlg.SingularException rdiv1!(copy(sAt), Diagonal(zeros(length(b))))
     end
 end
 

@@ -52,7 +52,7 @@ convert(::Type{T}, f::Factorization) where {T<:AbstractArray} = T(f)
 
 ### General promotion rules
 Factorization{T}(F::Factorization{T}) where {T} = F
-inv(F::Factorization{T}) where {T} = (n = size(F, 1); ldiv!(F, Matrix{T}(I, n, n)))
+inv(F::Factorization{T}) where {T} = (n = size(F, 1); ldiv2!(F, Matrix{T}(I, n, n)))
 
 Base.hash(F::Factorization, h::UInt) = mapreduce(f -> hash(getfield(F, f)), hash, h, 1:nfields(F))
 Base.:(==)(  F::T, G::T) where {T<:Factorization} = all(f -> getfield(F, f) == getfield(G, f), 1:nfields(F))
@@ -62,7 +62,7 @@ Base.isequal(F::T, G::T) where {T<:Factorization} = all(f -> isequal(getfield(F,
 # the complex rhs as a real rhs with twice the number of columns
 function (\)(F::Factorization{T}, B::VecOrMat{Complex{T}}) where T<:BlasReal
     c2r = reshape(transpose(reinterpret(T, reshape(B, (1, length(B))))), size(B, 1), 2*size(B, 2))
-    x = ldiv!(F, c2r)
+    x = ldiv2!(F, c2r)
     return reshape(collect(reinterpret(Complex{T}, transpose(reshape(x, div(length(x), 2), 2)))), _ret_size(F, B))
 end
 
@@ -70,22 +70,22 @@ function \(F::Factorization, B::AbstractVecOrMat)
     TFB = typeof(oneunit(eltype(B)) / oneunit(eltype(F)))
     BB = similar(B, TFB, size(B))
     copyto!(BB, B)
-    ldiv!(F, BB)
+    ldiv2!(F, BB)
 end
 function \(adjF::Adjoint{<:Any,<:Factorization}, B::AbstractVecOrMat)
     F = adjF.parent
     TFB = typeof(oneunit(eltype(B)) / oneunit(eltype(F)))
     BB = similar(B, TFB, size(B))
     copyto!(BB, B)
-    ldiv!(Adjoint(F), BB)
+    ldiv2!(Adjoint(F), BB)
 end
 
 # support the same 3-arg idiom as in our other in-place A_*_B functions:
-ldiv!(Y::AbstractVecOrMat, A::Factorization, B::AbstractVecOrMat) = ldiv!(A, copyto!(Y, B))
+ldiv!(Y::AbstractVecOrMat, A::Factorization, B::AbstractVecOrMat) = ldiv2!(A, copyto!(Y, B))
 ldiv!(Y::AbstractVecOrMat, adjA::Adjoint{<:Any,<:Factorization}, B::AbstractVecOrMat) =
-    (A = adjA.parent; ldiv!(Adjoint(A), copyto!(Y, B)))
+    (A = adjA.parent; ldiv2!(Adjoint(A), copyto!(Y, B)))
 ldiv!(Y::AbstractVecOrMat, transA::Transpose{<:Any,<:Factorization}, B::AbstractVecOrMat) =
-    (A = transA.parent; ldiv!(Transpose(A), copyto!(Y, B)))
+    (A = transA.parent; ldiv2!(Transpose(A), copyto!(Y, B)))
 
 # fallback methods for transposed solves
 \(transF::Transpose{<:Any,<:Factorization{<:Real}}, B::AbstractVecOrMat) = (F = transF.parent; \(Adjoint(F), B))
