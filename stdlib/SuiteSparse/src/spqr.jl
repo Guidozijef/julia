@@ -198,7 +198,7 @@ Base.LinAlg.qrfact(A::SparseMatrixCSC; tol = _default_tol(A)) = qrfact(A, Val{tr
 
 Base.LinAlg.qr(A::SparseMatrixCSC; tol = _default_tol(A)) = qr(A, Val{true}, tol = tol)
 
-function Base.LinAlg.mul!(Q::QRSparseQ, A::StridedVecOrMat)
+function Base.LinAlg.mul2!(Q::QRSparseQ, A::StridedVecOrMat)
     if size(A, 1) != size(Q, 1)
         throw(DimensionMismatch("size(Q) = $(size(Q)) but size(A) = $(size(A))"))
     end
@@ -213,7 +213,7 @@ function Base.LinAlg.mul!(Q::QRSparseQ, A::StridedVecOrMat)
     return A
 end
 
-function Base.LinAlg.mul!(A::StridedMatrix, Q::QRSparseQ)
+function Base.LinAlg.mul1!(A::StridedMatrix, Q::QRSparseQ)
     if size(A, 2) != size(Q, 1)
         throw(DimensionMismatch("size(Q) = $(size(Q)) but size(A) = $(size(A))"))
     end
@@ -227,7 +227,7 @@ function Base.LinAlg.mul!(A::StridedMatrix, Q::QRSparseQ)
     return A
 end
 
-function Base.LinAlg.mul!(adjQ::Adjoint{<:Any,<:QRSparseQ}, A::StridedVecOrMat)
+function Base.LinAlg.mul2!(adjQ::Adjoint{<:Any,<:QRSparseQ}, A::StridedVecOrMat)
     Q = adjQ.parent
     if size(A, 1) != size(Q, 1)
         throw(DimensionMismatch("size(Q) = $(size(Q)) but size(A) = $(size(A))"))
@@ -243,7 +243,7 @@ function Base.LinAlg.mul!(adjQ::Adjoint{<:Any,<:QRSparseQ}, A::StridedVecOrMat)
     return A
 end
 
-function Base.LinAlg.mul!(A::StridedMatrix, adjQ::Adjoint{<:Any,<:QRSparseQ})
+function Base.LinAlg.mul1!(A::StridedMatrix, adjQ::Adjoint{<:Any,<:QRSparseQ})
     Q = adjQ.parent
     if size(A, 2) != size(Q, 1)
         throw(DimensionMismatch("size(Q) = $(size(Q)) but size(A) = $(size(A))"))
@@ -375,7 +375,7 @@ function _ldiv_basic(F::QRSparse, B::StridedVecOrMat)
     X0 = view(X, 1:size(B, 1), :)
 
     # Apply Q' to B
-    Base.LinAlg.mul!(Adjoint(F.Q), X0)
+    Base.LinAlg.mul2!(Adjoint(F.Q), X0)
 
     # Zero out to get basic solution
     X[rnk + 1:end, :] = 0

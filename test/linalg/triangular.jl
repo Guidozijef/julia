@@ -2,9 +2,10 @@
 
 debug = false
 using Test
+
 using Base.LinAlg: BlasFloat, errorbounds, full!, naivesub!, transpose!,
                     UnitUpperTriangular, UnitLowerTriangular,
-                    mul!, rdiv!, Adjoint, Transpose
+                    mul!, mul1!, mul2!, rdiv!, Adjoint, Transpose
 
 debug && println("Triangular matrices")
 
@@ -320,7 +321,7 @@ for elty1 in (Float32, Float64, BigFloat, ComplexF32, ComplexF64, Complex{BigFlo
 
             if !(eltyB in (BigFloat, Complex{BigFloat})) # rand does not support BigFloat and Complex{BigFloat} as of Dec 2015
                 Tri = Tridiagonal(rand(eltyB,n-1),rand(eltyB,n),rand(eltyB,n-1))
-                @test mul!(Tri,copy(A1)) ≈ Tri*Matrix(A1)
+                @test mul2!(Tri,copy(A1)) ≈ Tri*Matrix(A1)
             end
 
             # Triangular-dense Matrix/vector multiplication
@@ -358,12 +359,12 @@ for elty1 in (Float32, Float64, BigFloat, ComplexF32, ComplexF64, Complex{BigFlo
             end
             #error handling
             Ann, Bmm, bm = A1, Matrix{eltyB}(uninitialized, n+1, n+1), Vector{eltyB}(uninitialized, n+1)
-            @test_throws DimensionMismatch mul!(Ann, bm)
-            @test_throws DimensionMismatch mul!(Bmm, Ann)
-            @test_throws DimensionMismatch mul!(Transpose(Ann), bm)
-            @test_throws DimensionMismatch mul!(Adjoint(Ann), bm)
-            @test_throws DimensionMismatch mul!(Bmm, Adjoint(Ann))
-            @test_throws DimensionMismatch mul!(Bmm, Transpose(Ann))
+            @test_throws DimensionMismatch mul2!(Ann, bm)
+            @test_throws DimensionMismatch mul1!(Bmm, Ann)
+            @test_throws DimensionMismatch mul2!(Transpose(Ann), bm)
+            @test_throws DimensionMismatch mul2!(Adjoint(Ann), bm)
+            @test_throws DimensionMismatch mul1!(Bmm, Adjoint(Ann))
+            @test_throws DimensionMismatch mul1!(Bmm, Transpose(Ann))
 
             # ... and division
             @test A1\B[:,1] ≈ Matrix(A1)\B[:,1]
@@ -493,6 +494,7 @@ end
 let n = 5
     A = rand(Float16, n, n)
     B = rand(Float16, n-1, n-1)
+
     @test_throws DimensionMismatch rdiv!(A, LowerTriangular(B))
     @test_throws DimensionMismatch rdiv!(A, UpperTriangular(B))
     @test_throws DimensionMismatch rdiv!(A, UnitLowerTriangular(B))

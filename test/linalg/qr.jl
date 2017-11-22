@@ -2,7 +2,7 @@
 
 using Test
 
-using Base.LinAlg: BlasComplex, BlasFloat, BlasReal, QRPivoted, mul!, Adjoint, Transpose
+using Base.LinAlg: BlasComplex, BlasFloat, BlasReal, QRPivoted, mul1!, mul2!, Adjoint, Transpose
 
 n = 10
 
@@ -20,7 +20,7 @@ breal = randn(n,2)/2
 bimg  = randn(n,2)/2
 
 # helper functions to unambiguously recover explicit forms of an implicit QR Q
-squareQ(Q::LinAlg.AbstractQ) = (sq = size(Q.factors, 1); mul!(Q, Matrix{eltype(Q)}(I, sq, sq)))
+squareQ(Q::LinAlg.AbstractQ) = (sq = size(Q.factors, 1); mul2!(Q, Matrix{eltype(Q)}(I, sq, sq)))
 rectangularQ(Q::LinAlg.AbstractQ) = convert(Array, Q)
 
 @testset for eltya in (Float32, Float64, ComplexF32, ComplexF64, BigFloat, Int)
@@ -135,20 +135,20 @@ rectangularQ(Q::LinAlg.AbstractQ) = convert(Array, Q)
                 a = raw_a
                 qrpa = factorize(a[:,1:n1])
                 q, r = qrpa.Q, qrpa.R
-                @test mul!(adjoint(squareQ(q)), q) ≈ Matrix(I, n, n)
-                @test_throws DimensionMismatch mul!(Matrix{eltya}(I, n+1, n+1),q)
-                @test mul!(squareQ(q), Adjoint(q)) ≈ Matrix(I, n, n)
-                @test_throws DimensionMismatch mul!(Matrix{eltya}(I, n+1, n+1), Adjoint(q))
+                @test mul1!(adjoint(squareQ(q)), q) ≈ Matrix(I, n, n)
+                @test_throws DimensionMismatch mul1!(Matrix{eltya}(I, n+1, n+1),q)
+                @test mul1!(squareQ(q), Adjoint(q)) ≈ Matrix(I, n, n)
+                @test_throws DimensionMismatch mul1!(Matrix{eltya}(I, n+1, n+1), Adjoint(q))
                 @test_throws BoundsError size(q,-1)
-                @test_throws DimensionMismatch Base.LinAlg.mul!(q,zeros(eltya,n1+1))
-                @test_throws DimensionMismatch Base.LinAlg.mul!(Adjoint(q), zeros(eltya,n1+1))
+                @test_throws DimensionMismatch Base.LinAlg.mul2!(q,zeros(eltya,n1+1))
+                @test_throws DimensionMismatch Base.LinAlg.mul2!(Adjoint(q), zeros(eltya,n1+1))
 
                 qra = qrfact(a[:,1:n1], Val(false))
                 q, r = qra.Q, qra.R
-                @test mul!(adjoint(squareQ(q)), q) ≈ Matrix(I, n, n)
-                @test_throws DimensionMismatch mul!(Matrix{eltya}(I, n+1, n+1),q)
-                @test mul!(squareQ(q), Adjoint(q)) ≈ Matrix(I, n, n)
-                @test_throws DimensionMismatch mul!(Matrix{eltya}(I, n+1, n+1),Adjoint(q))
+                @test mul1!(adjoint(squareQ(q)), q) ≈ Matrix(I, n, n)
+                @test_throws DimensionMismatch mul1!(Matrix{eltya}(I, n+1, n+1),q)
+                @test mul1!(squareQ(q), Adjoint(q)) ≈ Matrix(I, n, n)
+                @test_throws DimensionMismatch mul1!(Matrix{eltya}(I, n+1, n+1),Adjoint(q))
                 @test_throws BoundsError size(q,-1)
                 @test_throws DimensionMismatch q * Matrix{Int8}(I, n+4, n+4)
             end

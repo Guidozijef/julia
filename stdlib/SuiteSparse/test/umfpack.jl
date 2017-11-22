@@ -32,7 +32,7 @@
 
             @test A*x ≈ b
             z = complex.(b)
-            x = SuiteSparse.ldiv!(lua, z)
+            x = Base.LinAlg.ldiv!(lua, z)
             @test x ≈ float([1:5;])
             @test z === x
             y = similar(z)
@@ -47,11 +47,11 @@
 
             @test A'*x ≈ b
             z = complex.(b)
-            x = SuiteSparse.ldiv!(Adjoint(lua), z)
+            x = Base.LinAlg.ldiv!(Adjoint(lua), z)
             @test x ≈ float([1:5;])
             @test x === z
             y = similar(x)
-            SuiteSparse.ldiv!(y, Adjoint(lua), complex.(b))
+            Base.LinAlg.ldiv!(y, Adjoint(lua), complex.(b))
             @test y ≈ x
 
             @test A'*x ≈ b
@@ -59,10 +59,10 @@
             @test x ≈ float([1:5;])
 
             @test Transpose(A) * x ≈ b
-            x = SuiteSparse.ldiv!(Transpose(lua), complex.(b))
+            x = Base.LinAlg.ldiv!(Transpose(lua), complex.(b))
             @test x ≈ float([1:5;])
             y = similar(x)
-            SuiteSparse.ldiv!(y, Transpose(lua), complex.(b))
+            Base.LinAlg.ldiv!(y, Transpose(lua), complex.(b))
             @test y ≈ x
 
             @test Transpose(A) * x ≈ b

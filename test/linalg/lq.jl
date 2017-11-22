@@ -2,7 +2,7 @@
 
 using Test
 
-using Base.LinAlg: BlasComplex, BlasFloat, BlasReal, mul!, Adjoint, Transpose
+using Base.LinAlg: BlasComplex, BlasFloat, BlasReal, mul1!, mul2!, Adjoint, Transpose
 
 
 n = 10
@@ -21,7 +21,7 @@ breal = randn(n,2)/2
 bimg  = randn(n,2)/2
 
 # helper functions to unambiguously recover explicit forms of an LQPackedQ
-squareQ(Q::LinAlg.LQPackedQ) = (n = size(Q.factors, 2); mul!(Q, Matrix{eltype(Q)}(I, n, n)))
+squareQ(Q::LinAlg.LQPackedQ) = (n = size(Q.factors, 2); mul2!(Q, Matrix{eltype(Q)}(I, n, n)))
 rectangularQ(Q::LinAlg.LQPackedQ) = convert(Array, Q)
 
 @testset for eltya in (Float32, Float64, ComplexF32, ComplexF64)
@@ -54,8 +54,6 @@ rectangularQ(Q::LinAlg.LQPackedQ) = convert(Array, Q)
                     @test size(lqa.Q,3) == 1
                     @test_throws ErrorException lqa.Z
                     @test Array(adjoint(lqa)) ≈ a'
-                    @test lqa * lqa' ≈ a * a'
-                    @test lqa' * lqa ≈ a' * a
                     @test q*squareQ(q)' ≈ Matrix(I, n, n)
                     @test l*q ≈ a
                     @test Array(lqa) ≈ a
@@ -99,9 +97,9 @@ rectangularQ(Q::LinAlg.LQPackedQ) = convert(Array, Q)
             l,q = lqa.L, lqa.Q
             @test rectangularQ(q)*rectangularQ(q)' ≈ Matrix(I, n1, n1)
             @test squareQ(q)'*squareQ(q) ≈ Matrix(I, n1, n1)
-            @test_throws DimensionMismatch mul!(Matrix{eltya}(I, n+1, n+1),q)
-            @test mul!(Adjoint(q), rectangularQ(q)) ≈ Matrix(I, n1, n1)
-            @test_throws DimensionMismatch mul!(Matrix{eltya}(I, n+1, n+1), Adjoint(q))
+            @test_throws DimensionMismatch mul1!(Matrix{eltya}(I, n+1, n+1),q)
+            @test mul2!(Adjoint(q), rectangularQ(q)) ≈ Matrix(I, n1, n1)
+            @test_throws DimensionMismatch mul1!(Matrix{eltya}(I, n+1, n+1), Adjoint(q))
             @test_throws BoundsError size(q,-1)
         end
     end
@@ -149,7 +147,7 @@ end
     function getqs(F::Base.LinAlg.LQ)
         implicitQ = F.Q
         sq = size(implicitQ.factors, 2)
-        explicitQ = mul!(implicitQ, Matrix{eltype(implicitQ)}(I, sq, sq))
+        explicitQ = mul2!(implicitQ, Matrix{eltype(implicitQ)}(I, sq, sq))
         return implicitQ, explicitQ
     end
 
@@ -190,7 +188,7 @@ end
 @testset "postmultiplication with / right-application of LQPackedQ (#23779)" begin
     function getqs(F::Base.LinAlg.LQ)
         implicitQ = F.Q
-        explicitQ = mul!(implicitQ, Matrix{eltype(implicitQ)}(I, size(implicitQ)...))
+        explicitQ = mul2!(implicitQ, Matrix{eltype(implicitQ)}(I, size(implicitQ)...))
         return implicitQ, explicitQ
     end
     # for any shape m-by-n of LQ-factored matrix, where Q is an LQPackedQ

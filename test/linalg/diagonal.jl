@@ -1,7 +1,8 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
 using Test
-using Base.LinAlg: mul!, ldiv!, rdiv!, Adjoint, Transpose
+
+using Base.LinAlg: mul!, mul1!, mul2!, ldiv!, rdiv!, Adjoint, Transpose
 import Base.LinAlg: BlasFloat, BlasComplex, SingularException
 
 n=12 #Size of matrix problem to test
@@ -146,9 +147,9 @@ srand(1)
             if relty <: BlasFloat
                 b = rand(elty,n,n)
                 b = sparse(b)
-                @test mul!(copy(D), copy(b)) ≈ Array(D)*Array(b)
-                @test mul!(Transpose(copy(D)), copy(b)) ≈ Transpose(Array(D))*Array(b)
-                @test mul!(Adjoint(copy(D)), copy(b)) ≈ Array(D)'*Array(b)
+                @test mul2!(copy(D), copy(b)) ≈ Array(D)*Array(b)
+                @test mul2!(Transpose(copy(D)), copy(b)) ≈ Transpose(Array(D))*Array(b)
+                @test mul2!(Adjoint(copy(D)), copy(b)) ≈ Array(D)'*Array(b)
             end
         end
 
@@ -177,13 +178,13 @@ srand(1)
         VV = Array(D)
         DD = copy(D)
         r  = VV * Matrix(D)
-        @test Array(mul!(VV, DD)) ≈ r ≈ Array(D)*Array(D)
+        @test Array(mul1!(VV, DD)) ≈ r ≈ Array(D)*Array(D)
         DD = copy(D)
         r  = VV * Transpose(Array(D))
-        @test Array(mul!(VV, Transpose(DD))) ≈ r
+        @test Array(mul1!(VV, Transpose(DD))) ≈ r
         DD = copy(D)
         r  = VV * Array(D)'
-        @test Array(mul!(VV, Adjoint(DD))) ≈ r
+        @test Array(mul1!(VV, Adjoint(DD))) ≈ r
     end
     @testset "triu/tril" begin
         @test istriu(D)
@@ -347,9 +348,12 @@ end
 end
 
 let D1 = Diagonal(rand(5)), D2 = Diagonal(rand(5))
-    @test_throws MethodError mul!(D1,D2)
-    @test_throws MethodError mul!(Transpose(D1),D2)
-    @test_throws MethodError mul!(Adjoint(D1),D2)
+    @test LinAlg.mul1!(copy(D1),D2) == D1*D2
+    @test LinAlg.mul2!(D1,copy(D2)) == D1*D2
+    @test LinAlg.mul1!(copy(D1),D2) == D1*D2
+    @test LinAlg.mul2!(D1,copy(D2)) == D1*D2
+    @test LinAlg.mul1!(copy(D1),D2) == D1*D2
+    @test LinAlg.mul2!(D1,copy(D2)) == D1*D2
 end
 
 @testset "multiplication of QR Q-factor and Diagonal (#16615 spot test)" begin
@@ -357,7 +361,7 @@ end
     Q = qrfact(randn(5, 5)).Q
     @test D * Q' == Array(D) * Q'
     Q = qrfact(randn(5, 5), Val(true)).Q
-    @test_throws MethodError mul!(Q, D)
+    @test_throws ArgumentError mul2!(Q, D)
 end
 
 @testset "block diagonal matrices" begin
