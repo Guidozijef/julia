@@ -632,6 +632,7 @@ export
     pop!,
     prepend!,
     push!,
+    push,
     resize!,
     shift!,
     unshift!,

@@ -803,6 +803,9 @@ function get(dict::ImmutableDict, key, default)
     return default
 end
 
+push(dict::ImmutableDict, KV::Pair) = ImmutableDict(dict, KV)
+push(dict::ImmutableDict, KVs::Pair...) = foldl(push, dict, KVs)
+
 # this actually defines reverse iteration (e.g. it should not be used for merge/copy/filter type operations)
 start(t::ImmutableDict) = t
 next(::ImmutableDict{K,V}, t) where {K,V} = (Pair{K,V}(t.key, t.value), t.parent)
