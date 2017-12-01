@@ -61,6 +61,8 @@ Wrap an expression in a [`Task`](@ref) without executing it, and return the [`Ta
 creates a task, and does not run it.
 
 ```jldoctest
+julia> using Random
+
 julia> a1() = det(rand(1000, 1000));
 
 julia> b = @task a1();

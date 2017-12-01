@@ -34,6 +34,7 @@ if Sys.iswindows()
     cp_q("../stdlib/Unicode/docs/src/index.md",               "src/stdlib/unicode.md")
     cp_q("../stdlib/Distributed/docs/src/index.md",           "src/stdlib/distributed.md")
     cp_q("../stdlib/Printf/docs/src/index.md",                "src/stdlib/printf.md")
+    cp_q("../stdlib/Random/docs/src/index.md",                "src/stdlib/random.md")
 else
     symlink_q("../../../stdlib/DelimitedFiles/docs/src/index.md",        "src/stdlib/delimitedfiles.md")
     symlink_q("../../../stdlib/Test/docs/src/index.md",                  "src/stdlib/test.md")
@@ -48,6 +49,7 @@ else
     symlink_q("../../../stdlib/Unicode/docs/src/index.md",               "src/stdlib/unicode.md")
     symlink_q("../../../stdlib/Distributed/docs/src/index.md",           "src/stdlib/distributed.md")
     symlink_q("../../../stdlib/Printf/docs/src/index.md",                "src/stdlib/printf.md")
+    symlink_q("../../../stdlib/Random/docs/src/index.md",                "src/stdlib/random.md")
 end
 
 const PAGES = [
@@ -128,6 +130,7 @@ const PAGES = [
         "stdlib/iterativeeigensolvers.md",
         "stdlib/unicode.md",
         "stdlib/printf.md",
+        "stdlib/random.md",
     ],
     "Developer Documentation" => [
         "devdocs/reflection.md",
@@ -163,12 +166,13 @@ const PAGES = [
 ]
 
 using DelimitedFiles, Test, Mmap, SharedArrays, Profile, Base64, FileWatching, CRC32c,
-      Dates, IterativeEigensolvers, Unicode, Distributed, Printf
+      Dates, IterativeEigensolvers, Unicode, Distributed, Printf, Random
 
 makedocs(
     build     = joinpath(pwd(), "_build/html/en"),
     modules   = [Base, Core, BuildSysImg, DelimitedFiles, Test, Mmap, SharedArrays, Profile,
-                 Base64, FileWatching, Dates, IterativeEigensolvers, Unicode, Distributed, Printf],
+                 Base64, FileWatching, Dates, IterativeEigensolvers, Unicode, Distributed, Printf,
+                 Random],
     clean     = false,
     doctest   = "doctest" in ARGS,
     linkcheck = "linkcheck" in ARGS,

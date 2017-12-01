@@ -1,6 +1,7 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
 using Base.LinAlg: Adjoint, Transpose
+using Random
 
 # these definitions are what adjoint(...) and transpose(...) meant
 # meant prior to the Adjoint/Transpose transition, and the tests

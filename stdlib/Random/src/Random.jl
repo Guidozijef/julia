@@ -1,16 +1,21 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
+__precompile__(true)
+
 module Random
 
-using Base.dSFMT
+include("dSFMT.jl")
+
+using .dSFMT
 using Base.GMP: Limb, MPZ
 using Base: BitInteger, BitInteger_types, BitUnsigned, @gc_preserve
 
-import Base: copymutable, copy, copy!, ==, hash
+import Base: copymutable, copy, copy!, ==, hash, serialize, deserialize, convert
 
 export srand,
        rand, rand!,
        randn, randn!,
+       sprand, sprandn,
        randexp, randexp!,
        bitrand,
        randstring,
@@ -19,12 +24,15 @@ export srand,
        randperm, randperm!,
        randcycle, randcycle!,
        AbstractRNG, MersenneTwister, RandomDevice,
-       GLOBAL_RNG, randjump
+       defaultRNG, randjump
 
 
 ## general definitions
 
 abstract type AbstractRNG end
+
+defaultRNG() = GLOBAL_RNG
+
 
 ### integers
 
@@ -62,6 +70,7 @@ for UI = (:UInt10, :UInt10Raw, :UInt23, :UInt23Raw, :UInt52, :UInt52Raw,
         uint_default(::$UI) = $UI{uint_sup($UI)}()
     end
 end
+
 
 ### floats
 
@@ -237,7 +246,7 @@ include("RNGs.jl")
 include("generation.jl")
 include("normal.jl")
 include("misc.jl")
-
+include("sparse.jl")
 
 ## rand & rand! & srand docstrings
 
@@ -347,5 +356,17 @@ true
 ```
 """
 srand(rng::AbstractRNG, ::Nothing) = srand(rng)
+
+
+## deprecations
+
+# PR #21359
+
+@deprecate srand(r::MersenneTwister, filename::AbstractString, n::Integer=4) srand(r, read!(filename, Vector{UInt32}(uninitialized, Int(n))))
+@deprecate srand(filename::AbstractString, n::Integer=4) srand(read!(filename, Vector{UInt32}(uninitialized, Int(n))))
+@deprecate MersenneTwister(filename::AbstractString)  srand(MersenneTwister(0), read!(filename, Vector{UInt32}(uninitialized, Int(4))))
+
+@deprecate convert(::Type{UInt128},     u::UUID)     UInt128(u)
+@deprecate convert(::Type{UUID}, s::AbstractString)  UUID(s)
 
 end # module

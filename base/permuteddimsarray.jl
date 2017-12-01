@@ -28,6 +28,8 @@ See also: [`permutedims`](@ref).
 
 # Examples
 ```jldoctest
+julia> using Random
+
 julia> A = rand(3,5,4);
 
 julia> B = PermutedDimsArray(A, (3,1,2));

@@ -233,6 +233,8 @@ julia> zero(1)
 julia> zero(big"2.0")
 0.0
 
+julia> using Random
+
 julia> zero(rand(2,2))
 2×2 Array{Float64,2}:
  0.0  0.0

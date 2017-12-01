@@ -1,6 +1,6 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-using Test
+using Test, Random
 
 using Base.LinAlg: mul!, Adjoint, Transpose
 
@@ -64,7 +64,8 @@ end
 
 # Generic AbstractArrays
 module MyArray15367
-    using Test
+    using Test, Random
+
     struct MyArray{T,N} <: AbstractArray{T,N}
         data::Array{T,N}
     end

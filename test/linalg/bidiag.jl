@@ -1,6 +1,6 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-using Test
+using Test, Random
 using Base.LinAlg: mul!, Adjoint, Transpose
 import Base.LinAlg: BlasReal, BlasFloat
 

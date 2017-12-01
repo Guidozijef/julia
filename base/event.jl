@@ -118,6 +118,8 @@ If a second argument `val` is provided, it will be passed to the task (via the r
 the woken task.
 
 ```jldoctest
+julia> using Random
+
 julia> a5() = det(rand(1000, 1000));
 
 julia> b = Task(a5);

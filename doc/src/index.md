@@ -77,6 +77,7 @@
   * [Iterative Eigensolvers](@ref lib-itereigen)
   * [Unicode](@ref)
   * [Printf](@ref)
+  * [Random Numbers](@ref)
 
 ## Developer Documentation
 

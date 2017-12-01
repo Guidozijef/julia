@@ -34,8 +34,8 @@ Base.similar(::AbstractArray)
 Base.similar(::Any, ::Tuple)
 Base.linspace
 Base.logspace
-Base.Random.randsubseq
-Base.Random.randsubseq!
+Random.randsubseq
+Random.randsubseq!
 ```
 
 ## Basic functions
@@ -164,16 +164,16 @@ Base.mapslices
 ## Combinatorics
 
 ```@docs
-Base.Random.randperm
-Base.Random.randperm!
+Random.randperm
+Random.randperm!
 Base.invperm
 Base.isperm
 Base.permute!(::Any, ::AbstractVector)
 Base.invpermute!
-Base.Random.randcycle
-Base.Random.randcycle!
-Base.Random.shuffle
-Base.Random.shuffle!
+Random.randcycle
+Random.randcycle!
+Random.shuffle
+Random.shuffle!
 Base.reverse
 Base.reverseind
 Base.reverse!
@@ -203,8 +203,6 @@ Base.SparseArrays.issparse
 Base.SparseArrays.nnz
 Base.SparseArrays.spzeros
 Base.SparseArrays.spdiagm
-Base.SparseArrays.sprand
-Base.SparseArrays.sprandn
 Base.SparseArrays.nonzeros
 Base.SparseArrays.rowvals
 Base.SparseArrays.nzrange

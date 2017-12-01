@@ -305,6 +305,25 @@ include("lock.jl")
 include("threads.jl")
 include("weakkeydict.jl")
 
+# Crand is used in file.jl
+# RAND_MAX at least 2^15-1 in theory, but we assume 2^16-1 (in practice, it's 2^31-1)
+"""
+    Crand([T::Type])
+
+Interface to the C `rand()` function. If `T` is provided, generate a value of type `T`
+by composing two calls to `Crand()`. `T` can be `UInt32` or `Float64`.
+"""
+Crand() = ccall(:rand, Cuint, ())
+Crand(::Type{UInt32}) = ((Crand() % UInt32) << 16) ⊻ (Crand() % UInt32)
+Crand(::Type{Float64}) = Crand(UInt32) / 2^32
+
+"""
+    Csrand([seed])
+
+Interface the the C `srand(seed)` function.
+"""
+Csrand(seed=floor(time())) = ccall(:srand, Cvoid, (Cuint,), seed)
+
 # I/O
 include("stream.jl")
 include("socket.jl")
@@ -367,12 +386,6 @@ include("irrationals.jl")
 include("mathconstants.jl")
 using .MathConstants: ℯ, π, pi
 
-# random number generation
-include("random/dSFMT.jl")
-include("random/random.jl")
-using .Random
-import .Random: rand, rand!
-
 # (s)printf macros
 include("printf.jl")
 # import .Printf
@@ -427,6 +440,9 @@ include("libgit2/libgit2.jl")
 include("pkg/pkg.jl")
 
 # sparse matrices, vectors, and sparse linear algebra
+
+function _rand_pm1! end # defined in Random
+
 include("sparse/sparse.jl")
 using .SparseArrays
 
@@ -469,6 +485,8 @@ using .Docs, .Markdown
 isdefined(Core, :Inference) && Docs.loaddocs(Core.Inference.CoreDocs.DOCS)
 
 function __init__()
+    # for the few uses of Crand in Base:
+    Csrand()
     # Base library init
     reinit_stdio()
     global_logger(SimpleLogger(STDERR))
@@ -492,17 +510,18 @@ Base.require(:Base64)
 Base.require(:CRC32c)
 Base.require(:Dates)
 Base.require(:DelimitedFiles)
+Base.require(:Distributed)
 Base.require(:FileWatching)
-Base.require(:Logging)
 Base.require(:IterativeEigensolvers)
+Base.require(:Logging)
 Base.require(:Mmap)
+Base.require(:Printf)
 Base.require(:Profile)
+Base.require(:Random)
 Base.require(:SharedArrays)
 Base.require(:SuiteSparse)
 Base.require(:Test)
 Base.require(:Unicode)
-Base.require(:Distributed)
-Base.require(:Printf)
 
 @eval Base begin
     @deprecate_binding Test root_module(:Test) true ", run `using Test` instead"
@@ -510,6 +529,7 @@ Base.require(:Printf)
     @deprecate_binding Profile root_module(:Profile) true ", run `using Profile` instead"
     @deprecate_binding Dates root_module(:Dates) true ", run `using Dates` instead"
     @deprecate_binding Distributed root_module(:Distributed) true ", run `using Distributed` instead"
+    @deprecate_binding Random root_module(:Random) true ", run `using Random` instead"
 end
 
 empty!(LOAD_PATH)

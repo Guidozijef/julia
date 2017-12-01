@@ -1,5 +1,7 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
+using Random
+
 const mintrials = 5
 const mintime = 2000.0
 print_output = isempty(ARGS)

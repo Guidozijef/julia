@@ -34,6 +34,8 @@ corresponding [`show`](@ref) method for `typeof(x)`.)
 
 # Examples
 ```jldoctest
+julia> using Random
+
 julia> mimewritable(MIME("text/plain"), rand(5))
 true
 

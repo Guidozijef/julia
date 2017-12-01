@@ -33,3 +33,4 @@
   * [File Events](@ref lib-filewatching)
   * [Iterative Eigensolvers](@ref lib-itereigen)
   * [Printf](@ref)
+  * [Random Numbers](@ref)

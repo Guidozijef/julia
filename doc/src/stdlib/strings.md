@@ -54,7 +54,7 @@ Base.chomp
 Base.thisind
 Base.nextind
 Base.prevind
-Base.Random.randstring
+Random.randstring
 Core.Symbol
 Base.escape_string
 Base.unescape_string

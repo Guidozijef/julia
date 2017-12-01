@@ -608,12 +608,6 @@ function normestinv(A::SparseMatrixCSC{T}, t::Integer = min(2,maximum(size(A))))
 
     S = zeros(T <: Real ? Int : Ti, n, t)
 
-    function _rand_pm1!(v)
-        for i in eachindex(v)
-            v[i] = rand()<0.5 ? 1 : -1
-        end
-    end
-
     function _any_abs_eq(v,n::Int)
         for vv in v
             if abs(vv)==n

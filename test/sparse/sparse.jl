@@ -2,6 +2,7 @@
 
 using Base.LinAlg: mul!, ldiv!, rdiv!, Adjoint, Transpose
 using Base.Printf.@printf
+using Random
 
 @testset "issparse" begin
     @test issparse(sparse(ones(5,5)))

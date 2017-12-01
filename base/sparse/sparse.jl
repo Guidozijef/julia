@@ -27,12 +27,12 @@ import Base: @get!, acos, acosd, acot, acotd, acsch, asech, asin, asind, asinh,
     vcat, hcat, hvcat, cat, imag, indmax, ishermitian, kron, length, log, log1p, max, min,
     maximum, minimum, norm, one, promote_eltype, real, reshape, rot180,
     rotl90, rotr90, round, scale!, setindex!, similar, size, transpose, tril,
-    triu, vec, permute!, map, map!, Array
+    triu, vec, permute!, map, map!, Array, _rand_pm1!
 
 export AbstractSparseArray, AbstractSparseMatrix, AbstractSparseVector,
     SparseMatrixCSC, SparseVector, blkdiag, droptol!, dropzeros!, dropzeros,
     issparse, nonzeros, nzrange, rowvals, sparse, sparsevec, spdiagm,
-    sprand, sprandn, spzeros, nnz, permute
+    spzeros, nnz, permute
 
 include("abstractsparse.jl")
 include("sparsematrix.jl")

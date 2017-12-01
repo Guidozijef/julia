@@ -575,6 +575,8 @@ if the index is out of bounds, or has an undefined reference.
 
 # Examples
 ```jldoctest
+julia> using Random
+
 julia> isassigned(rand(3, 3), 5)
 true
 
