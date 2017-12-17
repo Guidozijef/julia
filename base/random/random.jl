@@ -227,6 +227,8 @@ rand(                ::Type{X}, d::Integer, dims::Integer...) where {X} = rand(X
 function __init__()
     try
         srand()
+        GLOBAL_RNG.advance = big(0)
+        GLOBAL_RNG.advance_last_vals = big(0)
     catch ex
         Base.showerror_nostdio(ex,
             "WARNING: Error during initialization of module Random")
