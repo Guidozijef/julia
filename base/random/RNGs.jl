@@ -67,19 +67,20 @@ mutable struct MersenneTwister <: AbstractRNG
     state::DSFMT_state
     vals::Vector{Float64}
     idx::Int
-    advance::BigInt
-    advance_last_vals::BigInt
+    advance::Int64
+    advance_last_vals::Int64
+    advance_jump::BigInt
 
-    function MersenneTwister(seed, state, vals, idx, advance, advance_last_vals)
+    function MersenneTwister(seed, state, vals, idx, advance, advance_last_vals, advance_jump)
         length(vals) == MTCacheLength && 0 <= idx <= MTCacheLength ||
             throw(DomainError((length(vals), idx),
                       "`length(vals)` and `idx` must be consistent with $MTCacheLength"))
-        new(seed, state, vals, idx, advance, advance_last_vals)
+        new(seed, state, vals, idx, advance, advance_last_vals, advance_jump)
     end
 end
 
 MersenneTwister(seed::Vector{UInt32}, state::DSFMT_state) =
-    MersenneTwister(seed, state, zeros(Float64, MTCacheLength), MTCacheLength, 0, 0)
+    MersenneTwister(seed, state, zeros(Float64, MTCacheLength), MTCacheLength, 0, -1, 0)
 
 """
     MersenneTwister(seed)
@@ -135,9 +136,13 @@ copy(src::MersenneTwister) =
 
 hash(r::MersenneTwister, h::UInt) = foldr(hash, h, (r.seed, r.state, r.vals, r.idx))
 
-show(io::IO, rng::MersenneTwister) =
-    print(io, "MersenneTwister(0x$(hex(from_seed(rng.seed))), $(rng.advance), $(rng.advance_last_vals), $(rng.idx))")
-
+function show(io::IO, rng::MersenneTwister)
+    idx = rng.advance_last_vals == -1 ? 0 : rng.idx # don't print 382 initially for idx
+    seed = from_seed(rng.seed)
+    seed_str = seed <= typemax(Int) ? dec(seed) : "0x" * hex(seed) # DWIM
+    aj = rng.advance_jump == 0 ? "" : dec(rng.advance_jump) * ", "
+    print(io, "MersenneTwister($seed_str, ($aj$(rng.advance), $(rng.advance_last_vals), $idx))")
+end
 
 ### low level API
 
@@ -148,7 +153,7 @@ mt_setempty!(r::MersenneTwister) = r.idx = MTCacheLength
 mt_pop!(r::MersenneTwister) = @inbounds return r.vals[r.idx+=1]
 
 function gen_rand(r::MersenneTwister)
-    MPZ.set!(r.advance_last_vals, r.advance)
+    r.advance_last_vals = r.advance
     @gc_preserve r fill_array!(r, pointer(r.vals), length(r.vals), Close1Open2())
     mt_setfull!(r)
 end
@@ -202,6 +207,9 @@ function srand(r::MersenneTwister, seed::Vector{UInt32})
     copyto!(resize!(r.seed, length(seed)), seed)
     dsfmt_init_by_array(r.state, r.seed)
     mt_setempty!(r)
+    r.advance = 0
+    r.advance_last_vals = -1
+    r.advance_jump = 0
     return r
 end
 
@@ -341,8 +349,7 @@ function _rand_max383!(r::MersenneTwister, A::UnsafeView{Float64}, I::FloatInter
 end
 
 function fill_array!(rng::MersenneTwister, A::Ptr{Float64}, n::Int, I)
-    MPZ.add_ui!(rng.advance, n)
-    #rng.advance += n
+    rng.advance += n
     fill_array!(rng.state, A, n, I)
 end
 
@@ -510,7 +517,7 @@ function randjump(mt::MersenneTwister, jumps::Integer, jumppoly::AbstractString)
     for i in 1:jumps-1
         cmt = mts[end]
         newrng = MersenneTwister(copy(cmt.seed), dSFMT.dsfmt_jump(cmt.state, jumppoly))
-        MPZ.set_ui!(newrng.advance, Int64(10)^20)
+        newrng.advance_jump += Int64(10)^20
         push!(mts, newrng)
     end
     return mts
