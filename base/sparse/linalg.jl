@@ -622,7 +622,7 @@ function normestinv(A::SparseMatrixCSC{T}, t::Integer = min(2,maximum(size(A))))
     X[1:n,1] = 1
     for j = 2:t
         while true
-            _rand_pm1!(view(X,1:n,j))
+            rand!(view(X,1:n,j), (-1, 1))
             yaux = X[1:n,j]' * X[1:n,1:j-1]
             if !_any_abs_eq(yaux,n)
                 break
@@ -683,7 +683,7 @@ function normestinv(A::SparseMatrixCSC{T}, t::Integer = min(2,maximum(size(A))))
                         end
                     end
                     if repeated
-                        _rand_pm1!(view(S,1:n,j))
+                        rand!(view(S,1:n,j), (-1, 1))
                     else
                         break
                     end

@@ -441,8 +441,6 @@ include("pkg/pkg.jl")
 
 # sparse matrices, vectors, and sparse linear algebra
 
-function _rand_pm1! end # defined in Random
-
 include("sparse/sparse.jl")
 using .SparseArrays
 

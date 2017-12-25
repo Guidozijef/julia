@@ -144,12 +144,3 @@ sprand(::Type{T}, n::Integer, p::AbstractFloat) where {T} = sprand(defaultRNG(),
 
 sprandn(n::Integer, p::AbstractFloat) = sprand(defaultRNG(), n, p, randn)
 sprandn(r::AbstractRNG, n::Integer, p::AbstractFloat) = sprand(r, n, p, randn)
-
-
-## _rand_pm1! (used in Base.LinAlg)
-
-function Base._rand_pm1!(v)
-    for i in eachindex(v)
-        v[i] = rand(Bool) ? 1 : -1
-    end
-end
