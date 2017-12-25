@@ -672,3 +672,12 @@ end
     r = T(1):T(108)
     @test rand(RNG, SamplerRangeFast(r)) ∈ r
 end
+
+@testset "rand(::Tuple)" begin
+    @test rand((0x1,)) == 0x1
+    @test rand((0x1, 2)) ∈ 1:2
+    @test rand((0x1, 2, 3)) ∈ 1:3
+    @test rand((0x1, 2, 3, 4)) ∈ 1:4
+    @test rand((0x1, 2, 3, 4, 5)) ∈ 1:5
+    @test rand((0x1, 2, 3, 4, 6)) ∈ 1:6
+end
