@@ -1,0 +1,71 @@
+From 26efd16b306c26c1dd1db60e79f374090a668fe6 Mon Sep 17 00:00:00 2001
+From: Tom Stellard <tstellar@redhat.com>
+Date: Wed, 3 May 2017 14:43:44 +0000
+Subject: [PATCH] CMake: Add LLVM_DYLIB_SYMBOL_VERSIONING option
+
+Summary:
+When apps or other libraries link against a library with symbol
+versions, the version string is recorded in the import table, and used
+at runtime to resolve the symbol back to a library that provides that
+version (vaguely like how two-level namespaces work in Mach-O).  ld's
+--default-symver flag tags every exported symbol with a symbol version
+string equal to the library's soname.  Using --default-symver means
+multiple versions of libLLVM can coexist within the same process, at
+least to the extent that they don't try to pass data between each
+other's llvms.
+
+As an example, imagine a language like Rust using llvm for CPU codegen,
+binding to OpenGL, with Mesa as the OpenGL implementation using llvm for
+R600 codegen.  With --default-symver Rust and Mesa will resolve their
+llvm usage to the version each was linked against, which need not match.
+
+(Other ELF platforms like BSD and Solaris might have similar semantics,
+I've not checked.)
+
+This is based on an autoconf version of this patch by Adam Jackson.
+
+This new option can be used to add --default-symver to the linker flags
+for libLLVM.so.
+
+Reviewers: beanz
+
+Reviewed By: beanz
+
+Subscribers: mgorny, llvm-commits
+
+Differential Revision: https://reviews.llvm.org/D30997
+
+git-svn-id: https://llvm.org/svn/llvm-project/llvm/trunk@302026 91177308-0d34-0410-b5e6-96231b3b80d8
+---
+ CMakeLists.txt                  | 2 ++
+ tools/llvm-shlib/CMakeLists.txt | 4 ++++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2f5df776e9e..78e2e016625 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -530,6 +530,8 @@ if(LLVM_LINK_LLVM_DYLIB OR LLVM_BUILD_LLVM_C_DYLIB)
+ endif()
+ option(LLVM_BUILD_LLVM_DYLIB "Build libllvm dynamic library" ${LLVM_BUILD_LLVM_DYLIB_default})
+ 
++option(LLVM_DYLIB_SYMBOL_VERSIONING OFF)
++
+ option(LLVM_OPTIMIZED_TABLEGEN "Force TableGen to be built with optimization" OFF)
+ if(CMAKE_CROSSCOMPILING OR (LLVM_OPTIMIZED_TABLEGEN AND (LLVM_ENABLE_ASSERTIONS OR CMAKE_CONFIGURATION_TYPES)))
+   set(LLVM_USE_HOST_TOOLS ON)
+diff --git a/tools/llvm-shlib/CMakeLists.txt b/tools/llvm-shlib/CMakeLists.txt
+index 27815868629..3ebede00cc4 100644
+--- a/tools/llvm-shlib/CMakeLists.txt
++++ b/tools/llvm-shlib/CMakeLists.txt
+@@ -50,6 +50,10 @@ endif()
+ 
+ target_link_libraries(LLVM PRIVATE ${LIB_NAMES})
+ 
++if (LLVM_DYLIB_SYMBOL_VERSIONING)
++  set_property(TARGET LLVM APPEND_STRING PROPERTY LINK_FLAGS " -Wl,--default-symver")
++endif()
++
+ if (APPLE)
+   set_property(TARGET LLVM APPEND_STRING PROPERTY
+               LINK_FLAGS
