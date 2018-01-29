@@ -583,6 +583,11 @@ static int is_typekey_ordered(jl_value_t **key, size_t n)
             !(jl_is_datatype(k) && (((jl_datatype_t*)k)->uid ||
                                     (!jl_has_free_typevars(k) && !contains_unions(k)))))
             return 0;
+        if (jl_is_datatype(k)) {
+            jl_datatype_t *kdt = (jl_datatype_t *) k;
+            if (!is_typekey_ordered(jl_svec_data(kdt->parameters), jl_svec_len(kdt->parameters)))
+                return 0;
+        }
     }
     return 1;
 }
