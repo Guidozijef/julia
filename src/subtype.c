@@ -206,7 +206,8 @@ static int obviously_unequal(jl_value_t *a, jl_value_t *b)
 {
     if (a == b)
         return 0;
-    if (jl_is_concrete_type(a) || jl_is_concrete_type(b))
+    if ((jl_is_concrete_type(a) || jl_is_concrete_type(b)) &&
+        jl_type_equality_is_identity(a, b))
         return 1;
     if (jl_is_unionall(a)) a = jl_unwrap_unionall(a);
     if (jl_is_unionall(b)) b = jl_unwrap_unionall(b);

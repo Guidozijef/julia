@@ -1266,6 +1266,10 @@ end
 @test Vector{Tuple{Any}}() isa Vector{Tuple{>:Int}}
 @test Vector{Tuple{>:Int}}() isa Vector{Tuple{Any}}
 @testintersect(Vector{Tuple{>:Int}}, Vector{Tuple{Any}}, Vector{Tuple{Any}})
+f25430(t::Vector{Tuple{Any}}) = true
+g25430(t::Vector{Tuple{>:Int}}) = true
+@test f25430(Vector{Tuple{>:Int}}())
+@test g25430(Vector{Tuple{Any}}())
 
 # issue #24521
 g24521(::T, ::T) where {T} = T
