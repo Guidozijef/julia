@@ -249,6 +249,7 @@ static int obviously_disjoint(jl_value_t *a, jl_value_t *b, int specificity)
     if (a == b || a == (jl_value_t*)jl_any_type || b == (jl_value_t*)jl_any_type)
         return 0;
     if (jl_is_concrete_type(a) && jl_is_concrete_type(b) &&
+        jl_type_equality_is_identity(a, b) &&
         // TODO: remove these 2 lines if and when Tuple{Union{}} === Union{}
         (((jl_datatype_t*)a)->name != jl_tuple_typename ||
          ((jl_datatype_t*)b)->name != jl_tuple_typename))

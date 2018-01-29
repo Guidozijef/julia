@@ -1265,6 +1265,7 @@ end
 # issue #25430
 @test Vector{Tuple{Any}}() isa Vector{Tuple{>:Int}}
 @test Vector{Tuple{>:Int}}() isa Vector{Tuple{Any}}
+@testintersect(Vector{Tuple{>:Int}}, Vector{Tuple{Any}}, Vector{Tuple{Any}})
 
 # issue #24521
 g24521(::T, ::T) where {T} = T
