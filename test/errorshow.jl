@@ -64,6 +64,9 @@ Base.show_method_candidates(buf, MethodError(method_c5,(Float64,)))
 Base.show_method_candidates(buf, MethodError(method_c5,(Int32,)))
 @test String(take!(buf)) == "\nClosest candidates are:\n  method_c5(!Matched::Type{Float64})$cfile$c5line"
 
+showerror(buf, ErrorException("type String has no field data"))
+@test String(take!(buf)) == "type String has no field data\nUse `codeunits(str)` instead."
+
 mutable struct Test_type end
 test_type = Test_type()
 for f in [getindex, setindex!]
@@ -277,6 +280,11 @@ let undefvar
     @test err_str == "ArgumentError: not an error"
     err_str = @except_str @assert(false) AssertionError
     @test err_str == "AssertionError: false"
+
+    err_str = @except_str WString[] UndefVarError
+    @test err_str == """`WString` has been moved to the package LegacyStrings.jl:
+Run Pkg.add("LegacyStrings") to install LegacyStrings on Julia v0.5-;
+Then do `using LegacyStrings` to get `WString`.\n"""
 end
 
 
@@ -520,4 +528,3 @@ end
         @test !contains(str, "The applicable method may be too new")
     end
 end
-
