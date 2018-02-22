@@ -24,6 +24,7 @@ matrix:
             - libssl-dev:i386
             - gfortran-5
             - gfortran-5-multilib
+            - time
     - os: linux
       env: ARCH="x86_64"
       compiler: "g++-5 -m64"
