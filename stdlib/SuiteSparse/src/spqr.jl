@@ -128,9 +128,12 @@ end
 struct QRSparseQ{Tv<:CHOLMOD.VTypes,Ti<:Integer} <: LinearAlgebra.AbstractQ{Tv}
     factors::SparseMatrixCSC{Tv,Ti}
     τ::Vector{Tv}
+    n::Int # Number of columns in original matrix
 end
 
 Base.size(Q::QRSparseQ) = (size(Q.factors, 1), size(Q.factors, 1))
+
+Matrix(Q::QRSparseQ) where {T} = lmul!(A, Matrix{T}(I, size(Q, 1), min(size(Q, 1), Q.n)))
 
 # From SPQR manual p. 6
 _default_tol(A::SparseMatrixCSC) =
@@ -304,7 +307,7 @@ julia> F.pcol
 """
 @inline function Base.getproperty(F::QRSparse, d::Symbol)
     if d == :Q
-        return QRSparseQ(F.factors, F.τ)
+        return QRSparseQ(F.factors, F.τ, size(F, 2))
     elseif d == :prow
         return invperm(F.rpivinv)
     elseif d == :pcol
