@@ -387,7 +387,7 @@ function vecnorm(itr, p::Real=2)
     elseif p == Inf
         return vecnormInf(itr)
     elseif p == 0
-        return typeof(float(norm(first(itr))))(count(!iszero, itr))
+        return typeof(float(norm(first(itr))))(sum(!iszero, itr))
     elseif p == -Inf
         return vecnormMinusInf(itr)
     else

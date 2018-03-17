@@ -106,12 +106,12 @@ function deletions(diff_stat::GitDiffStats)
     return ccall((:git_diff_stats_deletions, :libgit2), Csize_t, (Ptr{Cvoid},), diff_stat.ptr)
 end
 
-function Base.count(diff::GitDiff)
+function Base.length(diff::GitDiff)
     return ccall((:git_diff_num_deltas, :libgit2), Cint, (Ptr{Cvoid},), diff.ptr)
 end
 
 function Base.getindex(diff::GitDiff, i::Integer)
-    if i < 1 || i > count(diff)
+    if i < 1 || i > length(diff)
         throw(BoundsError(diff, (i,)))
     end
     delta_ptr = ccall((:git_diff_get_delta, :libgit2),
@@ -129,6 +129,6 @@ end
 
 function Base.show(io::IO, diff::GitDiff)
     println(io, "GitDiff:")
-    println(io, "Number of deltas: $(count(diff))")
+    println(io, "Number of deltas: $(length(diff))")
     show(io, GitDiffStats(diff))
 end

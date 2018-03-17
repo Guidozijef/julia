@@ -83,7 +83,7 @@ julia> findnz(A)
 ```
 """
 function findnz(A::AbstractMatrix{T}) where T
-    nnzA = count(t -> t != 0, A)
+    nnzA = sum(t -> t != 0, A)
     I = zeros(Int, nnzA)
     J = zeros(Int, nnzA)
     NZs = Vector{T}(undef, nnzA)
@@ -103,7 +103,7 @@ function findnz(A::AbstractMatrix{T}) where T
 end
 
 function findnz(B::BitMatrix)
-    nnzB = count(B)
+    nnzB = sum(B)
     I = Vector{Int}(undef, nnzB)
     J = Vector{Int}(undef, nnzB)
     cnt = 1

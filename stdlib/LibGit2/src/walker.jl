@@ -6,16 +6,16 @@
 A `GitRevWalker` *walks* through the *revisions* (i.e. commits) of
 a git repository `repo`. It is a collection of the commits
 in the repository, and supports iteration and calls to [`map`](@ref LibGit2.map)
-and [`count`](@ref LibGit2.count) (for instance, `count` could be used to determine
+and [`LibGit2.count`] (for instance, `LibGit2.count` could be used to determine
 what percentage of commits in a repository were made by a certain
 author).
 
 ```julia
 cnt = LibGit2.with(LibGit2.GitRevWalker(repo)) do walker
-    count((oid,repo)->(oid == commit_oid1), walker, oid=commit_oid1, by=LibGit2.Consts.SORT_TIME)
+    LibGit2.count((oid,repo)->(oid == commit_oid1), walker, oid=commit_oid1, by=LibGit2.Consts.SORT_TIME)
 end
 ```
-Here, `count` finds the number of commits along the walk with a certain `GitHash`.
+Here, `LibGit2.count` finds the number of commits along the walk with a certain `GitHash`.
 Since the `GitHash` is unique to a commit, `cnt` will be `1`.
 """
 function GitRevWalker(repo::GitRepo)
@@ -151,17 +151,17 @@ are:
 # Examples
 ```julia
 cnt = LibGit2.with(LibGit2.GitRevWalker(repo)) do walker
-    count((oid, repo)->(oid == commit_oid1), walker, oid=commit_oid1, by=LibGit2.Consts.SORT_TIME)
+    LibGit2.count((oid, repo)->(oid == commit_oid1), walker, oid=commit_oid1, by=LibGit2.Consts.SORT_TIME)
 end
 ```
-`count` finds the number of commits along the walk with a certain `GitHash` `commit_oid1`, starting
+`LibGit2.count` finds the number of commits along the walk with a certain `GitHash` `commit_oid1`, starting
 the walk from that commit and moving forwards in time from it. Since the `GitHash` is unique to
 a commit, `cnt` will be `1`.
 """
-function Base.count(f::Function, walker::GitRevWalker;
-                  oid::GitHash=GitHash(),
-                  by::Cint = Consts.SORT_NONE,
-                  rev::Bool=false)
+function count(f::Function, walker::GitRevWalker;
+               oid::GitHash=GitHash(),
+               by::Cint = Consts.SORT_NONE,
+               rev::Bool=false)
     c = 0
     sort!(walker, by=by, rev=rev)
     if !iszero(oid)

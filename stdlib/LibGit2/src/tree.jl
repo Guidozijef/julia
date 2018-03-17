@@ -82,12 +82,12 @@ function entryid(te::GitTreeEntry)
     return oid
 end
 
-function Base.count(tree::GitTree)
+function Base.length(tree::GitTree)
     return ccall((:git_tree_entrycount, :libgit2), Csize_t, (Ptr{Cvoid},), tree.ptr)
 end
 
 function Base.getindex(tree::GitTree, i::Integer)
-    if i < 1 || i > count(tree)
+    if i < 1 || i > length(tree)
         throw(BoundsError(tree, i))
     end
     te_ptr = ccall((:git_tree_entry_byindex, :libgit2),
@@ -129,7 +129,7 @@ end
 function Base.show(io::IO, tree::GitTree)
     println(io, "GitTree:")
     println(io, "Owner: ", repository(tree))
-    println(io, "Number of entries: ", count(tree))
+    println(io, "Number of entries: ", length(tree))
 end
 
 """

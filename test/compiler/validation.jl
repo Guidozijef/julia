@@ -48,7 +48,7 @@ end
     end
     errors = Core.Compiler.validate_code(c)
     @test length(errors) == 7
-    @test count(e.kind === Core.Compiler.INVALID_RVALUE for e in errors) == 7
+    @test sum(e.kind === Core.Compiler.INVALID_RVALUE for e in errors) == 7
 end
 
 @testset "INVALID_CALL_ARG" begin
@@ -61,7 +61,7 @@ end
     end
     errors = Core.Compiler.validate_code(c)
     @test length(errors) == 7
-    @test count(e.kind === Core.Compiler.INVALID_CALL_ARG for e in errors) == 7
+    @test sum(e.kind === Core.Compiler.INVALID_CALL_ARG for e in errors) == 7
 end
 
 @testset "EMPTY_SLOTNAMES" begin
@@ -135,6 +135,6 @@ end
     errors = Core.Compiler.validate_code(mi)
     mi.def.nargs -= 20
     @test length(errors) == 2
-    @test count(e.kind === Core.Compiler.SLOTNAMES_NARGS_MISMATCH for e in errors) == 1
-    @test count(e.kind === Core.Compiler.SIGNATURE_NARGS_MISMATCH for e in errors) == 1
+    @test sum(e.kind === Core.Compiler.SLOTNAMES_NARGS_MISMATCH for e in errors) == 1
+    @test sum(e.kind === Core.Compiler.SIGNATURE_NARGS_MISMATCH for e in errors) == 1
 end

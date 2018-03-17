@@ -746,56 +746,56 @@ end
 
 @testset "setindex" begin
     a = spzeros(Int, 10, 10)
-    @test count(!iszero, a) == 0
+    @test sum(!iszero, a) == 0
     a[1,:] = 1
-    @test count(!iszero, a) == 10
+    @test sum(!iszero, a) == 10
     @test a[1,:] == sparse(fill(1,10))
     a[:,2] = 2
-    @test count(!iszero, a) == 19
+    @test sum(!iszero, a) == 19
     @test a[:,2] == sparse(fill(2,10))
     b = copy(a)
 
     # Zero-assignment behavior of setindex!(A, v, i, j)
     a[1,3] = 0
     @test nnz(a) == 19
-    @test count(!iszero, a) == 18
+    @test sum(!iszero, a) == 18
     a[2,1] = 0
     @test nnz(a) == 19
-    @test count(!iszero, a) == 18
+    @test sum(!iszero, a) == 18
 
     # Zero-assignment behavior of setindex!(A, v, I, J)
     a[1,:] = 0
     @test nnz(a) == 19
-    @test count(!iszero, a) == 9
+    @test sum(!iszero, a) == 9
     a[2,:] = 0
     @test nnz(a) == 19
-    @test count(!iszero, a) == 8
+    @test sum(!iszero, a) == 8
     a[:,1] = 0
     @test nnz(a) == 19
-    @test count(!iszero, a) == 8
+    @test sum(!iszero, a) == 8
     a[:,2] = 0
     @test nnz(a) == 19
-    @test count(!iszero, a) == 0
+    @test sum(!iszero, a) == 0
     a = copy(b)
     a[:,:] = 0
     @test nnz(a) == 19
-    @test count(!iszero, a) == 0
+    @test sum(!iszero, a) == 0
 
     # Zero-assignment behavior of setindex!(A, B::SparseMatrixCSC, I, J)
     a = copy(b)
     a[1:2,:] = spzeros(2, 10)
     @test nnz(a) == 19
-    @test count(!iszero, a) == 8
+    @test sum(!iszero, a) == 8
     a[1:2,1:3] = sparse([1 0 1; 0 0 1])
     @test nnz(a) == 20
-    @test count(!iszero, a) == 11
+    @test sum(!iszero, a) == 11
     a = copy(b)
     a[1:2,:] = let c = sparse(fill(1,2,10)); fill!(c.nzval, 0); c; end
     @test nnz(a) == 19
-    @test count(!iszero, a) == 8
+    @test sum(!iszero, a) == 8
     a[1:2,1:3] = let c = sparse(fill(1,2,3)); c[1,2] = c[2,1] = c[2,2] = 0; c; end
     @test nnz(a) == 20
-    @test count(!iszero, a) == 11
+    @test sum(!iszero, a) == 11
 
     a[1,:] = 1:10
     @test a[1,:] == sparse([1:10;])
@@ -839,34 +839,34 @@ end
     A = spzeros(Int, 10, 20)
     A[1:5,1:10] = 10
     A[1:5,1:10] = 10
-    @test count(!iszero, A) == 50
+    @test sum(!iszero, A) == 50
     @test A[1:5,1:10] == fill(10, 5, 10)
     A[6:10,11:20] = 0
-    @test count(!iszero, A) == 50
+    @test sum(!iszero, A) == 50
     A[6:10,11:20] = 20
-    @test count(!iszero, A) == 100
+    @test sum(!iszero, A) == 100
     @test A[6:10,11:20] == fill(20, 5, 10)
     A[4:8,8:16] = 15
-    @test count(!iszero, A) == 121
+    @test sum(!iszero, A) == 121
     @test A[4:8,8:16] == fill(15, 5, 9)
 
     ASZ = 1000
     TSZ = 800
     A = sprand(ASZ, 2*ASZ, 0.0001)
     B = copy(A)
-    nA = count(!iszero, A)
+    nA = sum(!iszero, A)
     x = A[1:TSZ, 1:(2*TSZ)]
-    nx = count(!iszero, x)
+    nx = sum(!iszero, x)
     A[1:TSZ, 1:(2*TSZ)] = 0
-    nB = count(!iszero, A)
+    nB = sum(!iszero, A)
     @test nB == (nA - nx)
     A[1:TSZ, 1:(2*TSZ)] = x
-    @test count(!iszero, A) == nA
+    @test sum(!iszero, A) == nA
     @test A == B
     A[1:TSZ, 1:(2*TSZ)] = 10
-    @test count(!iszero, A) == nB + 2*TSZ*TSZ
+    @test sum(!iszero, A) == nB + 2*TSZ*TSZ
     A[1:TSZ, 1:(2*TSZ)] = x
-    @test count(!iszero, A) == nA
+    @test sum(!iszero, A) == nA
     @test A == B
 
     A = sparse(1I, 5, 5)
@@ -877,17 +877,17 @@ end
     @test A[lininds] == A[X] == 1:10
     A[lininds] = zeros(Int, 10)
     @test nnz(A) == 13
-    @test count(!iszero, A) == 3
+    @test sum(!iszero, A) == 3
     @test A[lininds] == A[X] == zeros(Int, 10)
     c = Vector(11:20); c[1] = c[3] = 0
     A[lininds] = c
     @test nnz(A) == 13
-    @test count(!iszero, A) == 11
+    @test sum(!iszero, A) == 11
     @test A[lininds] == A[X] == c
     A = sparse(1I, 5, 5)
     A[lininds] = c
     @test nnz(A) == 12
-    @test count(!iszero, A) == 11
+    @test sum(!iszero, A) == 11
     @test A[lininds] == A[X] == c
 
     let # prevent assignment to I from overwriting UniformSampling in enclosing scope
@@ -897,14 +897,14 @@ end
         FI = Array(I)
         @test sparse(FS[FI]) == S[I] == S[FI]
         @test sum(S[FI]) + sum(S[.!FI]) == sum(S)
-        @test count(!iszero, I) == count(I)
+        @test sum(!iszero, I) == sum(I)
 
         sumS1 = sum(S)
         sumFI = sum(S[FI])
         nnzS1 = nnz(S)
         S[FI] = 0
         sumS2 = sum(S)
-        cnzS2 = count(!iszero, S)
+        cnzS2 = sum(!iszero, S)
         @test sum(S[FI]) == 0
         @test nnz(S) == nnzS1
         @test (sum(S) + sumFI) == sumS1
@@ -915,7 +915,7 @@ end
         S[FI] = 0
         @test sum(S) == sumS2
         @test nnz(S) == nnzS3
-        @test count(!iszero, S) == cnzS2
+        @test sum(!iszero, S) == cnzS2
 
         S[FI] = [1:sum(FI);]
         @test sum(S) == sumS2 + sum(1:sum(FI))
@@ -1305,11 +1305,11 @@ end
     sm = sparse(D)
     sv = sparsevec(D)
 
-    @test count(!iszero, sm) == 10
-    @test count(!iszero, sv) == 10
+    @test sum(!iszero, sm) == 10
+    @test sum(!iszero, sv) == 10
 
-    @test count(!iszero, sparse(Diagonal(Int[]))) == 0
-    @test count(!iszero, sparsevec(Diagonal(Int[]))) == 0
+    @test sum(!iszero, sparse(Diagonal(Int[]))) == 0
+    @test sum(!iszero, sparsevec(Diagonal(Int[]))) == 0
 end
 
 @testset "explicit zeros" begin
@@ -2169,12 +2169,12 @@ end
     @test similar(A, Float32, Int8, 6) == similar(A, Float32, Int8, (6,))
 end
 
-@testset "count specializations" begin
-    # count should throw for sparse arrays for which zero(eltype) does not exist
-    @test_throws MethodError count(SparseMatrixCSC(2, 2, Int[1, 2, 3], Int[1, 2], Any[true, true]))
-    @test_throws MethodError count(SparseVector(2, Int[1], Any[true]))
-    # count should run only over S.nzval[1:nnz(S)], not S.nzval in full
-    @test count(SparseMatrixCSC(2, 2, Int[1, 2, 3], Int[1, 2], Bool[true, true, true])) == 2
+@testset "sum specializations" begin
+    # sum should throw for sparse arrays for which zero(eltype) does not exist
+    @test_throws MethodError sum(SparseMatrixCSC(2, 2, Int[1, 2, 3], Int[1, 2], Any[true, true]))
+    @test_throws MethodError sum(SparseVector(2, Int[1], Any[true]))
+    # sum should run only over S.nzval[1:nnz(S)], not S.nzval in full
+    @test sum(SparseMatrixCSC(2, 2, Int[1, 2, 3], Int[1, 2], Bool[true, true, true])) == 2
 end
 
 @testset "sparse findprev/findnext operations" begin

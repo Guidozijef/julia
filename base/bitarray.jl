@@ -1436,7 +1436,7 @@ end
 
 circshift!(B::BitVector, i::Integer) = circshift!(B, B, i)
 
-## count & find ##
+## sum & find ##
 
 function bitcount(Bc::Vector{UInt64})
     n = 0
@@ -1446,7 +1446,7 @@ function bitcount(Bc::Vector{UInt64})
     return n
 end
 
-count(B::BitArray) = bitcount(B.chunks)
+sum(B::BitArray) = bitcount(B.chunks)
 
 function unsafe_bitfindnext(Bc::Vector{UInt64}, start::Integer)
     chunk_start = _div64(start-1)+1
@@ -1605,7 +1605,7 @@ end
 
 function findall(B::BitArray)
     l = length(B)
-    nnzB = count(B)
+    nnzB = sum(B)
     ind = first(keys(B))
     I = Vector{typeof(ind)}(undef, nnzB)
     nnzB == 0 && return I
@@ -1642,7 +1642,7 @@ findall(::typeof(!iszero), B::BitArray) = findall(B)
 ## Reductions ##
 
 _sum(A::BitArray, dims)    = reduce(+, A, dims=dims)
-_sum(B::BitArray, ::Colon) = count(B)
+_sum(B::BitArray, ::Colon) = sum(B)
 
 function all(B::BitArray)
     isempty(B) && return true

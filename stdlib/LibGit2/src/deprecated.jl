@@ -62,3 +62,11 @@ end
 
 @deprecate hex(id::LibGit2.GitHash)      string(id)
 @deprecate hex(id::LibGit2.GitShortHash) string(id)
+
+@eval Base @deprecate count(diff::$(GitDiff)) length(diff)
+@eval Base @deprecate count(idx::$(GitIndex)) length(idx)
+@eval Base @deprecate count(rb::$(GitRebase)) length(rb)
+@eval Base @deprecate count(tree::$(GitTree)) length(tree)
+@eval Base @deprecate(count(f::Function, walker::$(GitRevWalker);
+                            oid::$(GitHash)=$(GitHash)(), by::Cint = $(Consts.SORT_NONE), rev::Bool=false),
+                      LibGit2.count(f, walker, oid=oid, by=by, rev=rev))

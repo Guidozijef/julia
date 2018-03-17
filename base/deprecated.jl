@@ -528,8 +528,8 @@ end
 # PR #23485
 export countnz
 function countnz(x)
-    depwarn("`countnz(x)` is deprecated, use either `count(!iszero, x)` or `count(t -> t != 0, x)` instead.", :countnz)
-    return count(t -> t != 0, x)
+    depwarn("`countnz(x)` is deprecated, use either `sum(!iszero, x)` or `sum(t -> t != 0, x)` instead.", :countnz)
+    return sum(t -> t != 0, x)
 end
 
 # issue #14470

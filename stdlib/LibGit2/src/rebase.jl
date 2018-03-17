@@ -12,7 +12,7 @@ function GitRebase(repo::GitRepo, branch::GitAnnotated, upstream::GitAnnotated;
     return GitRebase(repo, rebase_ptr_ptr[])
 end
 
-function Base.count(rb::GitRebase)
+function Base.length(rb::GitRebase)
     return ccall((:git_rebase_operation_entrycount, :libgit2), Csize_t, (Ptr{Cvoid},), rb.ptr)
 end
 
@@ -29,7 +29,7 @@ function current(rb::GitRebase)
 end
 
 function Base.getindex(rb::GitRebase, i::Integer)
-    if !(1 <= i <= count(rb))
+    if !(1 <= i <= length(rb))
         throw(BoundsError(rb, (i,)))
     end
     GC.@preserve rb begin
@@ -59,7 +59,7 @@ end
 
 function Base.show(io::IO, rb::GitRebase)
     println(io, "GitRebase:")
-    println(io, "Number: ", count(rb))
+    println(io, "Number: ", length(rb))
     println(io, "Currently performing operation: ", current(rb)+1)
 end
 

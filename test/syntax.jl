@@ -409,10 +409,10 @@ f16517() = try error(); catch; 0; end
 isline(x) = isa(x, LineNumberNode)
 
 # issue #16672
-@test count(isline, Meta.parse("begin end").args) == 1
-@test count(isline, Meta.parse("begin; end").args) == 1
-@test count(isline, Meta.parse("begin; x+2; end").args) == 1
-@test count(isline, Meta.parse("begin; x+2; y+1; end").args) == 2
+@test sum(isline, Meta.parse("begin end").args) == 1
+@test sum(isline, Meta.parse("begin; end").args) == 1
+@test sum(isline, Meta.parse("begin; x+2; end").args) == 1
+@test sum(isline, Meta.parse("begin; x+2; y+1; end").args) == 2
 
 # issue #16736
 let

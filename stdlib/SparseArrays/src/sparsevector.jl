@@ -40,7 +40,6 @@ const SparseVectorUnion{T} = Union{SparseVector{T}, SparseColumnView{T}}
 length(x::SparseVector)   = x.n
 size(x::SparseVector)     = (x.n,)
 nnz(x::SparseVector)      = length(x.nzval)
-count(f, x::SparseVector) = count(f, x.nzval) + f(zero(eltype(x)))*(length(x) - nnz(x))
 
 nonzeros(x::SparseVector) = x.nzval
 function nonzeros(x::SparseColumnView)
@@ -1291,6 +1290,7 @@ end
 ### Reduction
 
 sum(x::AbstractSparseVector) = sum(nonzeros(x))
+sum(f, x::AbstractSparseVector) = sum(f, nonzeros(x)) + f(zero(eltype(x)))*(length(x) - nnz(x))
 
 function maximum(x::AbstractSparseVector{T}) where T<:Real
     n = length(x)

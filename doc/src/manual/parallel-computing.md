@@ -1529,7 +1529,7 @@ julia> function f()
            @threads for i in 1:3000
                x[i] = findfirst(rx, s[i]).start
            end
-           count(v -> v == 1, x)
+           sum(v -> v == 1, x)
        end
 f (generic function with 1 method)
 
@@ -1563,7 +1563,7 @@ julia> function f_fix()
              @threads for i in 1:3000
                  x[i] = findfirst(rx[threadid()], s[i]).start
              end
-             count(v -> v == 1, x)
+             sum(v -> v == 1, x)
          end
 f_fix (generic function with 1 method)
 

@@ -450,7 +450,6 @@ julia> sum(1:20)
 ```
 """
 sum(a) = sum(identity, a)
-sum(a::AbstractArray{Bool}) = count(a)
 
 ## prod
 """
@@ -785,38 +784,3 @@ const ∈ = in
 ∉(x, itr)=!∈(x, itr)
 ∋(itr, x)= ∈(x, itr)
 ∌(itr, x)=!∋(itr, x)
-
-
-## count
-
-"""
-    count(p, itr) -> Integer
-    count(itr) -> Integer
-
-Count the number of elements in `itr` for which predicate `p` returns `true`.
-If `p` is omitted, counts the number of `true` elements in `itr` (which
-should be a collection of boolean values).
-
-```jldoctest
-julia> count(i->(4<=i<=6), [2,3,4,5,6])
-3
-
-julia> count([true, false, true, true])
-3
-```
-"""
-function count(pred, itr)
-    n = 0
-    for x in itr
-        n += pred(x)::Bool
-    end
-    return n
-end
-function count(pred, a::AbstractArray)
-    n = 0
-    for i in eachindex(a)
-        @inbounds n += pred(a[i])::Bool
-    end
-    return n
-end
-count(itr) = count(identity, itr)

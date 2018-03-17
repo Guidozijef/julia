@@ -110,7 +110,6 @@ Base.any!
 Base.all(::Any)
 Base.all(::AbstractArray, ::Any)
 Base.all!
-Base.count
 Base.any(::Any, ::Any)
 Base.all(::Any, ::Any)
 Base.foreach

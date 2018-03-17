@@ -1970,7 +1970,7 @@ function findall(A)
 end
 # Allocating result upfront is faster (possible only when collection can be iterated twice)
 function findall(A::AbstractArray{Bool})
-    n = count(A)
+    n = sum(A)
     I = Vector{eltype(keys(A))}(undef, n)
     cnt = 1
     for (i,a) in pairs(A)

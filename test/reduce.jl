@@ -328,25 +328,21 @@ struct SomeFunctor end
 @test contains("quick fox", "fox") == true
 @test contains("quick fox", "lazy dog") == false
 
-# count
+# sum
 
-@test count(x->x>0, Int[]) == count(Bool[]) == 0
-@test count(x->x>0, -3:5) == count((-3:5) .> 0) == 5
-@test count([true, true, false, true]) == count(BitVector([true, true, false, true])) == 3
-@test_throws TypeError count(sqrt, [1])
-@test_throws TypeError count([1])
+@test sum(x->x>0, Int[]) == sum(Bool[]) == 0
+@test sum(x->x>0, -3:5) == sum((-3:5) .> 0) == 5
+@test sum([true, true, false, true]) == sum(BitVector([true, true, false, true])) == 3
 let itr = (x for x in 1:10 if x < 7)
-    @test count(iseven, itr) == 3
-    @test_throws TypeError count(itr)
-    @test_throws TypeError count(sqrt, itr)
+    @test sum(iseven, itr) == 3
 end
-@test count(iseven(x) for x in 1:10 if x < 7) == 3
-@test count(iseven(x) for x in 1:10 if x < -7) == 0
+@test sum(iseven(x) for x in 1:10 if x < 7) == 3
+@test sum(iseven(x) for x in 1:10 if x < -7) == 0
 
-@test count(!iszero, Int[]) == 0
-@test count(!iszero, Int[0]) == 0
-@test count(!iszero, Int[1]) == 1
-@test count(!iszero, [1, 0, 2, 0, 3, 0, 4]) == 4
+@test sum(!iszero, Int[]) == 0
+@test sum(!iszero, Int[0]) == 0
+@test sum(!iszero, Int[1]) == 1
+@test sum(!iszero, [1, 0, 2, 0, 3, 0, 4]) == 4
 
 
 ## cumsum, cummin, cummax

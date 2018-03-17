@@ -163,7 +163,7 @@ function read!(repo::GitRepo, force::Bool = false)
     return
 end
 
-function Base.count(idx::GitIndex)
+function Base.length(idx::GitIndex)
     return ccall((:git_index_entrycount, :libgit2), Csize_t, (Ptr{Cvoid},), idx.ptr)
 end
 
@@ -200,5 +200,5 @@ of a multi-branch "octopus" merge, stages `2`, `3`, and `4` might be used).
 stage(ie::IndexEntry) = ccall((:git_index_entry_stage, :libgit2), Cint, (Ptr{IndexEntry},), Ref(ie))
 
 function Base.show(io::IO, idx::GitIndex)
-    println(io, "GitIndex:\nRepository: ", repository(idx), "\nNumber of elements: ", count(idx))
+    println(io, "GitIndex:\nRepository: ", repository(idx), "\nNumber of elements: ", length(idx))
 end

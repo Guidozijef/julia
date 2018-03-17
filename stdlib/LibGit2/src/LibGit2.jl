@@ -156,7 +156,7 @@ function isdiff(repo::GitRepo, treeish::AbstractString, paths::AbstractString=""
     tree = GitTree(repo, "$treeish^{tree}")
     try
         diff = diff_tree(repo, tree, paths, cached=cached)
-        result = count(diff) > 0
+        result = length(diff) > 0
         close(diff)
         return result
     finally
@@ -205,7 +205,7 @@ function diff_files(repo::GitRepo, branch1::AbstractString, branch2::AbstractStr
     files = AbstractString[]
     try
         diff = diff_tree(repo, tree1, tree2)
-        for i in 1:count(diff)
+        for i in 1:length(diff)
             delta = diff[i]
             delta === nothing && break
             if Consts.DELTA_STATUS(delta.status) in filter
@@ -635,10 +635,10 @@ function revcount(repo::GitRepo, commit1::AbstractString, commit2::AbstractStrin
     commit2_id = revparseid(repo, commit2)
     base_id = merge_base(repo, string(commit1_id), string(commit2_id))
     fc = with(GitRevWalker(repo)) do walker
-        count((i,r)->i!=base_id, walker, oid=commit1_id, by=Consts.SORT_TOPOLOGICAL)
+        LibGit2.count((i,r)->i!=base_id, walker, oid=commit1_id, by=Consts.SORT_TOPOLOGICAL)
     end
     sc = with(GitRevWalker(repo)) do walker
-        count((i,r)->i!=base_id, walker, oid=commit2_id, by=Consts.SORT_TOPOLOGICAL)
+        LibGit2.count((i,r)->i!=base_id, walker, oid=commit2_id, by=Consts.SORT_TOPOLOGICAL)
     end
     return (fc-1, sc-1)
 end

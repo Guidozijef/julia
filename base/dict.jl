@@ -751,7 +751,7 @@ end
 start(t::ImmutableDict) = t
 next(::ImmutableDict{K,V}, t) where {K,V} = (Pair{K,V}(t.key, t.value), t.parent)
 done(::ImmutableDict, t) = !isdefined(t, :parent)
-length(t::ImmutableDict) = count(x->true, t)
+length(t::ImmutableDict) = sum(x->true, t)
 isempty(t::ImmutableDict) = done(t, start(t))
 empty(::ImmutableDict, ::Type{K}, ::Type{V}) where {K, V} = ImmutableDict{K,V}()
 

@@ -18,7 +18,7 @@ import LinearAlgebra: mul!, ldiv!, rdiv!, chol, adjoint!, diag, dot, eig,
 
 import Base: @get!, acos, acosd, acot, acotd, acsch, asech, asin, asind, asinh,
     atan, atand, atanh, broadcast!, conj!, cos, cosc, cosd, cosh, cospi, cot,
-    cotd, coth, count, csc, cscd, csch, done,
+    cotd, coth, csc, cscd, csch, done,
     exp10, exp2, findprev, findnext, floor, hash, argmin, inv,
     log10, log2, next, sec, secd, sech, show,
     sin, sinc, sind, sinh, sinpi, squeeze, start, sum, summary, tan,

@@ -492,7 +492,6 @@ export
     any,
     firstindex,
     collect,
-    count,
     delete!,
     deleteat!,
     eltype,

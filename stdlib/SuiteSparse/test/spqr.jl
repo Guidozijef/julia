@@ -77,7 +77,7 @@ end
     xd = Array(A)\b
 
     # check that basic solution has more zeros
-    @test count(!iszero, xs) < count(!iszero, xd)
+    @test sum(!iszero, xs) < sum(!iszero, xd)
     @test A*xs ≈ A*xd
 end
 

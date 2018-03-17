@@ -26,11 +26,11 @@ x1_full[SparseArrays.nonzeroinds(spv_x1)] = nonzeros(spv_x1)
     @test size(x,2) == 1
     @test !isempty(x)
 
-    @test count(!iszero, x) == 3
+    @test sum(!iszero, x) == 3
     @test nnz(x) == 3
     @test SparseArrays.nonzeroinds(x) == [2, 5, 6]
     @test nonzeros(x) == [1.25, -0.75, 3.5]
-    @test count(SparseVector(8, [2, 5, 6], [true,false,true])) == 2
+    @test sum(SparseVector(8, [2, 5, 6], [true,false,true])) == 2
 end
 
 @testset "conversion to dense Array" begin

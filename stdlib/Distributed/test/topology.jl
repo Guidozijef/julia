@@ -98,7 +98,7 @@ remove_workers_and_test()
 # test `lazy` connection setup
 function def_count_conn()
     @everywhere function count_connected_workers()
-        count(x -> isa(x, Distributed.Worker) && isdefined(x, :r_stream) && isopen(x.r_stream),
+        sum(x -> isa(x, Distributed.Worker) && isdefined(x, :r_stream) && isopen(x.r_stream),
                 Distributed.PGRP.workers)
     end
 end

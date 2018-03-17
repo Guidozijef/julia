@@ -127,12 +127,12 @@ region_active(s::ModeState) = :off
 
 input_string(s::PromptState) = String(take!(copy(s.input_buffer)))
 
-input_string_newlines(s::PromptState) = count(c->(c == '\n'), input_string(s))
+input_string_newlines(s::PromptState) = sum(c->(c == '\n'), input_string(s))
 function input_string_newlines_aftercursor(s::PromptState)
     str = input_string(s)
     isempty(str) && return 0
     rest = str[nextind(str, position(s)):end]
-    return count(c->(c == '\n'), rest)
+    return sum(c->(c == '\n'), rest)
 end
 
 abstract type HistoryProvider end

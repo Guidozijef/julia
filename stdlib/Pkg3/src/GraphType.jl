@@ -519,7 +519,7 @@ function check_consistency(graph::Graph)
     for p0 in fix_inds
         @assert 1 ≤ p0 ≤ np
         @assert !gconstr[p0][end]
-        @assert count(gconstr[p0]) == 1
+        @assert sum(gconstr[p0]) == 1
     end
 
     for (p,eq_cl) in eq_classes, (rvn,rvs) in eq_cl
@@ -1061,7 +1061,7 @@ function deep_clean!(graph::Graph)
 
     log_event_global!(graph, "cleaning graph")
 
-    sumspp = sum(count(graph.gconstr[p0]) for p0 = 1:np)
+    sumspp = sum(sum(graph.gconstr[p0]) for p0 = 1:np)
 
     while true
         gconstr_msk = [trues(spp[p0]) for p0 = 1:np]
@@ -1105,7 +1105,7 @@ function deep_clean!(graph::Graph)
         isempty(affected) && break
     end
 
-    sumspp_new = sum(count(graph.gconstr[p0]) for p0 = 1:np)
+    sumspp_new = sum(sum(graph.gconstr[p0]) for p0 = 1:np)
 
     log_event_global!(graph, "cleaned graph, stats (total n. of states): before = $(sumspp) after = $(sumspp_new) diff = $(sumspp-sumspp_new)")
 
@@ -1213,12 +1213,12 @@ function compute_eq_classes_soft!(graph::Graph; log_events::Bool = true)
 
     ignored = graph.ignored
     gconstr = graph.gconstr
-    sumspp = sum(count(gconstr[p0]) for p0 = 1:np)
+    sumspp = sum(sum(gconstr[p0]) for p0 = 1:np)
     for p0 = 1:np
         ignored[p0] && continue
         build_eq_classes_soft1!(graph, p0)
     end
-    sumspp_new = sum(count(gconstr[p0]) for p0 = 1:np)
+    sumspp_new = sum(sum(gconstr[p0]) for p0 = 1:np)
 
     log_events && log_event_global!(graph, "computed version equivalence classes, stats (total n. of states): before = $(sumspp) after = $(sumspp_new) diff = $(sumspp_new-sumspp)")
 
@@ -1240,7 +1240,7 @@ function build_eq_classes_soft1!(graph::Graph, p0::Int)
     gadj0 = gadj[p0]
     gmsk0 = gmsk[p0]
     gconstr0 = gconstr[p0]
-    eff_spp0 = count(gconstr0)
+    eff_spp0 = sum(gconstr0)
     cvecs = BitVector[vcat(BitVector(), (gmsk0[j1][gconstr[gadj0[j1]],v0] for j1 = 1:length(gadj0) if !ignored[gadj0[j1]])...) for v0 in findall(gconstr0)]
 
     @assert length(cvecs) == eff_spp0
@@ -1277,7 +1277,7 @@ function update_ignored!(graph::Graph)
     ignored = graph.ignored
 
     for p0 = 1:np
-        ignored[p0] = (count(gconstr[p0]) == 1)
+        ignored[p0] = (sum(gconstr[p0]) == 1)
     end
 
     return graph
@@ -1307,8 +1307,8 @@ function prune_graph!(graph::Graph)
 
     # We will remove all packages that only have one allowed state
     # (includes fixed packages and forbidden packages)
-    pkg_mask = BitArray(count(gconstr[p0]) ≠ 1 for p0 = 1:np)
-    new_np = count(pkg_mask)
+    pkg_mask = BitArray(sum(gconstr[p0]) ≠ 1 for p0 = 1:np)
+    new_np = sum(pkg_mask)
 
     # a map that translates the new index ∈ 1:new_np into its
     # corresponding old index ∈ 1:np
@@ -1361,7 +1361,7 @@ function prune_graph!(graph::Graph)
     vers_mask = [keep_vers(new_p0) for new_p0 = 1:new_np]
 
     # Update number of states per package
-    new_spp = Int[count(vers_mask[new_p0]) for new_p0 = 1:new_np]
+    new_spp = Int[sum(vers_mask[new_p0]) for new_p0 = 1:new_np]
 
     # Update versions maps
     function compute_pvers(new_p0)
