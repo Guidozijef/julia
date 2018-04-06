@@ -1358,9 +1358,7 @@ static jl_value_t *jl_deserialize_datatype(jl_serializer_state *s, int pos, jl_v
     assert(pos == backref_list.len - 1 && "nothing should have been deserialized since assigning pos");
     backref_list.items[pos] = dt;
     dt->size = size;
-    dt->struct_decl = NULL;
     dt->instance = NULL;
-    dt->ditype = NULL;
     dt->abstract = flags & 1;
     dt->mutabl = (flags >> 1) & 1;
     int has_layout = (flags >> 2) & 1;
@@ -1729,8 +1727,6 @@ static jl_value_t *jl_deserialize_value_method_instance(jl_serializer_state *s, 
     li->backedges = (jl_array_t*)jl_deserialize_value(s, (jl_value_t**)&li->backedges);
     if (li->backedges)
         jl_gc_wb(li, li->backedges);
-    li->functionObjectsDecls.functionObject = NULL;
-    li->functionObjectsDecls.specFunctionObject = NULL;
     li->inInference = 0;
     li->specptr.fptr = NULL;
     if (constret)
