@@ -200,7 +200,6 @@ struct D21923{T,N}; v::D21923{T}; end
 @test fieldtype(D21923, 1) == D21923
 
 # issue #22624, more circular definitions
-#= broken again :-(
 struct T22624{A,B,C}; v::Vector{T22624{Int64,A}}; end
 let elT = T22624.body.body.body.types[1].parameters[1]
     @test elT == T22624{Int64, T22624.var, C} where C
@@ -209,7 +208,6 @@ let elT = T22624.body.body.body.types[1].parameters[1]
     @test elT2.body.types[1].parameters[1] === elT2
     @test Base.isconcretetype(elT2.body.types[1])
 end
-=#
 
 # issue #3890
 mutable struct A3890{T1}
