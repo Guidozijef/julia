@@ -823,13 +823,13 @@ int jl_type_equality_is_identity(jl_value_t *t1, jl_value_t *t2)
         return 0;
     jl_datatype_t *dt1 = (jl_datatype_t *) t1;
     jl_datatype_t *dt2 = (jl_datatype_t *) t2;
-    if (!is_cacheable(dt1)) {
-        if (!is_cacheable(dt2))
+    if (!(is_cacheable(dt1) || jl_svec_len(dt1->parameters) == 0)) {
+        if (!(is_cacheable(dt2) || jl_svec_len(dt2->parameters) == 0))
             return 0;
         else
             return 1;
     }
-    if (!is_cacheable(dt2))
+    if (!(is_cacheable(dt2) || jl_svec_len(dt2->parameters) == 0))
         return 1;
 
     return is_typekey_ordered(jl_svec_data(dt1->parameters), jl_svec_len(dt1->parameters)) ==
