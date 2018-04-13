@@ -547,18 +547,6 @@ JL_DLLEXPORT jl_value_t *jl_type_unionall(jl_tvar_t *v, jl_value_t *body)
 
 // --- type instantiation and cache ---
 
-static int contains_unions(jl_value_t *type)
-{
-    if (jl_is_uniontype(type) || jl_is_unionall(type)) return 1;
-    if (!jl_is_datatype(type)) return 0;
-    int i;
-    for(i=0; i < jl_nparams(type); i++) {
-        if (contains_unions(jl_tparam(type,i)))
-            return 1;
-    }
-    return 0;
-}
-
 static intptr_t wrapper_id(jl_value_t *t)
 {
     // DataType wrappers occur often, e.g. when called as constructors.
@@ -579,14 +567,13 @@ static int is_typekey_ordered(jl_value_t **key, size_t n)
         jl_value_t *k = key[i];
         if (jl_is_typevar(k))
             return 0;
-        if (jl_is_type(k) && k != jl_bottom_type && !wrapper_id(k) &&
-            !(jl_is_datatype(k) && (((jl_datatype_t*)k)->uid ||
-                                    (!jl_has_free_typevars(k) && !contains_unions(k)))))
-            return 0;
         if (jl_is_datatype(k)) {
             jl_datatype_t *kdt = (jl_datatype_t *) k;
             if (!is_typekey_ordered(jl_svec_data(kdt->parameters), jl_svec_len(kdt->parameters)))
                 return 0;
+        } else {
+            if (jl_is_type(k) && k != jl_bottom_type && !wrapper_id(k))
+                return 0; // Union or UnionAll which is not a wrapper
         }
     }
     return 1;
