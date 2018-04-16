@@ -1626,10 +1626,12 @@ typedef struct _arriver_t arriver_t;
 typedef struct _reducer_t reducer_t;
 
 typedef struct _jl_taskq_t jl_taskq_t;
-typedef struct _jl_condition_t jl_condition_t;
+typedef struct _jl_taskq_t jl_condition_t;
 typedef struct _jl_task_t jl_task_t;
 
 struct _jl_taskq_t {
+    JL_DATA_TYPE
+
     jl_task_t *head;
     jl_mutex_t lock;
 };
@@ -1722,13 +1724,6 @@ struct _jl_task_t {
     int16_t prio;
 
     jl_timing_block_t *timing_stack;
-};
-
-struct _jl_condition_t {
-    JL_DATA_TYPE
-
-    volatile uint8_t notify;
-    jl_taskq_t waitq;
 };
 #endif // JULIA_ENABLE_THREADING && JULIA_ENABLE_PARTR
 
