@@ -669,7 +669,7 @@ function late_inline_special_case!(ir::IRCode, idx::Int, stmt::Expr, atypes::Vec
         subtype_call.typ = Bool
         ir[SSAValue(idx)] = subtype_call
         return true
-    elseif f === return_type
+    elseif is_return_type(f)
         if isconstType(stmt.typ)
             ir[SSAValue(idx)] = quoted(stmt.typ.parameters[1])
             return true

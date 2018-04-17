@@ -840,7 +840,7 @@ function is_pure_builtin(@nospecialize(f))
         return (contains_is(_PURE_BUILTINS, f) ||
                 contains_is(_PURE_BUILTINS_VOLATILE, f))
     else
-        return f === return_type
+        return is_return_type(f)
     end
 end
 
@@ -1284,7 +1284,7 @@ function inlineable(@nospecialize(f), @nospecialize(ft), e::Expr, atypes::Vector
 
     # check whether call can be inlined to just a quoted constant value
     if isa(f, widenconst(ft)) && !isdefined(method, :generator)
-        if f === return_type
+        if is_return_type(f)
             if isconstType(e.typ)
                 return inline_as_constant(e.typ.parameters[1], argexprs, sv, invoke_data)
             elseif isa(e.typ, Const)

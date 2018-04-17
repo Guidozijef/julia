@@ -31,6 +31,7 @@ include("options.jl")
 
 # core operations & types
 function return_type end # promotion.jl expects this to exist
+is_return_type(f) = f === return_type
 include("promotion.jl")
 include("tuple.jl")
 include("pair.jl")
