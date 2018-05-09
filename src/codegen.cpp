@@ -3751,10 +3751,11 @@ static Function* gen_cfun_wrapper(
     void *callptr = NULL;
     int calltype = 0;
     // infer it first, if necessary
-    // FIXME!
+    // FIXME! pretend this is OK
     if (lam)
         name = jl_symbol_name(lam->def.method->name);
-    if (lam && params.cache && !into) {
+    if (lam && params.cache) {
+        // if (!into)
         (void)jl_generate_fptr(&lam, world);
         if (lam->invoke == jl_fptr_trampoline) {
             calltype = 0;
