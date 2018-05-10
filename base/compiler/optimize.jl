@@ -238,7 +238,7 @@ const EMPTY_DEFS = ValueDef[]
 # logic #
 #########
 
-function isinlineable(m::Method, src::CodeInfo, mod::Module, params::Params, bonus::Int=0)
+function isinlineable(m::Method, src::CodeInfo, mod::Module, params::Params, union_penalties::Bool, bonus::Int=0)
     # compute the cost (size) of inlining this code
     inlineable = false
     cost_threshold = params.inline_cost_threshold
@@ -256,7 +256,7 @@ function isinlineable(m::Method, src::CodeInfo, mod::Module, params::Params, bon
         end
     end
     if !inlineable
-        inlineable = inline_worthy(src.code, src, mod, params, cost_threshold + bonus)
+        inlineable = inline_worthy(src.code, src, mod, params, union_penalties, cost_threshold + bonus)
     end
     return inlineable
 end
@@ -374,6 +374,7 @@ function optimize(me::InferenceState)
     end
 
     # determine and cache inlineability
+    union_penalties = false
     if !force_noinline
         # don't keep ASTs for functions specialized on a Union argument
         # TODO: this helps avoid a type-system bug mis-computing sparams during intersection
@@ -382,7 +383,7 @@ function optimize(me::InferenceState)
             for P in sig.parameters
                 P = unwrap_unionall(P)
                 if isa(P, Union)
-                    force_noinline = true
+                    union_penalties = true
                     break
                 end
             end
@@ -397,7 +398,7 @@ function optimize(me::InferenceState)
         if me.bestguess ⊑ Tuple && !isbitstype(widenconst(me.bestguess))
             bonus = me.params.inline_tupleret_bonus
         end
-        me.src.inlineable = isinlineable(def, me.src, me.mod, me.params, bonus)
+        me.src.inlineable = isinlineable(def, me.src, me.mod, me.params, union_penalties, bonus)
     end
     me.src.inferred = true
     if me.optimize && !(me.limited && me.parent !== nothing)
@@ -1656,7 +1657,8 @@ plus_saturate(x, y) = max(x, y, x+y)
 # known return type
 isknowntype(@nospecialize T) = (T == Union{}) || isconcretetype(T)
 
-function statement_cost(ex::Expr, line::Int, src::CodeInfo, mod::Module, params::Params)
+function statement_cost(ex::Expr, line::Int, src::CodeInfo, mod::Module,
+                        union_penalties::Bool, params::Params)
     head = ex.head
     if is_meta_expr(ex) || head == :copyast # not sure if copyast is right
         return 0
@@ -1664,7 +1666,7 @@ function statement_cost(ex::Expr, line::Int, src::CodeInfo, mod::Module, params:
     argcost = 0
     for a in ex.args
         if a isa Expr
-            argcost = plus_saturate(argcost, statement_cost(a, line, src, mod, params))
+            argcost = plus_saturate(argcost, statement_cost(a, line, src, mod, union_penalties, params))
         end
     end
     if head == :return || head == :(=)
@@ -1695,6 +1697,13 @@ function statement_cost(ex::Expr, line::Int, src::CodeInfo, mod::Module, params:
                     # impossible
                     # return plus_saturate(argcost, isknowntype(ex.typ) ? 1 : params.inline_nonleaf_penalty)
                     return argcost
+                elseif f === Main.Core.isa
+                    # If we're in a union context, we penalize type computations
+                    # on union types. In such cases, it is usually better to perform
+                    # union splitting on the outside.
+                    if union_penalties && isa(exprtype(ex.args[2], src, mod), Union)
+                        return plus_saturate(argcost, params.inline_nonleaf_penalty)
+                    end
                 elseif f == Main.Core.arrayref
                     return plus_saturate(argcost, isknowntype(ex.typ) ? 4 : params.inline_nonleaf_penalty)
                 end
@@ -1735,12 +1744,13 @@ end
 
 function inline_worthy(body::Array{Any,1}, src::CodeInfo, mod::Module,
                        params::Params,
+                       union_penalties::Bool=false,
                        cost_threshold::Integer=params.inline_cost_threshold)
     bodycost = 0
     for line = 1:length(body)
         stmt = body[line]
         if stmt isa Expr
-            thiscost = statement_cost(stmt, line, src, mod, params)::Int
+            thiscost = statement_cost(stmt, line, src, mod, union_penalties, params)::Int
         elseif stmt isa GotoNode
             # loops are generally always expensive
             # but assume that forward jumps are already counted for from
@@ -1756,16 +1766,18 @@ function inline_worthy(body::Array{Any,1}, src::CodeInfo, mod::Module,
 end
 
 function inline_worthy(body::Expr, src::CodeInfo, mod::Module, params::Params,
+                       union_penalties::Bool=false,
                        cost_threshold::Integer=params.inline_cost_threshold)
-    bodycost = statement_cost(body, typemax(Int), src, mod, params)
+    bodycost = statement_cost(body, typemax(Int), src, mod, union_penalties, params)
     return bodycost <= cost_threshold
 end
 
 function inline_worthy(@nospecialize(body), src::CodeInfo, mod::Module, params::Params,
+                       union_penalties::Bool=false,
                        cost_threshold::Integer=params.inline_cost_threshold)
     newbody = exprtype(body, src, mod)
     !isa(newbody, Expr) && return true
-    return inline_worthy(newbody, src, mod, params, cost_threshold)
+    return inline_worthy(newbody, src, mod, params, union_penalties, cost_threshold)
 end
 
 ssavalue_increment(@nospecialize(body), incr) = body
