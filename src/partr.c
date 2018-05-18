@@ -528,34 +528,43 @@ void NOINLINE JL_NORETURN task_wrapper(void)
     jl_task_t *task = ptls->current_task;
     task->started = 1;
 
-    uint32_t nargs;
-    jl_value_t **args;
-    if (!jl_is_svec(task->args)) {
-        nargs = 1;
-        args = &task->args;
-    }
-    else {
-        nargs = jl_svec_len(task->args);
-        args = jl_svec_data(task->args);
-    }
-
     jl_sym_t *new_state;
-    JL_TRY {
-        if (ptls->defer_signal) {
-            ptls->defer_signal = 0;
-            jl_sigint_safepoint(ptls);
-        }
-        JL_TIMING(ROOT);
-        ptls->world_age = jl_world_counter;
-        task->result = task->fptr(task->mfunc, args, nargs);
-        jl_gc_wb(task, task->result);
-        new_state = done_sym;
-    }
-    JL_CATCH {
-        task->result = task->exception = ptls->exception_in_transit;
-        jl_gc_wb(task, task->exception);
+
+    if (task->exception != jl_nothing) {
+        ptls->bt_size = rec_backtrace(ptls->bt_data, JL_MAX_BT_SIZE);
+        task->result = task->exception;
         jl_gc_wb(task, task->result);
         new_state = failed_sym;
+    }
+    else {
+        uint32_t nargs;
+        jl_value_t **args;
+        if (!jl_is_svec(task->args)) {
+            nargs = 1;
+            args = &task->args;
+        }
+        else {
+            nargs = jl_svec_len(task->args);
+            args = jl_svec_data(task->args);
+        }
+
+        JL_TRY {
+            if (ptls->defer_signal) {
+                ptls->defer_signal = 0;
+                jl_sigint_safepoint(ptls);
+            }
+            JL_TIMING(ROOT);
+            ptls->world_age = jl_world_counter;
+            task->result = task->fptr(task->mfunc, args, nargs);
+            jl_gc_wb(task, task->result);
+            new_state = done_sym;
+        }
+        JL_CATCH {
+            task->result = task->exception = ptls->exception_in_transit;
+            jl_gc_wb(task, task->exception);
+            jl_gc_wb(task, task->result);
+            new_state = failed_sym;
+        }
     }
 
     /* grain tasks must synchronize */
@@ -768,7 +777,8 @@ JL_DLLEXPORT jl_task_t *jl_task_new(jl_value_t *_args)
     If `sticky` is set, the task will only run on the current thread. If `detach`
     is set, the spawned task cannot be synced. Yields.
  */
-JL_DLLEXPORT jl_task_t *jl_task_spawn(jl_task_t *task, int8_t sticky, int8_t detach)
+JL_DLLEXPORT jl_task_t *jl_task_spawn(jl_task_t *task, jl_value_t *arg, int8_t err,
+                                      int8_t unyielding, int8_t sticky, int8_t detach)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
 
@@ -781,11 +791,21 @@ JL_DLLEXPORT jl_task_t *jl_task_spawn(jl_task_t *task, int8_t sticky, int8_t det
         if (detach)
             task->settings |= TASK_IS_DETACHED;
     }
+    if (err) {
+        task->exception = arg;
+        jl_gc_wb(task, task->exception);
+    }
+    else {
+        task->result = arg;
+        if (arg != jl_nothing)
+            jl_gc_wb(task, task->result);
+    }
     enqueue_task(task);
 
     /* only yield if we're running a non-sticky task */
-    if (!task->started // need a better solution to prevent yields in callbacks
-            &&  ptls->current_task  &&  !(ptls->current_task->settings & TASK_IS_STICKY))
+    if (!unyielding
+            &&  !task->started
+            &&  (ptls->current_task  &&  !(ptls->current_task->settings & TASK_IS_STICKY)))
         jl_task_yield(1);
 
     return task;

@@ -275,7 +275,7 @@ function put_unbuffered(c::Channel, v)
         end
     end
     taker = popfirst!(c.takers)
-    yield(taker, v) # immediately give taker a chance to run, but don't block the current task
+    schedule(taker, v) # immediately give taker a chance to run but don't block the current task
     return v
 end
 

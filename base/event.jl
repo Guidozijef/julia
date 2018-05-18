@@ -70,8 +70,9 @@ isempty(c::Condition) = ccall(:jl_condition_isempty, Cint, (Ref{Condition},), c)
 Add a [`Task`](@ref) to the scheduler's queue. The task will run when a thread is available
 to execute it.
 """
-schedule(t::Task, @nospecialize(arg = nothing); error=false) =
-    ccall(:jl_task_spawn, Ref{Task}, (Ref{Task},Int8,Int8), t, 0, 0)
+schedule(t::Task, @nospecialize(arg = nothing); error=false, unyielding=false) =
+    ccall(:jl_task_spawn, Ref{Task}, (Ref{Task},Any,Int8,Int8,Int8,Int8),
+          t, arg, error, unyielding, 0, 0)
 
 """
     fetch(t::Task)
@@ -440,7 +441,7 @@ function AsyncCondition(cb::Function)
     end)
     # must start the task right away so that it can wait for the AsyncCondition before
     # we re-enter the event loop. this avoids a race condition. see issue #12719
-    yield(waiter)
+    schedule(waiter)
     return async
 end
 
