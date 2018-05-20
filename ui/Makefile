@@ -9,6 +9,15 @@ override CFLAGS += $(JCFLAGS)
 override CXXFLAGS += $(JCXXFLAGS)
 override CPPFLAGS += $(JCPPFLAGS)
 
+ifeq ($(SANITIZE),1)
+ifeq ($(SANITIZE_THREAD),1)
+ifeq ($(SANITIZE_THREAD_ONLYJL),1)
+override CXXFLAGS+=-fsanitize=thread
+override CFLAGS+=-fsanitize=thread
+endif
+endif
+endif
+
 SRCS := repl
 
 HEADERS := $(addprefix $(JULIAHOME)/src/,julia.h julia_assert.h julia_threads.h julia_internal.h options.h) \

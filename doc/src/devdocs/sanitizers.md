@@ -38,4 +38,5 @@ by compiling with `SANITIZE_MEMORY=1`.
 ## Thread Sanitizer (TSAN)
 
 For debugging data-races and other threading related issues you can use Clang's [thread sanitizer (TSAN)](https://clang.llvm.org/docs/ThreadSanitizer.html)
-by compiling with `SANITIZE_THREAD=1`.
+by compiling with `SANITIZE_THREAD=1`. Iff you are only interested in Julia code and don't
+want to sanitize the Julia runtime you can add `SANITIZE_THREAD_ONLYJL=1`.

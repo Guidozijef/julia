@@ -563,8 +563,13 @@ SANITIZE_OPTS += -fsanitize=address -mllvm -asan-stack=0
 SANITIZE_LDFLAGS += -fsanitize=address
 endif
 ifeq ($(SANITIZE_THREAD),1)
+ifeq ($(SANITIZE_THREAD_ONLYJL),1)
+SANITIZE_OPTS += -DJL_TSAN_ENABLED
+SANITIZE_LDFLAGS += -DJL_TSAN_ENABLED
+else
 SANITIZE_OPTS += -fsanitize=thread
 SANITIZE_LDFLAGS += -fsanitize=thread
+endif
 endif
 ifeq ($(SANITIZE_OPTS),)
 $(error SANITIZE=1, but no sanitizer selected, set either SANITIZE_MEMORY, SANITIZE_THREAD, or SANITIZE_ADDRESS)
