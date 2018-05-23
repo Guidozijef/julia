@@ -1188,7 +1188,9 @@ typed_hcat(::Type{T}, X::Number...) where {T} = hvcat_fill(Matrix{T}(undef, 1,le
 vcat(V::AbstractVector...) = typed_vcat(promote_eltype(V...), V...)
 vcat(V::AbstractVector{T}...) where {T} = typed_vcat(T, V...)
 
-function _typed_vcat(::Type{T}, V::Union{AbstractVector{<:AbstractVector}, Tuple{Vararg{AbstractVector}}}) where T
+AbstractVecOrTuple{T} = Union{AbstractVector{T}, Tuple{Vararg{T}}}
+
+function _typed_vcat(::Type{T}, V::AbstractVecOrTuple{<:AbstractVector}) where T
     n::Int = 0
     for Vk in V
         n += length(Vk)
@@ -1209,7 +1211,7 @@ typed_hcat(::Type{T}, A::AbstractVecOrMat...) where {T} = _typed_hcat(T, A)
 hcat(A::AbstractVecOrMat...) = typed_hcat(promote_eltype(A...), A...)
 hcat(A::AbstractVecOrMat{T}...) where {T} = typed_hcat(T, A...)
 
-function _typed_hcat(::Type{T}, A::Union{AbstractVector{<:AbstractVector}, Tuple{Vararg{AbstractVecOrMat}}}) where T
+function _typed_hcat(::Type{T}, A::AbstractVecOrTuple{<:AbstractVecOrMat}) where T
     nargs = length(A)
     nrows = size(A[1], 1)
     ncols = 0
@@ -1246,7 +1248,7 @@ end
 vcat(A::AbstractVecOrMat...) = typed_vcat(promote_eltype(A...), A...)
 vcat(A::AbstractVecOrMat{T}...) where {T} = typed_vcat(T, A...)
 
-function _typed_vcat(::Type{T}, A::Union{AbstractVector{<:AbstractVecOrMat}, Tuple{Vararg{AbstractVecOrMat}}}) where T
+function _typed_vcat(::Type{T}, A::AbstractVecOrTuple{<:AbstractVecOrMat}) where T
     nargs = length(A)
     nrows = sum(a->size(a, 1), A)::Int
     ncols = size(A[1], 2)
