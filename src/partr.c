@@ -1132,13 +1132,9 @@ void jl_mark_enqueued_tasks(jl_gc_mark_cache_t *gc_cache, gc_mark_sp_t *sp)
     for (int16_t i = 0;  i < heap_p;  ++i)
         for (int16_t j = 0;  j < heaps[i].ntasks;  ++j)
             jl_gc_mark_obj(gc_cache, sp, heaps[i].tasks[j]);
-    for (int16_t i = 0;  i < jl_n_threads;  ++i) {
-        jl_task_t *t = sticky_taskqs[i].head;
-        while (t) {
-            jl_gc_mark_obj(gc_cache, sp, t);
-            t = t->next;
-        }
-    }
+    for (int16_t i = 0;  i < jl_n_threads;  ++i)
+        if (sticky_taskqs[i].head)
+            jl_gc_mark_obj(gc_cache, sp, sticky_taskqs[i].head);
 }
 
 
