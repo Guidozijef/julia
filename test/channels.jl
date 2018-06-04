@@ -33,6 +33,8 @@ end
         size = 0
         inc() = size += 1
         dec() = size -= 1
+        #TODO: too many below?
+        #@sync for i = 1:10^4
         @sync for i = 1:10^3
             @async (sleep(rand()); put!(c, i); inc())
             @async (sleep(rand()); take!(c); dec())
@@ -71,9 +73,10 @@ using Distributed
 @testset "channels bound to tasks" for N in [1, 10]
     # Normal exit of task
     c=Channel(N)
-    t=@schedule (yield();nothing)
-    bind(c, t)
-    fetch(t)
+    bind(c, @async (yield();nothing))
+    #t=@schedule (yield();nothing)
+    #bind(c, t)
+    #fetch(t)
     @test_throws InvalidStateException take!(c)
     @test !isopen(c)
 
@@ -229,8 +232,8 @@ end
     try
         newstderr = redirect_stderr()
         errstream = @async read(newstderr[1], String)
-        schedule(t)
-        #yield(t)
+        #schedule(t)
+        yield(t)
     finally
         redirect_stderr(oldstderr)
         close(newstderr[2])
