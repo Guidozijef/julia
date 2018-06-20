@@ -33,16 +33,13 @@ end
         size = 0
         inc() = size += 1
         dec() = size -= 1
-        #TODO: too many below?
-        #@sync for i = 1:10^4
-        @sync for i = 1:10^3
+        @sync for i = 1:10^4
             @async (sleep(rand()); put!(c, i); inc())
             @async (sleep(rand()); take!(c); dec())
         end
         @test size == 0
     end
-    # TODO: unbuffered channels aren't working
-    #testcpt(0)
+    testcpt(0)
     testcpt(1)
     testcpt(32)
     testcpt(Inf)
@@ -51,7 +48,7 @@ end
     # Test multiple "for" loops waiting on the same channel which
     # is closed after adding a few elements.
     c = Channel(32)
-    results = []
+    results = Vector{Int}()
     @sync begin
         for i in 1:20
             @async for ii in c
@@ -69,14 +66,10 @@ end
 
 # Tests for channels bound to tasks.
 using Distributed
-#@testset "channels bound to tasks" for N in [0, 10]
-@testset "channels bound to tasks" for N in [1, 10]
+@testset "channels bound to tasks" for N in [0, 10]
     # Normal exit of task
     c=Channel(N)
     bind(c, @async (yield();nothing))
-    #t=@schedule (yield();nothing)
-    #bind(c, t)
-    #fetch(t)
     @test_throws InvalidStateException take!(c)
     @test !isopen(c)
 
@@ -232,7 +225,6 @@ end
     try
         newstderr = redirect_stderr()
         errstream = @async read(newstderr[1], String)
-        #schedule(t)
         yield(t)
     finally
         redirect_stderr(oldstderr)
@@ -262,9 +254,7 @@ end
 end
 
 @testset "schedule_and_wait" begin
-    #t = @schedule(nothing)
     ct = current_task()
-    ccall(:jl_breakpoint, Cvoid, (Any,), ct)
     testobject = "testobject"
     # note: there is a low probability this test could fail, due to receiving network traffic simultaneously
     #@test length(Base.Workqueue) == 1

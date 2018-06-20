@@ -775,7 +775,7 @@ JL_DLLEXPORT jl_task_t *jl_task_new(jl_value_t *_args)
 /*  jl_task_spawn() -- enqueue a task for execution
 
     If `sticky` is set, the task will only run on the current thread. If `detach`
-    is set, the spawned task cannot be synced. Yields.
+    is set, the spawned task cannot be synced. Generally yields the calling task.
  */
 JL_DLLEXPORT jl_task_t *jl_task_spawn(jl_task_t *task, jl_value_t *arg, int8_t err,
                                       int8_t unyielding, int8_t sticky, int8_t detach)
@@ -802,7 +802,12 @@ JL_DLLEXPORT jl_task_t *jl_task_spawn(jl_task_t *task, jl_value_t *arg, int8_t e
     }
     enqueue_task(task);
 
-    /* only yield if we're running a non-sticky task */
+    /* Yielding here is important -- this is what allows depth first
+       scheduling. However, this breaks some assumptions made by parts of
+       the Julia runtime -- I/O and channels. So, we have to allow the caller
+       to disallow yielding. Also, if the task being scheduled has already
+       been started, or if the calling task is sticky, we don't yield.
+     */
     if (!unyielding
             &&  !task->started
             &&  (ptls->current_task  &&  !(ptls->current_task->settings & TASK_IS_STICKY)))

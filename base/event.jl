@@ -5,8 +5,6 @@
 
 if JULIA_PARTR
 
-# Global TODO: arg and error
-
 import Core.Condition
 
 """
@@ -88,9 +86,9 @@ Allow the scheduler to use the thread running the current task to run a higher p
 if one exists in the scheduler's queue. The current task will be re-queued.
 """
 yield() = ccall(:jl_task_yield, Any, (Cint,), 1)
-yield(t::Task, @nospecialize x = nothing) = yield() # TODO: cannot yieldto anymore
-yieldto(t::Task, @nospecialize x = nothing) = yield() # TODO: cannot yieldto anymore
-try_yieldto(undo, reftask::Ref{Task}) = yield() # TODO: cannot yieldto anymore
+yield(t::Task, @nospecialize x = nothing) = (schedule(t, x); yield())
+yieldto(t::Task, @nospecialize x = nothing) = yield(t, x)
+try_yieldto(undo, reftask::Ref{Task}) = yield(t, x)
 
 """
     wait()
