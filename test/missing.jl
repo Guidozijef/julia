@@ -380,25 +380,30 @@ end
     @test coalesce(missing, nothing) === nothing
 end
 
-@testset "sort $(eltype(X))" for (X, P) in
-    (([2, missing, -2, 5, missing], [3, 1, 4, 2, 5]),
-     ([NaN, missing, 5, -0.0, NaN, missing, Inf, 0.0, -Inf], [9, 4, 8, 3, 7, 1, 5, 2, 6]),
-     ([missing, "a", "c", missing, "b"], [2, 5, 3, 1, 4]))
-    @test isequal(sortperm(X), P)
-    @test isequal(sortperm(X, alg=QuickSort), P)
-    @test isequal(sortperm(X, alg=MergeSort), P)
+@testset "sort and sortperm with $(eltype(X))" for (X, P, RP) in
+    (([2, missing, -2, 5, missing], [3, 1, 4, 2, 5], [2, 5, 4, 1, 3]),
+     ([NaN, missing, 5, -0.0, NaN, missing, Inf, 0.0, -Inf],
+      [9, 4, 8, 3, 7, 1, 5, 2, 6], [2, 6, 1, 5, 7, 3, 8, 4, 9]),
+    ([NaN, missing, NaN, missing], [1, 3, 2, 4], [2, 4, 1, 3]),
+    ([missing, NaN, missing, NaN], [2, 4, 1, 3], [1, 3, 2, 4]),
+    ([missing, -1.0, missing, 2.4], [2, 4, 1, 3], [1, 3, 4, 2]),
+    (Union{Float64,Missing}[NaN, -1.0, NaN, 2.4], [2, 4, 1, 3], [1, 3, 4, 2]),
+    ([missing, "a", "c", missing, "b"], [2, 5, 3, 1, 4], [1, 4, 3, 5, 2]))
+    @test sortperm(X) == P
+    @test sortperm(X, alg=QuickSort) == P
+    @test sortperm(X, alg=MergeSort) == P
 
-    @test isequal(sort(X), X[P])
-    @test isequal(sort(X, alg=QuickSort), X[P])
-    @test isequal(sort(X, alg=MergeSort), X[P])
+    XP = X[P]
+    @test isequal(sort(X), XP)
+    @test isequal(sort(X, alg=QuickSort), XP)
+    @test isequal(sort(X, alg=MergeSort), XP)
 
-    RX = reverse(X[P])
+    @test sortperm(X, rev=true) == RP
+    @test sortperm(X, alg=QuickSort, rev=true) == RP
+    @test sortperm(X, alg=MergeSort, rev=true) == RP
 
-    @test isequal(X[sortperm(X, rev=true)], RX)
-    @test isequal(X[sortperm(X, alg=QuickSort, rev=true)], RX)
-    @test isequal(X[sortperm(X, alg=MergeSort, rev=true)], RX)
-
-    @test isequal(sort(X, rev=true), RX)
-    @test isequal(sort(X, alg=QuickSort, rev=true), RX)
-    @test isequal(sort(X, alg=MergeSort, rev=true), RX)
+    XRP = X[RP]
+    @test isequal(sort(X, rev=true), XRP)
+    @test isequal(sort(X, alg=QuickSort, rev=true), XRP)
+    @test isequal(sort(X, alg=MergeSort, rev=true), XRP)
 end

@@ -1034,7 +1034,7 @@ allowsmissing(::AbstractVector{Int},
               ::Perm{<:DirectOrdering,<:AbstractVector{T}}) where {T} =
     T >: Missing
 
-function nans2left!(testf::Function, v::AbstractVector, o::Ordering, lo::Int, hi::Int)
+function specials2left!(testf::Function, v::AbstractVector, o::Ordering, lo::Int, hi::Int)
     i = lo
     @inbounds while i <= hi && testf(o,v[i])
         i += 1
@@ -1049,7 +1049,7 @@ function nans2left!(testf::Function, v::AbstractVector, o::Ordering, lo::Int, hi
     end
     return i, hi
 end
-function nans2right!(testf::Function, v::AbstractVector, o::Ordering, lo::Int, hi::Int)
+function specials2right!(testf::Function, v::AbstractVector, o::Ordering, lo::Int, hi::Int)
     i = hi
     @inbounds while lo <= i && testf(o,v[i])
         i -= 1
@@ -1065,44 +1065,42 @@ function nans2right!(testf::Function, v::AbstractVector, o::Ordering, lo::Int, h
     return lo, i
 end
 
-function nans2left!(v::AbstractVector, o::Ordering)
+function specials2left!(v::AbstractVector, a::Algorithm, o::Ordering)
     lo, hi = first(axes(v,1)), last(axes(v,1))
     if allowsmissing(v, o)
-        # First move NaN and missing to the end
-        # Then do a second pass over them to move missing after NaN
-        i, hi = nans2left!((o, v) -> isnan(o, v) || ismissing(o, v),
-                            v, o, lo, hi)
-        nans2left!(ismissing, v, o, lo, i)
+        i, _ = specials2left!((v, o) -> ismissing(v, o) || isnan(v, o), v, o, lo, hi)
+        sort!(v, lo, i-1, a, o)
+        return i, hi
     else
-        i, hi = nans2left!(isnan, v, o, lo, hi)
+        return specials2left!(isnan, v, o, lo, hi)
     end
-    return i, hi
 end
-function nans2right!(v::AbstractVector, o::Ordering)
+function specials2right!(v::AbstractVector, a::Algorithm, o::Ordering)
     lo, hi = first(axes(v,1)), last(axes(v,1))
     if allowsmissing(v, o)
-        # First move NaN and missing to the end
-        # Then do a second pass over them to move missing after NaN
-        lo, i = nans2right!((o, v) -> isnan(o, v) || ismissing(o, v),
-                            v, o, lo, hi)
-        nans2right!(ismissing, v, o, i, hi)
+        _, i = specials2right!((v, o) -> ismissing(v, o) || isnan(v, o), v, o, lo, hi)
+        sort!(v, i+1, hi, a, o)
+        return lo, i
     else
-        lo, i = nans2right!(isnan, v, o, lo, hi)
+        return specials2right!(isnan, v, o, lo, hi)
     end
-    return lo, i
 end
 
-nans2end!(v::AbstractVector, o::ForwardOrdering) = nans2right!(v,o)
-nans2end!(v::AbstractVector, o::ReverseOrdering) = nans2left!(v,o)
-nans2end!(v::AbstractVector{Int}, o::Perm{<:ForwardOrdering}) = nans2right!(v,o)
-nans2end!(v::AbstractVector{Int}, o::Perm{<:ReverseOrdering}) = nans2left!(v,o)
+specials2end!(v::AbstractVector, a::Algorithm, o::ForwardOrdering) =
+    specials2right!(v,a,o)
+specials2end!(v::AbstractVector, a::Algorithm, o::ReverseOrdering) =
+    specials2left!(v,a,o)
+specials2end!(v::AbstractVector{Int}, a::Algorithm, o::Perm{<:ForwardOrdering}) =
+    specials2right!(v,a,o)
+specials2end!(v::AbstractVector{Int}, a::Algorithm, o::Perm{<:ReverseOrdering}) =
+    specials2left!(v,a,o)
 
 issignleft(o::ForwardOrdering, x::Floats) = lt(o, x, zero(x))
 issignleft(o::ReverseOrdering, x::Floats) = lt(o, x, -zero(x))
 issignleft(o::Perm, i::Int) = issignleft(o.order, o.data[i])
 
 function fpsort!(v::AbstractVector, a::Algorithm, o::Ordering)
-    i, j = lo, hi = nans2end!(v,o)
+    i, j = lo, hi = specials2end!(v,a,o)
     @inbounds while true
         while i <= j &&  issignleft(o,v[i]); i += 1; end
         while i <= j && !issignleft(o,v[j]); j -= 1; end
