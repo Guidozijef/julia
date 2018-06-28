@@ -1731,6 +1731,12 @@ Base.iterate(::Iterator27434, ::Any) = nothing
 @test @inferred splat27434(Iterator27434(1, 2, 3)) == (1, 2, 3)
 @test Core.Compiler.return_type(splat27434, Tuple{typeof(Iterators.repeated(1))}) == Union{}
 
+# PR #27843
+bar27843(x, y::Bool) = fill(x, 0)
+bar27843(x, y) = fill(x, ntuple(_ -> 0, y))::Array{typeof(x)}
+foo27843(x, y) = bar27843(x, y)
+@test Core.Compiler.return_type(foo27843, Tuple{Union{Float64,Int}, Any}) == Union{Array{Float64}, Array{Int}}
+
 # issue #27078
 f27078(T::Type{S}) where {S} = isa(T, UnionAll) ? f27078(T.body) : T
 T27078 = Vector{Vector{T}} where T
