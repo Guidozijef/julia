@@ -31,8 +31,9 @@ mutable struct Channel{T} <: AbstractChannel
     sz_max::Int                          # maximum size of channel
     lock::SpinLock
 
-    # Used when sz_max == 0, i.e., an unbuffered channel.
-    waiters::Atomic{Int}
+    # The following fields synchronize tasks that use unbuffered channels
+    # (sz_max == 0).
+    nwaiters::Atomic{Int}
     takers::Vector{Task}
     putters::Vector{Task}
 
@@ -347,7 +348,7 @@ function put_unbuffered(c::Channel, v)
             return v
         else
             unlock(c.lock)
-            c.waiters[] > 0 && notify(c.cond_take, nothing, false, false)
+            c.nwaiters[] > 0 && notify(c.cond_take, nothing, false, false)
             wait(c.cond_put)
         end
     end
@@ -465,6 +466,8 @@ function take_unbuffered(c::Channel{T}) where T
     unlock(c.lock)
     notify(c.cond_put, nothing, false, false)
     try
+        # We wait here for a putter which will reschedule us with the
+        # value it is putting (which is returned by this wait call).
         return wait()::T
     catch ex
         lock(c.lock)
@@ -513,11 +516,8 @@ on a [`put!`](@ref).
 isready(c::Channel) = n_avail(c) > 0
 
 if JULIA_PARTR
-function n_avail(c::Channel)
-    lock(c.lock)
-    n = isbuffered(c) ? length(c.data) : length(c.putters)
-    unlock(c.lock)
-    return n
+function n_avail(c::Channel) = lock(c.lock) do
+    isbuffered(c) ? length(c.data) : length(c.putters)
 end
 else # !JULIA_PARTR
 n_avail(c::Channel) = isbuffered(c) ? length(c.data) : length(c.putters)
@@ -534,11 +534,11 @@ end
 
 if JULIA_PARTR
 function wait_unbuffered(c::Channel)
-    atomic_add!(c.waiters, 1)
+    atomic_add!(c.nwaiters, 1)
     try
         wait_impl(c)
     finally
-        atomic_sub!(c.waiters, 1)
+        atomic_sub!(c.nwaiters, 1)
     end
     nothing
 end

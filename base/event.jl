@@ -82,13 +82,14 @@ fetch(t::Task) = ccall(:jl_task_sync, Any, (Ref{Task},), t)
 """
     yield()
 
-Allow the scheduler to use the thread running the current task to run a higher priority task,
-if one exists in the scheduler's queue. The current task will be re-queued.
+Allow the scheduler to use the thread running the current task to run a higher
+priority task (i.e. earlier in the depth-first graph), if one exists in the
+scheduler's queue. The current task will be re-queued.
 """
 yield() = ccall(:jl_task_yield, Any, (Cint,), 1)
 yield(t::Task, @nospecialize x = nothing) = (schedule(t, x); yield())
 yieldto(t::Task, @nospecialize x = nothing) = yield(t, x)
-try_yieldto(undo, reftask::Ref{Task}) = yield(t, x)
+try_yieldto(undo, reftask::Ref{Task}) = (schedule(reftask[]); yield())
 
 """
     wait()

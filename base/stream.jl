@@ -278,15 +278,15 @@ function wait_readbyte(x::LibuvStream, c::UInt8)
             wait(x.readnotify)
         end
     finally
-        if JULIA_PARTR
+        @static if JULIA_PARTR
             if isempty(x.readnotify)
                 stop_reading(x) # stop reading iff there are currently no other read clients of the stream
             end
-        else
+        else # !JULIA_PARTR
             if isempty(x.readnotify.waitq)
                 stop_reading(x) # stop reading iff there are currently no other read clients of the stream
             end
-        end
+        end # !JULIA_PARTR
         unpreserve_handle(x)
     end
     nothing
@@ -307,15 +307,15 @@ function wait_readnb(x::LibuvStream, nb::Int)
             wait(x.readnotify)
         end
     finally
-        if JULIA_PARTR
+        @static if JULIA_PARTR
             if isempty(x.readnotify)
                 stop_reading(x) # stop reading iff there are currently no other read clients of the stream
             end
-        else
+        else # !JULIA_PARTR
             if isempty(x.readnotify.waitq)
                 stop_reading(x) # stop reading iff there are currently no other read clients of the stream
             end
-        end
+        end # !JULIA_PARTR
         if oldthrottle <= x.throttle <= nb
             x.throttle = oldthrottle
         end
@@ -719,15 +719,15 @@ function readbytes!(s::LibuvStream, a::Vector{UInt8}, nb::Int)
             return bytesavailable(newbuf)
         finally
             s.buffer = sbuf
-            if JULIA_PARTR
+            @static if JULIA_PARTR
                 if !isempty(s.readnotify)
                     start_reading(s) # resume reading iff there are currently other read clients of the stream
                 end
-            else
+            else # !JULIA_PARTR
                 if !isempty(s.readnotify.waitq)
                     start_reading(s) # resume reading iff there are currently other read clients of the stream
                 end
-            end
+            end # !JULIA_PARTR
         end
     end
     @assert false # unreachable
@@ -761,15 +761,15 @@ function unsafe_read(s::LibuvStream, p::Ptr{UInt8}, nb::UInt)
             nb == bytesavailable(newbuf) || throw(EOFError())
         finally
             s.buffer = sbuf
-            if JULIA_PARTR
+            @static if JULIA_PARTR
                 if !isempty(s.readnotify)
                     start_reading(s) # resume reading iff there are currently other read clients of the stream
                 end
-            else
+            else # !JULIA_PARTR
                 if !isempty(s.readnotify.waitq)
                     start_reading(s) # resume reading iff there are currently other read clients of the stream
                 end
-            end
+            end # !JULIA_PARTR
         end
     end
     nothing

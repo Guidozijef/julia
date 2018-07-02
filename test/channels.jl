@@ -59,6 +59,7 @@ end
         for i in 1:5
             put!(c,i)
         end
+        sleep(1.0)
         close(c)
     end
     @test sum(results) == 15
@@ -127,7 +128,7 @@ using Distributed
 
     # channeled_tasks
     for T in [Any, Int]
-        chnls, tasks = Base.channeled_tasks(2, (c1,c2)->(@assert take!(c1)==1; put!(c2,2)); ctypes=[T,T], csizes=[N,N])
+        chnls, tasks = Base.channeled_tasks(2, (c1,c2)->(@assert take!(c1)==1; put!(c2,2); sleep(1.0)); ctypes=[T,T], csizes=[N,N])
         put!(chnls[1], 1)
         @test take!(chnls[2]) == 2
         @test_throws InvalidStateException wait(chnls[1])
