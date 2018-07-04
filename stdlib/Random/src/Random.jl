@@ -26,7 +26,7 @@ export srand,
        shuffle, shuffle!,
        randperm, randperm!,
        randcycle, randcycle!,
-       AbstractRNG, MersenneTwister, RandomDevice,
+       AbstractRNG, MersenneTwister, RandomDevice, RANDOM_DEVICE,
        randjump
 
 
@@ -244,6 +244,14 @@ rand(                ::Type{X}, d::Integer, dims::Integer...) where {X} = rand(X
 function __init__()
     try
         srand()
+        if !Sys.iswindows()
+            # open /dev/urandom "in-place" (in RANDOM_DEVICE.file)
+            RANDOM_DEVICE.file.handle = pointer(RANDOM_DEVICE.file.ios)
+            systemerror("opening file /dev/urandom",
+                ccall(:ios_file, Ptr{Cvoid},
+                      (Ptr{UInt8}, Cstring, Cint, Cint, Cint, Cint),
+                      RANDOM_DEVICE.file.ios, "/dev/urandom", 1, 0, 0, 0) == C_NULL)
+        end
     catch ex
         Base.showerror_nostdio(ex,
             "WARNING: Error during initialization of module Random")

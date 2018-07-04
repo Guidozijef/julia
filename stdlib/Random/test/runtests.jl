@@ -677,3 +677,7 @@ end
     @test eltype(Random.UInt52(UInt128)) == UInt128
     @test eltype(Random.UInt104()) == UInt128
 end
+
+@testset "RANDOM_DEVICE" begin
+    @test rand(Random.RANDOM_DEVICE) isa Float64
+end

@@ -67,6 +67,7 @@ RandomDevice
 RandomDevice(::Nothing) = RandomDevice()
 srand(rng::RandomDevice) = rng
 
+const RANDOM_DEVICE = RandomDevice()
 
 ## MersenneTwister
 
