@@ -516,7 +516,7 @@ on a [`put!`](@ref).
 isready(c::Channel) = n_avail(c) > 0
 
 if JULIA_PARTR
-function n_avail(c::Channel) = lock(c.lock) do
+n_avail(c::Channel) = lock(c.lock) do
     isbuffered(c) ? length(c.data) : length(c.putters)
 end
 else # !JULIA_PARTR

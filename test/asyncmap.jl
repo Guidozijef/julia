@@ -39,7 +39,7 @@ b=asyncmap(identity, a)
 @test size(a) == size(b)
 
 # check with an iterator that does not implement size()
-c=Channel(32); foreach(i->put!(c,i), 1:10); close(c)
+c=Channel{Int}(32); foreach(i->put!(c,i), 1:10); close(c)
 b=asyncmap(identity, c)
 @test Int[1:10...] == b
 @test size(b) == (10,)

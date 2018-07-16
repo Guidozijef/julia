@@ -55,11 +55,11 @@ end
                 push!(results, ii)
             end
         end
-        sleep(1.0)
+        sleep(0.2)
         for i in 1:5
             put!(c,i)
         end
-        sleep(1.0)
+        sleep(0.2)
         close(c)
     end
     @test sum(results) == 15
@@ -128,7 +128,7 @@ using Distributed
 
     # channeled_tasks
     for T in [Any, Int]
-        chnls, tasks = Base.channeled_tasks(2, (c1,c2)->(@assert take!(c1)==1; put!(c2,2); sleep(1.0)); ctypes=[T,T], csizes=[N,N])
+        chnls, tasks = Base.channeled_tasks(2, (c1,c2)->(@assert take!(c1)==1; put!(c2,2); sleep(0.2)); ctypes=[T,T], csizes=[N,N])
         put!(chnls[1], 1)
         @test take!(chnls[2]) == 2
         @test_throws InvalidStateException wait(chnls[1])
@@ -238,7 +238,7 @@ end
         error in running finalizer: ErrorException("task switch not allowed from inside gc finalizer")
         error in running finalizer: ErrorException("task switch not allowed from inside gc finalizer")
         """
-#= TODO: this is not a useful test, especially as there's no Workqueue any more
+#= TODO: there's no Workqueue any more
     # test for invalid state in Workqueue during yield
     t = @async nothing
     t.state = :invalid
@@ -255,11 +255,14 @@ end
 end
 
 @testset "schedule_and_wait" begin
+    t = @async(nothing)
     ct = current_task()
     testobject = "testobject"
     # note: there is a low probability this test could fail, due to receiving network traffic simultaneously
+    # TODO: there's no Workqueue any more
     #@test length(Base.Workqueue) == 1
     @test Base.schedule_and_wait(ct, 8) == 8
+    # TODO: there's no Workqueue any more
     #@test isempty(Base.Workqueue)
     @test Base.schedule_and_wait(ct, testobject) === testobject
 end
@@ -268,6 +271,7 @@ end
     t = @task(nothing)
     ct = current_task()
     testerr = ErrorException("expected")
+    # TODO: throwto() is unimplemented
     #@async Base.throwto(t, testerr)
     @async schedule(t, testerr, error=true)
     @test try
@@ -278,8 +282,9 @@ end
     end === testerr
 end
 
+#= TODO: this testset depends on task execution ordering and that makes no
+# sense with threads!
 @testset "Timer / AsyncCondition triggering and race #12719" begin
-    #= TODO: test below depends on ordering and that makes no sense with threads; write new ones!
     tc = Ref(0)
     t = Timer(0) do t
         tc[] += 1
@@ -300,7 +305,6 @@ end
     @test !isopen(t)
     sleep(0.1)
     @test tc[] == 0
-    =#
 
     tc = Ref(0)
     async = Base.AsyncCondition() do async
@@ -344,6 +348,7 @@ end
     sleep(0.1)
     @test tc[] == 1
 end
+=#
 
 @testset "check_channel_state" begin
     c = Channel(1)
