@@ -797,7 +797,7 @@ JL_DLLEXPORT int jl_isa_compileable_sig(
         if (!definition->isva || np <= nargs)
             return 0;
     }
-    else if (definition->isva ? np != nargs : np < nargs) {
+    else if (definition->isva ? np < nargs - 1 : np != nargs) {
         return 0;
     }
 
