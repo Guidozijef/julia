@@ -370,6 +370,19 @@ struct InsertionSortAlg <: Algorithm end
 struct QuickSortAlg     <: Algorithm end
 struct MergeSortAlg     <: Algorithm end
 
+"""
+    PartialQuickSort{T <: Union{Int,OrdinalRange}}
+
+Indicate that a sorting function should use the partial quick sort
+algorithm, which is *not* stable.
+
+Partial quick sort returns the smallest `k` elements sorted from smallest
+to largest, finding them and sorting them using [`QuickSort`](@ref).
+A stable sort preserves the ordering of elements which
+compare equal (e.g. "a" and "A" in a sort of letters which
+ignores case). Partial quick sort can be performed in-place in memory.
+Like [`MergeSort`](@ref), it is a divide-and-conquer sort algorithm.
+"""
 struct PartialQuickSort{T <: Union{Int,OrdinalRange}} <: Algorithm
     k::T
 end
@@ -379,8 +392,50 @@ Base.last(a::PartialQuickSort{Int}) = a.k
 Base.first(a::PartialQuickSort) = first(a.k)
 Base.last(a::PartialQuickSort) = last(a.k)
 
+"""
+    InsertionSort
+
+Indicate that a sorting function should use the insertion sort
+algorithm, which is stable.
+
+A stable sort preserves the ordering of elements which
+compare equal (e.g. "a" and "A" in a sort of letters
+which ignores case). Insertion sort traverses the collection one element
+at a time, inserting each element into its correct, sorted position in
+the output list. This can be done in-place in memory.
+Insertion sort has quadratic performance in the number of elements
+in the collection: it is well-suited to small collections but should
+not be used for large ones.
+"""
 const InsertionSort = InsertionSortAlg()
+"""
+    QuickSort
+
+Indicate that a sorting function should use the quick sort
+algorithm, which is *not* stable.
+
+A stable sort preserves the ordering of elements which
+compare equal (e.g. "a" and "A" in a sort of letters which
+ignores case). Quick sort can be performed in-place in memory.
+Like [`MergeSort`](@ref), it is a divide-and-conquer sort algorithm.
+Quick sort has good performance for large collections.
+"""
 const QuickSort     = QuickSortAlg()
+"""
+    MergeSort
+
+Indicate that a sorting function should use the merge sort
+algorithm, which is stable.
+
+A stable sort preserves the ordering of elements which compare
+equal (e.g. "a" and "A" in a sort of letters which ignores
+case). Merge sort divides the collection into
+subcollections and repeatedly merges them, sorting each
+subcollection at each step, until the entire
+collection has been recombined in sorted form. Merge sort
+is *not* in-place.
+Like [`QuickSort`](@ref), it is a divide-and-conquer sort algorithm.
+"""
 const MergeSort     = MergeSortAlg()
 
 const DEFAULT_UNSTABLE = QuickSort
